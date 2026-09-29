@@ -1,8 +1,8 @@
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
-import { useEffect, useRef, useState } from 'react'
-import { useNavigate } from 'react-router'
-import { api, getRoutes, getStations, type Route, type RouteShape, type Vehicle } from '../api'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { useNavigate, useSearchParams } from 'react-router'
+import { api, getRoutes, getStations, stationRouteIds, type Route, type RouteShape, type Vehicle } from '../api'
 import { Status } from '../components'
 import { locationErrorMessage, nearestStations, OUT_OF_AREA_MILES } from '../geo'
 import { decodePolyline } from '../polyline'
@@ -10,6 +10,10 @@ import { usePolling, useTitle } from '../usePolling'
 
 const REFRESH_MS = 10_000
 const BOSTON: L.LatLngExpression = [42.355, -71.08]
+
+// Filter chips. A line matches its route IDs by prefix: "Green" is all four branches.
+const LINES = ['Red', 'Orange', 'Blue', 'Green', 'Mattapan']
+const onLine = (line: string | null, routeId: string) => !line || routeId.startsWith(line)
 
 // Popup/tooltip content as text, so names from the API are never parsed as HTML.
 const text = (s: string) => Object.assign(document.createElement('div'), { innerText: s })
@@ -34,10 +38,13 @@ function trainIcon(color: string, bearing: number | null) {
 
 export default function MapPage() {
   const navigate = useNavigate()
+  const [params, setParams] = useSearchParams()
+  const line = LINES.find((l) => l === params.get('line')) ?? null // in the URL, so Back and shared links keep it
   const routes = usePolling(getRoutes, 'routes')
   const stations = usePolling(getStations, 'stations')
   const shapes = usePolling(() => api<RouteShape[]>('/routes/shapes'), 'shapes')
   const vehicles = usePolling(() => api<Vehicle[]>('/vehicles'), 'vehicles', REFRESH_MS)
+  const tracks = useMemo(() => shapes.data?.map((s) => ({ routeId: s.routeId, points: decodePolyline(s.polyline) })), [shapes.data])
 
   const container = useRef<HTMLDivElement>(null)
   const trains = useRef(new Map<string, L.Marker>())
@@ -67,19 +74,29 @@ export default function MapPage() {
 
   // Lines
   useEffect(() => {
-    if (!map || !shapes.data) return
+    if (!map || !tracks) return
     const color = (id: string) => routes.data?.find((r) => r.id === id)?.color ?? 'gray'
     const layer = L.layerGroup(
-      shapes.data.map((s) => L.polyline(decodePolyline(s.polyline), { color: color(s.routeId), weight: 5, opacity: 0.9 })),
+      tracks
+        .filter((t) => onLine(line, t.routeId))
+        .map((t) => L.polyline(t.points, { color: color(t.routeId), weight: 5, opacity: 0.9 })),
     ).addTo(map)
     return () => void layer.remove()
-  }, [map, shapes.data, routes.data])
+  }, [map, tracks, routes.data, line])
+
+  // Picking a line zooms to fit it; All goes back to the whole system.
+  useEffect(() => {
+    if (!map || !tracks) return
+    const points = tracks.filter((t) => line && onLine(line, t.routeId)).flatMap((t) => t.points)
+    if (points.length) map.fitBounds(L.latLngBounds(points), { padding: [16, 16] })
+    else map.setView(BOSTON, 12)
+  }, [map, tracks, line])
 
   // Stations: tap to open departures
   useEffect(() => {
     if (!map || !stations.data) return
     const layer = L.layerGroup(
-      stations.data.map((s) =>
+      stations.data.filter((s) => stationRouteIds(s).some((id) => onLine(line, id))).map((s) =>
         L.circleMarker([s.latitude, s.longitude], {
           pane: 'stations', radius: 6, color: '#222', weight: 2, fillColor: 'white', fillOpacity: 1,
         })
@@ -88,13 +105,13 @@ export default function MapPage() {
       ),
     ).addTo(map)
     return () => void layer.remove()
-  }, [map, stations.data, navigate])
+  }, [map, stations.data, navigate, line])
 
   // Trains: move existing markers instead of recreating them, so an open popup survives a refresh.
   useEffect(() => {
     if (!map || !vehicles.data) return
     const live = new Set<string>()
-    for (const v of vehicles.data) {
+    for (const v of vehicles.data.filter((v) => onLine(line, v.routeId))) {
       live.add(v.id)
       const route = routes.data?.find((r) => r.id === v.routeId)
       let marker = trains.current.get(v.id)
@@ -115,7 +132,7 @@ export default function MapPage() {
         trains.current.delete(id)
       }
     }
-  }, [map, vehicles.data, routes.data])
+  }, [map, vehicles.data, routes.data, line])
 
   // Center on the user with a blue dot, unless they're nowhere near the T.
   const locate = () => {
@@ -147,9 +164,28 @@ export default function MapPage() {
     <>
       <h1 className="text-2xl font-bold">Live map</h1>
       <Status error={vehicles.error ?? shapes.error ?? stations.error} />
+      <div role="radiogroup" aria-label="Show line" className="-mx-4 flex gap-2 overflow-x-auto px-4 [scrollbar-width:none]">
+        {[null, ...LINES].map((l) => {
+          const color = l ? routes.data?.find((r) => r.id.startsWith(l))?.color : undefined
+          const selected = line === l
+          return (
+            <button
+              key={l ?? 'all'}
+              role="radio"
+              aria-checked={selected}
+              onClick={() => setParams(l ? { line: l } : {}, { replace: true })}
+              className={`flex min-h-9 shrink-0 items-center gap-1.5 rounded-full px-3.5 text-sm font-semibold shadow-sm ${selected ? 'text-white' : 'bg-white dark:bg-neutral-900'} ${selected && !l ? 'bg-neutral-900 dark:bg-white dark:text-neutral-900' : ''}`}
+              style={selected && color ? { backgroundColor: color } : undefined}
+            >
+              {l && !selected && <span className="size-2.5 rounded-full" style={{ backgroundColor: color ?? 'gray' }} />}
+              {l ?? 'All'}
+            </button>
+          )
+        })}
+      </div>
       {/* isolate keeps Leaflet's high z-indexes below the sticky header */}
       <div className="relative isolate">
-        <div ref={container} className="h-[calc(100dvh-16rem-env(safe-area-inset-top)-env(safe-area-inset-bottom))] min-h-80 overflow-hidden rounded-xl shadow-sm" />
+        <div ref={container} className="h-[calc(100dvh-19rem-env(safe-area-inset-top)-env(safe-area-inset-bottom))] min-h-80 overflow-hidden rounded-xl shadow-sm" />
         <button
           onClick={locate}
           disabled={locating}
