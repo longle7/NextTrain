@@ -103,6 +103,22 @@ New to the code? Start with **[docs/backend.md](docs/backend.md)**: how requests
 - `/alerts` returns every subway alert with the routes, stations, and directions it covers; the app decides what each line, station, and commute shows. A line's status counts alerts of severity 3 and up (MBTA uses 1-2 for things like a closed staircase, which still show on that station's page).
 - The live map (`/map`) uses Leaflet with OpenStreetMap tiles, loaded only when the map opens. Line shapes are MBTA's canonical (regular service) patterns. OpenStreetMap's tile servers are for light use; switch to a commercial tile provider before launch.
 
+## Hosting (Azure)
+
+Merging to `main` deploys automatically once CI passes (`.github/workflows/deploy.yml`):
+
+| Piece | Azure service | Cost |
+|---|---|---|
+| Web app | Static Web Apps (Free) | $0 |
+| API | Container Apps (Consumption, 0.25 vCPU, scales to zero, at most 1 replica) running the root `Dockerfile`, image on ghcr.io | ~$0–3/month |
+| Database | Azure SQL Database, Basic (5 DTU, 2 GB) | ~$5/month |
+
+A $10/month budget on the resource group emails the subscription owner at 50%, 80%, and 100% of actual spend and at 100% forecast. Azure has no hard cap on pay-as-you-go spending, so the limits above (one replica, fixed-price database) are what keep the bill small.
+
+Production settings live in Azure, never in the repo: the connection string and MBTA key are Container App secrets, and `Cors__AllowedOrigins__2` adds the web app's address to the allowed origins. GitHub signs in to Azure with OIDC (no stored password) using the `AZURE_CLIENT_ID`, `AZURE_TENANT_ID`, and `AZURE_SUBSCRIPTION_ID` repository variables; `API_URL` is the address the web app calls, and the `SWA_DEPLOY_TOKEN` secret uploads the web app.
+
+The API scales to zero when idle, so the first request after a quiet spell takes a few seconds while it starts. Set the Container App's minimum replicas to 1 (about $4 more a month) to avoid that.
+
 ## Road to the App Store
 
 The web app is built to be wrapped as a native iPhone app with [Capacitor](https://capacitorjs.com). **[docs/app-store](docs/app-store/README.md)** has the listing kit: screenshots, name, description, keywords, App Privacy answers, review notes, Info.plist strings, and the submission checklist.
@@ -116,7 +132,7 @@ Ready:
 
 Still to do:
 
-1. **Host the API over HTTPS.** The app side is ready: build the web app with `VITE_API_URL=https://<api-host> npm run build` (it defaults to the relative `/api`), the API already allows the Capacitor origins (`Cors:AllowedOrigins` in `appsettings.json`), and `/health` is there for the host's health probe.
+1. **Custom domain.** The API is hosted on Azure (see [Hosting](#hosting-azure)); point the app's domain at it and build the iPhone app with `VITE_API_URL=https://<api-host>`.
 2. **Optional: Sign in with Apple**, for commutes that follow you across devices. App Review doesn't require it (the app has no third-party login), and Delete my data already covers Apple's data-deletion rule.
 3. **Push notifications** for commutes ("your train leaves in 5 min") via APNs. The `NotificationSubscription` table is ready for it, and it gives the app native value beyond a website (App Review guideline 4.2).
 4. **Build and ship on a Mac.** The iPhone app's Xcode project is in `NextTrain.Web/ios` (Capacitor, bundle ID `com.longle7.nexttrain`). Run `VITE_API_URL=https://<api-host> npm run ios`, then `npx cap open ios`, set your signing team, and archive. You'll need an Apple Developer account.

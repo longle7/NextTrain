@@ -26,8 +26,10 @@ var builder = WebApplication.CreateBuilder(args);
 // ---- 1. Services -------------------------------------------------------------------------------------------
 
 // Database: EF Core over SQL Server. One NextTrainDbContext per request ("scoped").
+// EnableRetryOnFailure retries the brief connection drops Azure SQL has during maintenance, instead of failing.
 builder.Services.AddDbContext<NextTrainDbContext>(options =>
-    options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
+    options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection"),
+        sql => sql.EnableRetryOnFailure()));
 
 // MBTA client: an HttpClient that gives up after 10 seconds and retries brief failures (5xx, 408, network)
 // twice with a short backoff. 429 "too many requests" isn't retried: the in-memory cache keeps us under the limit.
