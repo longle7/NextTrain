@@ -2,9 +2,9 @@
 
 [![CI](https://github.com/longle7/NextTrain/actions/workflows/ci.yml/badge.svg)](https://github.com/longle7/NextTrain/actions/workflows/ci.yml)
 
-REST API for Boston MBTA subway commuters: find the nearest station and see real-time train predictions.
+Real-time train times for Boston MBTA subway commuters: browse lines and stations, see live departures, and save commutes.
 
-Built with .NET 10, ASP.NET Core, EF Core, and SQL Server, using the [MBTA V3 API](https://api-v3.mbta.com).
+Built with .NET 10, ASP.NET Core, EF Core, and SQL Server, with a React + TypeScript + Tailwind web app, using the [MBTA V3 API](https://api-v3.mbta.com).
 
 ## Endpoints
 
@@ -38,17 +38,18 @@ docker compose up --build
 curl -X POST http://localhost:5080/admin/import-stations
 ```
 
-API at http://localhost:5080, Swagger at http://localhost:5080/swagger.
+Web app at http://localhost:5173, API at http://localhost:5080, Swagger at http://localhost:5080/swagger.
 
 ## Run locally
 
-Requires the .NET 10 SDK and SQL Server on `localhost` (Windows authentication).
+Requires the .NET 10 SDK, Node 24, and SQL Server on `localhost` (Windows authentication).
 
 ```
-dotnet run --project NextTrain.Api
+dotnet run --project NextTrain.Api        # API at http://localhost:5112, database created on startup
+cd NextTrain.Web && npm install && npm run dev   # web app at http://localhost:5173
 ```
 
-API at http://localhost:5112. The database is created on startup.
+Import stations once with `POST http://localhost:5112/admin/import-stations`. The web dev server forwards `/api/*` to the API.
 
 ## MBTA API key
 
@@ -63,15 +64,17 @@ $env:MBTA_API_KEY = "<key>"; docker compose up                           # Docke
 
 ```
 dotnet test
+cd NextTrain.Web && npm run lint && npm test && npm run build
 ```
 
-Tests run against a real SQL Server database (`NextTrainDb_Tests` on `localhost` by default; override with the `NEXTTRAIN_TEST_DB` connection string). MBTA calls are faked. CI runs the same tests against a SQL Server container on every pull request.
+API tests run against a real SQL Server database (`NextTrainDb_Tests` on `localhost` by default; override with the `NEXTTRAIN_TEST_DB` connection string). MBTA calls are faked. Web tests (Vitest) cover the countdown and departure grouping logic. CI runs all of it on every pull request.
 
 ## Project layout
 
 - `NextTrain.Core`: domain entities, service interfaces, MBTA DTOs
 - `NextTrain.Api`: controllers, EF Core DbContext and migrations, MBTA client, station import and lookup
 - `NextTrain.Tests`: xUnit unit, integration, and HTTP endpoint tests
+- `NextTrain.Web`: React web app (Vite, Tailwind, React Router); served by nginx in Docker, which proxies `/api` to the API
 
 ## Design notes
 

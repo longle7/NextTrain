@@ -37,3 +37,17 @@ jobs:
       - run: dotnet build NextTrain.slnx
 
       - run: dotnet test NextTrain.slnx --no-build
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: NextTrain.Web/package-lock.json
+
+      - name: Web lint, test, build
+        working-directory: NextTrain.Web
+        run: |
+          npm ci
+          npm run lint
+          npm test
+          npm run build
