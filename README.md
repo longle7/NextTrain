@@ -14,7 +14,7 @@ Built with .NET 10, ASP.NET Core, EF Core, and SQL Server, using the [MBTA V3 AP
 | GET | `/stations/nearest?lat=&lon=&route=` | Nearest station to a location |
 | GET | `/stations/{mbtaStopId}` | One station, e.g. `place-pktrm` |
 | GET | `/stations/{mbtaStopId}/predictions?route=&direction=` | Upcoming trains, soonest first |
-| GET | `/admin/import-stations` | Import subway stations from MBTA |
+| POST | `/admin/import-stations` | Import subway stations from MBTA (Development only) |
 
 Routes: `Red`, `Mattapan`, `Orange`, `Blue`, `Green-B`, `Green-C`, `Green-D`, `Green-E`. Direction is `0` or `1`.
 
@@ -22,7 +22,7 @@ Routes: `Red`, `Mattapan`, `Orange`, `Blue`, `Green-B`, `Green-C`, `Green-D`, `G
 
 ```
 docker compose up --build
-curl http://localhost:5080/admin/import-stations
+curl -X POST http://localhost:5080/admin/import-stations
 ```
 
 API at http://localhost:5080, Swagger at http://localhost:5080/swagger.

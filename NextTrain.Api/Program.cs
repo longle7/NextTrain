@@ -36,20 +36,20 @@ using (var scope = app.Services.CreateScope())
     scope.ServiceProvider.GetRequiredService<NextTrainDbContext>().Database.Migrate();
 }
 
-// Swagger middleware (Development only)
+// Development only: Swagger, and the station import (not mapped at all in other environments).
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
     app.UseSwaggerUI();
+
+    // POST /admin/import-stations
+    app.MapPost("/admin/import-stations", async (IStationImportService importer) =>
+    {
+        await importer.ImportStationsAsync();
+        return Results.Ok("Stations imported.");
+    });
 }
 
 app.MapControllers();
-
-// Optional: one-time import endpoint, e.g., GET /admin/import-stations
-app.MapGet("/admin/import-stations", async (IStationImportService importer) =>
-{
-    await importer.ImportStationsAsync();
-    return Results.Ok("Stations imported.");
-});
 
 app.Run();

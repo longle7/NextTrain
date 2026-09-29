@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
@@ -131,5 +132,31 @@ public class StationsEndpointTests : IDisposable
         var response = await _client.GetAsync("/stations/place-pktrm/predictions");
 
         Assert.Equal(HttpStatusCode.ServiceUnavailable, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task ImportStations_Development_PostOnly()
+    {
+        _mbta.StopsByRoute["Orange"] = new()
+        {
+            new MbtaStopDto { Id = "place-dwnxg", Attributes = new() { Name = "Downtown Crossing", Latitude = 42.3555, Longitude = -71.0605 } }
+        };
+
+        var get = await _client.GetAsync("/admin/import-stations");
+        var post = await _client.PostAsync("/admin/import-stations", null);
+
+        Assert.Equal(HttpStatusCode.MethodNotAllowed, get.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, post.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await _client.GetAsync("/stations/place-dwnxg")).StatusCode);
+    }
+
+    [Fact]
+    public async Task ImportStations_Production_NotMapped()
+    {
+        using var prodClient = _factory.WithWebHostBuilder(b => b.UseEnvironment("Production")).CreateClient();
+
+        var post = await prodClient.PostAsync("/admin/import-stations", null);
+
+        Assert.Equal(HttpStatusCode.NotFound, post.StatusCode);
     }
 }
