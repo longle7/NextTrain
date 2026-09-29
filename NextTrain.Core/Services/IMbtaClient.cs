@@ -1,11 +1,9 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Text;
-
-namespace NextTrain.Core.Services
+﻿namespace NextTrain.Core.Services
 {
     /// <summary>
-    /// Absraction over the MBTA API
+    /// Everything the app needs from the MBTA API. The real implementation is MbtaClient (NextTrain.Api), which
+    /// caches each answer. Code depends on this interface rather than MbtaClient, so tests can swap in
+    /// FakeMbtaClient and never call the real MBTA.
     /// </summary>
     public interface IMbtaClient
     {
