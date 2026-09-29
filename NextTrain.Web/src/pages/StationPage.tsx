@@ -6,6 +6,8 @@ import { useNow, usePolling } from '../usePolling'
 
 const REFRESH_MS = 10_000
 
+const clock = (iso: string) => new Date(iso).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
+
 export default function StationPage() {
   const { stopId = '' } = useParams()
   const now = useNow()
@@ -44,20 +46,24 @@ export default function StationPage() {
           return (
             <li key={`${g.routeId}|${g.directionId}`}>
               <Card>
-                <div className="flex items-center gap-2">
-                  <LineBadge routeId={g.routeId} routes={routes.data} />
-                  <span className="font-semibold">to {destination}</span>
+                {/* Next train big on the right, the ones after it underneath: readable at a glance. */}
+                <div className="flex items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      <LineBadge routeId={g.routeId} routes={routes.data} />
+                      <span className="truncate font-semibold">to {destination}</span>
+                    </div>
+                    {g.departures.length > 1 && (
+                      <p className="mt-1 text-sm text-neutral-500">
+                        Then {g.departures.slice(1).map((time) => countdown(time, now)).join(', ')}
+                      </p>
+                    )}
+                  </div>
+                  <div className="shrink-0 text-right">
+                    <div className="text-2xl font-bold tabular-nums">{countdown(g.departures[0], now)}</div>
+                    <div className="text-xs text-neutral-500">{clock(g.departures[0])}</div>
+                  </div>
                 </div>
-                <ol className="mt-3 divide-y divide-neutral-100 dark:divide-neutral-800">
-                  {g.departures.map((time) => (
-                    <li key={time} className="flex justify-between py-2">
-                      <span className="text-neutral-500">
-                        {new Date(time).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
-                      </span>
-                      <span className="font-bold tabular-nums">{countdown(time, now)}</span>
-                    </li>
-                  ))}
-                </ol>
               </Card>
             </li>
           )

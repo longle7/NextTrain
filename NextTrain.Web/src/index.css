@@ -12,4 +12,7 @@
 
 body {
   @apply bg-neutral-100 text-neutral-900 antialiased dark:bg-neutral-950 dark:text-neutral-100;
+  /* Feel like an app on iOS: no gray flash on tap, no text-size jump on rotate. */
+  -webkit-tap-highlight-color: transparent;
+  -webkit-text-size-adjust: 100%;
 }

@@ -50,14 +50,28 @@ export async function api<T>(path: string): Promise<T> {
   return response.json() as Promise<T>
 }
 
-// Routes almost never change, so fetch them once per page load.
-let routesPromise: Promise<Route[]> | undefined
-export function getRoutes(): Promise<Route[]> {
-  routesPromise ??= api<Route[]>('/routes').catch((e) => {
-    routesPromise = undefined // allow retry after a failure
-    throw e
-  })
-  return routesPromise
+// Fetches `path` once per page load and shares the result; a failure allows a retry.
+function fetchOnce<T>(path: string): () => Promise<T> {
+  let promise: Promise<T> | undefined
+  return () =>
+    (promise ??= api<T>(path).catch((e) => {
+      promise = undefined
+      throw e
+    }))
 }
 
+// Routes and stations almost never change.
+export const getRoutes = fetchOnce<Route[]>('/routes')
+export const getStations = fetchOnce<Station[]>('/stations')
+
 export const stationRouteIds = (station: Station) => station.routeId.split(',')
+
+/** Case-insensitive name search, names starting with the query first. */
+export function searchStations(stations: Station[], query: string, limit = 8): Station[] {
+  const q = query.trim().toLowerCase()
+  if (!q) return []
+  return stations
+    .filter((s) => s.name.toLowerCase().includes(q))
+    .sort((a, b) => Number(!a.name.toLowerCase().startsWith(q)) - Number(!b.name.toLowerCase().startsWith(q)))
+    .slice(0, limit)
+}

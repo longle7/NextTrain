@@ -1,6 +1,6 @@
-import { Link, useParams, useSearchParams } from 'react-router'
-import { api, getRoutes, stationRouteIds, type Route, type Station } from '../api'
-import { Card, LineBadge, Status } from '../components'
+import { useParams, useSearchParams } from 'react-router'
+import { api, getRoutes, type Station } from '../api'
+import { Card, Status, StationLink } from '../components'
 import { usePolling } from '../usePolling'
 
 const SORTS = [
@@ -61,7 +61,7 @@ export default function LinePage() {
                   />
                   <span className="absolute top-1/2 left-0 size-5 -translate-y-1/2 rounded-full border-4 bg-white dark:bg-neutral-900" style={{ borderColor: color }} />
                 </span>
-                <StationLink station={station} routes={routes.data} currentRoute={routeId} />
+                <StationLink station={station} routes={routes.data} hideRoute={routeId} />
               </li>
             ))}
           </ol>
@@ -73,7 +73,12 @@ export default function LinePage() {
               <Card>
                 <div className="flex items-center gap-3">
                   {sort === 'ridership' && <span className="w-6 text-right text-sm font-bold text-neutral-400 tabular-nums">{i + 1}</span>}
-                  <StationLink station={station} routes={routes.data} currentRoute={routeId} showRidership={sort === 'ridership'} />
+                  <StationLink
+                    station={station}
+                    routes={routes.data}
+                    hideRoute={routeId}
+                    detail={sort === 'ridership' && ridershipLabel(station)}
+                  />
                 </div>
               </Card>
             </li>
@@ -90,31 +95,5 @@ export default function LinePage() {
   )
 }
 
-function StationLink({ station, routes, currentRoute, showRidership }: {
-  station: Station
-  routes: Route[] | undefined
-  currentRoute: string
-  showRidership?: boolean
-}) {
-  const transfers = stationRouteIds(station).filter((id) => id !== currentRoute)
-  // Several Green branches read better as one "GL" badge.
-  const greens = transfers.filter((id) => id.startsWith('Green-'))
-  const badges = [...new Set(transfers.map((id) => (greens.length > 1 && id.startsWith('Green-') ? 'Green' : id)))]
-  return (
-    <Link to={`/stations/${station.mbtaStopId}`} className="flex min-h-11 flex-1 items-center justify-between gap-2 py-1 hover:underline">
-      <span>
-        <span className="font-medium">{station.name}</span>
-        {showRidership && (
-          <span className="block text-sm text-neutral-500">
-            {station.averageWeekdayBoardings === null ? 'No data' : `${station.averageWeekdayBoardings.toLocaleString()} weekday boardings`}
-          </span>
-        )}
-      </span>
-      <span className="flex flex-wrap justify-end gap-1">
-        {badges.map((id) => (
-          <LineBadge key={id} routeId={id} routes={routes} />
-        ))}
-      </span>
-    </Link>
-  )
-}
+const ridershipLabel = (station: Station) =>
+  station.averageWeekdayBoardings === null ? 'No data' : `${station.averageWeekdayBoardings.toLocaleString()} weekday boardings`

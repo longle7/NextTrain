@@ -113,7 +113,7 @@ export default function MapPage() {
       <h1 className="text-2xl font-bold">Live map</h1>
       <Status error={vehicles.error ?? shapes.error ?? stations.error} />
       {/* isolate keeps Leaflet's high z-indexes below the sticky header */}
-      <div ref={container} className="isolate h-[70vh] overflow-hidden rounded-xl shadow-sm" />
+      <div ref={container} className="isolate h-[calc(100dvh-16rem-env(safe-area-inset-top)-env(safe-area-inset-bottom))] min-h-80 overflow-hidden rounded-xl shadow-sm" />
       <p className="text-center text-xs text-neutral-500">
         Trains update every 10 seconds; arrows show the direction of travel. Tap a train for where it's headed, or a station for departures.
       </p>
