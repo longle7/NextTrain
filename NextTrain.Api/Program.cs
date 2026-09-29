@@ -1,4 +1,4 @@
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.EntityFrameworkCore;
 using NextTrain.Api.Data;
 using NextTrain.Api.Services;
 using NextTrain.Core.Services;
@@ -28,6 +28,13 @@ builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
 var app = builder.Build();
+
+// Apply pending migrations so a fresh database (e.g., in Docker) gets its schema.
+// ponytail: migrate on startup, move to a deploy step if multiple instances run at once.
+using (var scope = app.Services.CreateScope())
+{
+    scope.ServiceProvider.GetRequiredService<NextTrainDbContext>().Database.Migrate();
+}
 
 // Swagger middleware (Development only)
 if (app.Environment.IsDevelopment())

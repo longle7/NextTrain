@@ -1,0 +1,26 @@
+# Local stack: API on http://localhost:5080 (Swagger at /swagger) + SQL Server.
+# Optional: export MBTA_API_KEY=<key> before `docker compose up` for the higher rate limit.
+services:
+  sqlserver:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    environment:
+      ACCEPT_EULA: "Y"
+      # Local dev container only; not a real secret.
+      MSSQL_SA_PASSWORD: "NextTrain!Dev1"
+    healthcheck:
+      test: /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P "NextTrain!Dev1" -C -Q "SELECT 1"
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build: .
+    depends_on:
+      sqlserver:
+        condition: service_healthy
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ConnectionStrings__DefaultConnection: "Server=sqlserver;Database=NextTrainDb;User Id=sa;Password=NextTrain!Dev1;TrustServerCertificate=True;"
+      Mbta__ApiKey: ${MBTA_API_KEY:-}
+    ports:
+      - "5080:8080"
