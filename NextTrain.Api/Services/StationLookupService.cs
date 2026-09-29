@@ -28,7 +28,7 @@ namespace NextTrain.Api.Services
 
             if (!string.IsNullOrWhiteSpace(routeId))
             {
-                query = query.Where(s => s.RouteId == routeId);
+                query = WhereServesRoute(query, routeId);
             }
 
             var stations = await query.ToListAsync();
@@ -71,7 +71,7 @@ namespace NextTrain.Api.Services
 
             if (!string.IsNullOrWhiteSpace(routeId))
             {
-                query = query.Where(s => s.RouteId == routeId);
+                query = WhereServesRoute(query, routeId);
             }
 
             var stations = await query
@@ -79,6 +79,14 @@ namespace NextTrain.Api.Services
                 .ToListAsync();
 
             return stations;
+        }
+
+        // RouteId is comma-separated for transfer stations (e.g., "Orange,Red"),
+        // so match whole entries: ",Orange,Red," contains ",Red,".
+        private static IQueryable<Station> WhereServesRoute(IQueryable<Station> query, string routeId)
+        {
+            var needle = "," + routeId + ",";
+            return query.Where(s => ("," + s.RouteId + ",").Contains(needle));
         }
 
         // Haversine formula for distance in kilometers between two lat/lon points.
