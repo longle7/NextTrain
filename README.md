@@ -30,6 +30,7 @@ Commutes belong to an anonymous ID stored on the device (sent as `X-User-Id`) un
 | GET | `/stations/nearest?lat=&lon=&route=` | Nearest station to a location |
 | GET | `/stations/{mbtaStopId}` | One station, e.g. `place-pktrm` |
 | GET | `/stations/{mbtaStopId}/predictions?route=&direction=` | Upcoming trains, soonest first |
+| GET | `/health` | Health probe for hosting: 200 when the database is reachable, 503 when not |
 | POST | `/admin/import-stations` | Import subway stations from MBTA (Development only) |
 | GET | `/commutes` | Your saved commutes |
 | GET | `/commutes/{id}` | One saved commute |
@@ -113,7 +114,7 @@ Ready:
 
 Still to do:
 
-1. **Host the API over HTTPS** and point the app at it (the web app calls a relative `/api` today), with CORS allowing the Capacitor origin.
+1. **Host the API over HTTPS.** The app side is ready: build the web app with `VITE_API_URL=https://<api-host> npm run build` (it defaults to the relative `/api`), the API already allows the Capacitor origins (`Cors:AllowedOrigins` in `appsettings.json`), and `/health` is there for the host's health probe.
 2. **Sign in with Apple** to replace the anonymous device ID (Delete my data already covers Apple's account-deletion rule).
 3. **Push notifications** for commutes ("your train leaves in 5 min") via APNs. The `NotificationSubscription` table is ready for it, and it gives the app native value beyond a website (App Review guideline 4.2).
 4. **Wrap and ship**: `npm i @capacitor/core @capacitor/ios`, `npx cap add ios`, and build in Xcode on a Mac. Needs an Apple Developer account, a privacy policy URL, and a location usage description (`NSLocationWhenInUseUsageDescription`) for "Near you".

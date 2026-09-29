@@ -23,6 +23,16 @@ builder.Services.AddScoped<IStationLookupService, StationLookupService>();
 
 builder.Services.AddControllers();
 
+// The iPhone app runs the web app from capacitor://localhost and calls this API cross-origin.
+// Allowed origins come from configuration (Cors:AllowedOrigins); the web app itself is same-origin and needs none.
+builder.Services.AddCors(options => options.AddDefaultPolicy(policy => policy
+    .WithOrigins(builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? [])
+    .AllowAnyHeader()
+    .AllowAnyMethod()));
+
+// GET /health for the host's health probe: 200 when the database is reachable, 503 when not.
+builder.Services.AddHealthChecks().AddCheck<DatabaseHealthCheck>("database");
+
 // Swagger services
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
@@ -50,6 +60,8 @@ if (app.Environment.IsDevelopment())
     });
 }
 
+app.UseCors();
+app.MapHealthChecks("/health");
 app.MapControllers();
 
 app.Run();

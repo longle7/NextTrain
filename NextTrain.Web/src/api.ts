@@ -84,8 +84,12 @@ export class ApiError extends Error {
   }
 }
 
+// The web app is served next to the API at /api (Vite in dev, nginx in Docker). The iPhone app bundles the web app,
+// so its build points at the hosted API instead: VITE_API_URL=https://api.example.com npm run build
+const API_URL = import.meta.env.VITE_API_URL ?? '/api'
+
 export async function api<T>(path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(`/api${path}`, {
+  const response = await fetch(`${API_URL}${path}`, {
     ...init,
     headers: { 'Content-Type': 'application/json', 'X-User-Id': userId(), ...init?.headers },
   })
