@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
@@ -9,10 +10,17 @@ using NextTrain.Core.Services;
 namespace NextTrain.Api.Services
 {
     /// <summary>
-    /// Service that imports stops from MBTA into the Stations table.
+    /// Service that imports subway stations from MBTA into the Stations table.
     /// </summary>
     public class StationImportService : IStationImportService
     {
+        // MBTA subway routes (route types 0 and 1). Mattapan is part of the Red Line.
+        // ponytail: hardcoded list, fetch from /routes?filter[type]=0,1 if MBTA adds lines.
+        public static readonly string[] SubwayRoutes =
+        {
+            "Red", "Mattapan", "Orange", "Blue", "Green-B", "Green-C", "Green-D", "Green-E"
+        };
+
         private readonly IMbtaClient _mbtaClient;
         private readonly NextTrainDbContext _dbContext;
 
@@ -24,42 +32,63 @@ namespace NextTrain.Api.Services
 
         public async Task ImportStationsAsync()
         {
-            var stops = await _mbtaClient.GetStopDtosAsync();
+            var stopsByRoute = new List<(string RouteId, MbtaStopDto Stop)>();
 
-            foreach (var stop in stops)
+            foreach (var routeId in SubwayRoutes)
             {
-                // Check if station already exists
-                var existing = await _dbContext.Stations
-                    .FirstOrDefaultAsync(s => s.MbtaStopId == stop.Id);
+                var stops = await _mbtaClient.GetStopDtosAsync(routeId);
+                stopsByRoute.AddRange(stops.Select(stop => (routeId, stop)));
+            }
 
-                if (existing is null)
+            var imported = MergeStops(stopsByRoute);
+
+            var existingById = await _dbContext.Stations.ToDictionaryAsync(s => s.MbtaStopId);
+
+            foreach (var station in imported)
+            {
+                if (existingById.TryGetValue(station.MbtaStopId, out var existing))
                 {
-                    var station = new Station
-                    {
-                        MbtaStopId = stop.Id,
-                        Name = stop.Attributes.Name,
-                        Latitude = stop.Attributes.Latitude ?? 0.0,
-                        Longitude = stop.Attributes.Longitude ?? 0.0,
-                        PlatformCode = stop.Attributes.PlatformCode,
-                        RouteId = stop.Relationships?.Route?.Data?.Id ?? string.Empty,
-                        CreatedAtUtc = DateTime.UtcNow
-                    };
-
-                    _dbContext.Stations.Add(station);
+                    existing.Name = station.Name;
+                    existing.Latitude = station.Latitude;
+                    existing.Longitude = station.Longitude;
+                    existing.PlatformCode = station.PlatformCode;
+                    existing.RouteId = station.RouteId;
+                    existing.UpdatedAtUtc = DateTime.UtcNow;
                 }
                 else
                 {
-                    // Update basic attributes if they changed
-                    existing.Name = stop.Attributes.Name;
-                    existing.Latitude = stop.Attributes.Latitude ?? 0.0;
-                    existing.Longitude = stop.Attributes.Longitude ?? 0.0;
-                    existing.PlatformCode = stop.Attributes.PlatformCode;
-                    existing.RouteId = stop.Relationships?.Route?.Data?.Id ?? existing.RouteId;
-                    existing.UpdatedAtUtc = DateTime.UtcNow;
+                    _dbContext.Stations.Add(station);
                 }
             }
 
             await _dbContext.SaveChangesAsync();
+        }
+
+        /// <summary>
+        /// Collapses per-route stop lists into one station per MBTA stop ID.
+        /// Transfer stations get a comma-separated, sorted RouteId (e.g., "Orange,Red").
+        /// Stops without coordinates are skipped.
+        /// </summary>
+        public static List<Station> MergeStops(IEnumerable<(string RouteId, MbtaStopDto Stop)> stopsByRoute)
+        {
+            return stopsByRoute
+                .Where(x => x.Stop.Attributes.Latitude.HasValue && x.Stop.Attributes.Longitude.HasValue)
+                .GroupBy(x => x.Stop.Id)
+                .Select(g =>
+                {
+                    var stop = g.First().Stop;
+                    return new Station
+                    {
+                        MbtaStopId = stop.Id,
+                        Name = stop.Attributes.Name,
+                        Latitude = stop.Attributes.Latitude!.Value,
+                        Longitude = stop.Attributes.Longitude!.Value,
+                        PlatformCode = stop.Attributes.PlatformCode,
+                        RouteId = string.Join(",", g.Select(x => x.RouteId).Distinct().Order(StringComparer.Ordinal)),
+                        CreatedAtUtc = DateTime.UtcNow
+                    };
+                })
+                .ToList();
         }
     }
 }

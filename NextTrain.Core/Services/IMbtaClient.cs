@@ -9,7 +9,8 @@ namespace NextTrain.Core.Services
     /// </summary>
     public interface IMbtaClient
     {
-        // Gets all the stops from the MBTA API
-        Task<IReadOnlyList<MbtaStopDto>> GetStopDtosAsync();
+        // Gets the stops served by a single route (e.g., "Red").
+        // MBTA only populates the stop's route relationship when filtering by one route.
+        Task<IReadOnlyList<MbtaStopDto>> GetStopDtosAsync(string routeId);
     }
 }
