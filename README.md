@@ -11,7 +11,7 @@ Built with .NET 10, ASP.NET Core, EF Core, and SQL Server, with a React + TypeSc
 | Method | Path | Description |
 |---|---|---|
 | GET | `/routes` | Subway lines with colors and direction destinations |
-| GET | `/stations?route=Red` | List stations, optionally filtered by route |
+| GET | `/stations?route=Red&sort=line` | List stations, optionally by route; `sort` is `name` (default), `line` (order along the route), or `ridership` |
 | GET | `/stations/nearest?lat=&lon=&route=` | Nearest station to a location |
 | GET | `/stations/{mbtaStopId}` | One station, e.g. `place-pktrm` |
 | GET | `/stations/{mbtaStopId}/predictions?route=&direction=` | Upcoming trains, soonest first |
@@ -79,4 +79,5 @@ API tests run against a real SQL Server database (`NextTrainDb_Tests` on `localh
 ## Design notes
 
 - Stations are imported per subway route because MBTA only reports a stop's route when filtering by a single route. Transfer stations store all routes, e.g. `Green-B,Green-C,Green-D,Green-E,Red`.
+- Ridership is average weekday boardings per station from MassDOT's Fall 2024 counts (embedded snapshot, applied on import). Mattapan stops are not in the dataset.
 - Predictions are cached in memory for 10 seconds per station; route info for 1 hour. MBTA calls time out after 10 seconds and retry transient failures twice. If MBTA is unavailable the API returns 503.

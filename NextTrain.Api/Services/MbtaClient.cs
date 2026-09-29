@@ -44,8 +44,9 @@ namespace NextTrain.Api.Services
 
         public async Task<IReadOnlyList<MbtaStopDto>> GetStopDtosAsync(string routeId)
         {
-            var payload = await GetAsync<MbtaStopsResponseDto>(
-                $"https://api-v3.mbta.com/stops?filter[route]={Uri.EscapeDataString(routeId)}");
+            // Returned in line order. Cached like routes: stations almost never change.
+            var payload = await GetCachedAsync<MbtaStopsResponseDto>(
+                $"https://api-v3.mbta.com/stops?filter[route]={Uri.EscapeDataString(routeId)}", RouteCacheDuration);
 
             return payload?.Data ?? new List<MbtaStopDto>();
         }
