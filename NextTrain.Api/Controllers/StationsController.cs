@@ -34,10 +34,8 @@ namespace NextTrain.Api.Controllers
                     return Ok(stations.OrderByDescending(s => s.AverageWeekdayBoardings ?? -1));
 
                 case StationSort.Line when route is null:
-                    return ValidationProblem(new ValidationProblemDetails(new Dictionary<string, string[]>
-                    {
-                        ["sort"] = new[] { "sort=line requires a route." }
-                    }));
+                    ModelState.AddModelError("sort", "sort=line requires a route.");
+                    return ValidationProblem();
 
                 case StationSort.Line:
                     IReadOnlyList<MbtaStopDto> lineOrder;
