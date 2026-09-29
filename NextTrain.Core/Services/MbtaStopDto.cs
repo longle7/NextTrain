@@ -18,8 +18,6 @@ namespace NextTrain.Core.Services
         public string Id { get; set; } = string.Empty; // MBTA stop ID (e.g., "place-alwh")
 
         public MbtaStopAttributesDto Attributes { get; set; } = new();
-
-        public MbtaStopRelationshipsDto? Relationships { get; set; }
     }
 
     /// <summary>
@@ -29,30 +27,12 @@ namespace NextTrain.Core.Services
     {
         public string Name { get; set; } = string.Empty;
 
-        // TODO: Need to filter out stations with null values for lat and long
+        // Nullable: some MBTA stops have no coordinates; the import skips them.
         public double? Latitude { get; set; }
 
         public double? Longitude { get; set; }
 
         // Optional: platform code, type, etc.
         public string? PlatformCode { get; set; }
-    }
-
-    /// <summary>
-    /// Relationships (e.g., routes serving this stop).
-    /// </summary>
-    public class MbtaStopRelationshipsDto
-    {
-        public MbtaRouteRelationDto? Route { get; set; }
-    }
-
-    public class MbtaRouteRelationDto
-    {
-        public MbtaRouteDataDto? Data { get; set; }
-    }
-
-    public class MbtaRouteDataDto
-    {
-        public string Id { get; set; } = string.Empty; // Route ID, e.g., "Red"
     }
 }

@@ -24,9 +24,10 @@ namespace NextTrain.Api.Services
             _apiKey = configuration["Mbta:ApiKey"];
         }
 
-        public async Task<IReadOnlyList<MbtaStopDto>> GetStopDtosAsync()
+        public async Task<IReadOnlyList<MbtaStopDto>> GetStopDtosAsync(string routeId)
         {
-            var request = new HttpRequestMessage(HttpMethod.Get, "https://api-v3.mbta.com/stops");
+            var url = $"https://api-v3.mbta.com/stops?filter[route]={Uri.EscapeDataString(routeId)}";
+            using var request = new HttpRequestMessage(HttpMethod.Get, url);
 
             if (!string.IsNullOrWhiteSpace(_apiKey))
             {
