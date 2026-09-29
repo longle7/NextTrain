@@ -14,6 +14,7 @@ builder.Services.AddHttpClient<IMbtaClient, MbtaClient>();
 
 // Station import service
 builder.Services.AddScoped<IStationImportService, StationImportService>();
+builder.Services.AddScoped<IStationLookupService, StationLookupService>();
 
 builder.Services.AddControllers();
 

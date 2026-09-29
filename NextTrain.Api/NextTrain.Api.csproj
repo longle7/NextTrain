@@ -23,8 +23,4 @@
     <ProjectReference Include="..\NextTrain.Core\NextTrain.Core.csproj" />
   </ItemGroup>
 
-  <ItemGroup>
-    <Folder Include="Controllers\" />
-  </ItemGroup>
-
 </Project>
