@@ -11,7 +11,16 @@ using NextTrain.Core.Services;
 namespace NextTrain.Api.Services
 {
     /// <summary>
-    /// Service that imports subway stations from MBTA into the Stations table.
+    /// Copies subway stations from MBTA into our Stations table. StationRefreshService runs it at startup and daily.
+    ///
+    /// The flow of ImportStationsAsync:
+    ///   1. Ask MBTA for each subway route's stops, one route at a time. MBTA only says which route a stop is on
+    ///      when you filter by a single route, so we can't ask for everything at once.
+    ///   2. MergeStops: Park Street appears in both the Red and Green lists, so merge duplicates into one station
+    ///      whose RouteId lists every line ("Green-B,Green-C,Green-D,Green-E,Red").
+    ///   3. Add ridership (from an embedded data file) to each station.
+    ///   4. Upsert: update stations we already have, insert new ones. Nothing is ever deleted, so running it
+    ///      again is always safe.
     /// </summary>
     public class StationImportService : IStationImportService
     {

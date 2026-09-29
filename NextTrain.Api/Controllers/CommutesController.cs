@@ -7,7 +7,13 @@ using NextTrain.Core.Domain;
 namespace NextTrain.Api.Controllers
 {
     /// <summary>
-    /// A user's saved commutes. The user is identified by the X-User-Id header.
+    /// A user's saved commutes (create, read, update, delete).
+    ///
+    /// Who is the user? The app makes up a random ID once per device and sends it as the X-User-Id header on
+    /// every request. Each endpoint only touches rows with that ID, and someone else's commute answers 404
+    /// (not 403), so IDs can't be discovered by guessing.
+    /// Saving (POST/PUT): check the limit, then TryApplyAsync validates the request against the database and
+    /// copies it onto the entity; any problem returns a 400 listing what's wrong.
     /// ponytail: header is trusted as-is, replace with the authenticated user's ID when login exists.
     /// </summary>
     [ApiController]
