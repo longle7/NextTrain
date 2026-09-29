@@ -105,7 +105,7 @@ The web app is built to be wrapped as a native iPhone app with [Capacitor](https
 Ready:
 
 - **App icon**: NextTrain's own mark (not the MBTA's "T", a trademark App Review would flag under guideline 5.2.1). The 1024×1024 App Store icon, with no alpha channel as Apple requires, is `NextTrain.Web/assets/app-store-icon.png`.
-- **Privacy policy** at `/privacy` (in the app under Settings); once hosted, that URL is the one App Store Connect asks for. Location never leaves the device and there's no tracking, so the App Privacy answers are short: *User Content* (saved commutes) for app functionality, not linked to identity, not used for tracking.
+- **Privacy policy** at `/privacy` (in the app under Settings); once hosted, that URL is the one App Store Connect asks for. Location never leaves the device and there's no tracking, so the App Privacy answers are short: *User Content* (saved commutes) and *Identifiers → User ID* (the random device ID), both used only for app functionality and not for tracking.
 - **In-app data deletion**: Settings → Delete my data calls `DELETE /me`.
 - **App Review from outside Boston**: "Near you" and the map say you're outside the MBTA area instead of listing stations 2,700 miles away.
 
