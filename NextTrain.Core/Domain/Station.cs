@@ -5,7 +5,7 @@
     /// </summary>
     public class Station
     {
-        // Primary key for your own database.
+        // Database ID (primary key).
         public int Id { get; set; }
 
         // MBTA's stop ID (e.g., "place-alwh" for Alewife).

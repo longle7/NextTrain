@@ -5,7 +5,7 @@
     /// </summary>
     public class NotificationSubscription
     {
-        // Primary key for your own database.
+        // Database ID (primary key).
         public int Id { get; set; }
 
         // Foreign key to identify the user.
