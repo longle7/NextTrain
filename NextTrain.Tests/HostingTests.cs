@@ -24,6 +24,29 @@ public class HostingTests : IDisposable
         Assert.Equal("Healthy", await response.Content.ReadAsStringAsync());
     }
 
+    [Fact]
+    public async Task Responses_AreCompressed_WhenTheClientAcceptsIt()
+    {
+        using var client = _factory.CreateClient();
+        using var request = new HttpRequestMessage(HttpMethod.Get, "/health");
+        request.Headers.Add("Accept-Encoding", "br, gzip");
+
+        var response = await client.SendAsync(request);
+
+        Assert.Equal("br", Assert.Single(response.Content.Headers.ContentEncoding));
+    }
+
+    [Fact]
+    public async Task UnknownPath_Returns404ProblemJson()
+    {
+        using var client = _factory.CreateClient();
+
+        var response = await client.GetAsync("/nope");
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
+    }
+
     [Theory]
     [InlineData("capacitor://localhost", true)] // the iPhone app
     [InlineData("https://evil.example", false)]

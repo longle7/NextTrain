@@ -213,6 +213,19 @@ public class StationsEndpointTests : IDisposable
     }
 
     [Fact]
+    public async Task UnexpectedError_InProduction_Returns500ProblemJson_WithoutInternals()
+    {
+        _mbta.VehiclesError = new InvalidOperationException("secret internal detail");
+        using var prodClient = _factory.WithWebHostBuilder(b => b.UseEnvironment("Production")).CreateClient();
+
+        var response = await prodClient.GetAsync("/vehicles");
+
+        Assert.Equal(HttpStatusCode.InternalServerError, response.StatusCode);
+        Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
+        Assert.DoesNotContain("secret internal detail", await response.Content.ReadAsStringAsync());
+    }
+
+    [Fact]
     public async Task GetVehicles_MbtaDown_Returns503()
     {
         _mbta.VehiclesError = new HttpRequestException("MBTA down");

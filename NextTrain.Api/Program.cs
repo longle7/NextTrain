@@ -33,11 +33,26 @@ builder.Services.AddCors(options => options.AddDefaultPolicy(policy => policy
 // GET /health for the host's health probe: 200 when the database is reachable, 503 when not.
 builder.Services.AddHealthChecks().AddCheck<DatabaseHealthCheck>("database");
 
+// Every error is problem JSON (the app shows its "title" or first "errors" entry): unhandled exceptions become a
+// 500 without internals, and bare status codes like 404 get a body.
+builder.Services.AddProblemDetails();
+
+// Compress responses: the map polls /vehicles every 10 seconds and the station and shape lists are tens of KB,
+// all over mobile data. Safe over HTTPS: no response carries a secret for a BREACH-style attack to extract.
+builder.Services.AddResponseCompression(options => options.EnableForHttps = true);
+
 // Swagger services
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
 var app = builder.Build();
+
+app.UseResponseCompression();
+if (!app.Environment.IsDevelopment())
+{
+    app.UseExceptionHandler(); // Development keeps the detailed error page
+}
+app.UseStatusCodePages();
 
 // Apply pending migrations so a fresh database (e.g., in Docker) gets its schema.
 // ponytail: migrate on startup, move to a deploy step if multiple instances run at once.
