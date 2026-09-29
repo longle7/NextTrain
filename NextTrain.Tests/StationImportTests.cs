@@ -43,14 +43,6 @@ public class StationImportTests
         Assert.Equal("place-alfcl", Assert.Single(stations).MbtaStopId);
     }
 
-    private class FakeMbtaClient : IMbtaClient
-    {
-        public Dictionary<string, List<MbtaStopDto>> StopsByRoute { get; } = new();
-
-        public Task<IReadOnlyList<MbtaStopDto>> GetStopDtosAsync(string routeId) =>
-            Task.FromResult<IReadOnlyList<MbtaStopDto>>(StopsByRoute.GetValueOrDefault(routeId) ?? new());
-    }
-
     [Fact]
     public async Task Import_InsertsThenUpdates_AndRouteFilterMatchesTransferStations()
     {

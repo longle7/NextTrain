@@ -12,5 +12,9 @@ namespace NextTrain.Core.Services
         // Gets the stops served by a single route (e.g., "Red").
         // MBTA only populates the stop's route relationship when filtering by one route.
         Task<IReadOnlyList<MbtaStopDto>> GetStopDtosAsync(string routeId);
+
+        // Gets predictions at a station (parent IDs like "place-pktrm" include all platforms)
+        // for a comma-separated list of routes (e.g., "Orange,Red").
+        Task<IReadOnlyList<MbtaPredictionDto>> GetPredictionsAsync(string mbtaStopId, string routeIds);
     }
 }
