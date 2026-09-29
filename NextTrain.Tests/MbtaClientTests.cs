@@ -48,4 +48,24 @@ public class MbtaClientTests
         Assert.Equal(2, handler.Urls.Count);
         Assert.Contains("filter[stop]=place-pktrm&filter[route]=Green-B,Red", Uri.UnescapeDataString(handler.Urls[0]));
     }
+
+    [Fact]
+    public async Task GetSubwayRoutesAsync_ParsesSnakeCase_SortedBySortOrder()
+    {
+        const string json = """
+            {"data":[
+              {"id":"Blue","attributes":{"long_name":"Blue Line","color":"003DA5","text_color":"FFFFFF","sort_order":10040,
+                "direction_names":["West","East"],"direction_destinations":["Bowdoin","Wonderland"]}},
+              {"id":"Red","attributes":{"long_name":"Red Line","color":"DA291C","text_color":"FFFFFF","sort_order":10010,
+                "direction_names":["South","North"],"direction_destinations":["Ashmont/Braintree","Alewife"]}}]}
+            """;
+        var client = new MbtaClient(new HttpClient(new StubHandler(json)), new ConfigurationBuilder().Build(),
+            new MemoryCache(new MemoryCacheOptions()));
+
+        var routes = await client.GetSubwayRoutesAsync();
+
+        Assert.Equal(new[] { "Red", "Blue" }, routes.Select(r => r.Id));
+        Assert.Equal("Red Line", routes[0].Attributes.LongName);
+        Assert.Equal(new[] { "Ashmont/Braintree", "Alewife" }, routes[0].Attributes.DirectionDestinations);
+    }
 }

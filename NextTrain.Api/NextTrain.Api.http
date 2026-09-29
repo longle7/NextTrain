@@ -4,6 +4,10 @@ POST {{host}}/admin/import-stations
 
 ###
 
+GET {{host}}/routes
+
+###
+
 GET {{host}}/stations?route=Red
 
 ###

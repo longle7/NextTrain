@@ -13,6 +13,8 @@ public class FakeMbtaClient : IMbtaClient
     public Dictionary<string, List<MbtaPredictionDto>> PredictionsByStop { get; } = new();
     public Exception? PredictionsError { get; set; }
 
+    public List<MbtaRouteDto> Routes { get; } = new();
+
     public Task<IReadOnlyList<MbtaStopDto>> GetStopDtosAsync(string routeId) =>
         Task.FromResult<IReadOnlyList<MbtaStopDto>>(StopsByRoute.GetValueOrDefault(routeId) ?? new());
 
@@ -20,4 +22,7 @@ public class FakeMbtaClient : IMbtaClient
         PredictionsError is not null
             ? Task.FromException<IReadOnlyList<MbtaPredictionDto>>(PredictionsError)
             : Task.FromResult<IReadOnlyList<MbtaPredictionDto>>(PredictionsByStop.GetValueOrDefault(mbtaStopId) ?? new());
+
+    public Task<IReadOnlyList<MbtaRouteDto>> GetSubwayRoutesAsync() =>
+        Task.FromResult<IReadOnlyList<MbtaRouteDto>>(Routes);
 }
