@@ -30,6 +30,20 @@ namespace NextTrain.Api.Controllers
                 return Problem("MBTA routes are temporarily unavailable.", statusCode: StatusCodes.Status503ServiceUnavailable);
             }
         }
+
+        // GET /routes/shapes
+        [HttpGet("shapes")]
+        public async Task<ActionResult<IEnumerable<MbtaShape>>> GetShapes([FromServices] IMbtaClient mbta)
+        {
+            try
+            {
+                return Ok(await mbta.GetSubwayShapesAsync());
+            }
+            catch (Exception e) when (e is HttpRequestException or TaskCanceledException)
+            {
+                return Problem("MBTA route shapes are temporarily unavailable.", statusCode: StatusCodes.Status503ServiceUnavailable);
+            }
+        }
     }
 
     // Direction lists are indexed by direction ID (0 or 1).

@@ -26,6 +26,22 @@ export interface Prediction {
   status: string | null
 }
 
+export interface Vehicle {
+  id: string
+  routeId: string
+  directionId: number
+  latitude: number
+  longitude: number
+  bearing: number | null // degrees clockwise from north
+  currentStatus: 'INCOMING_AT' | 'STOPPED_AT' | 'IN_TRANSIT_TO' | null
+  stopName: string | null // the stop it's at or heading to
+}
+
+export interface RouteShape {
+  routeId: string
+  polyline: string // Google encoded polyline
+}
+
 export async function api<T>(path: string): Promise<T> {
   const response = await fetch(`/api${path}`)
   if (!response.ok) {

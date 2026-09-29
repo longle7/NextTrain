@@ -19,5 +19,11 @@ namespace NextTrain.Core.Services
 
         // Gets subway routes (types 0 and 1) with colors and direction names, in MBTA sort order.
         Task<IReadOnlyList<MbtaRouteDto>> GetSubwayRoutesAsync();
+
+        // Gets live positions of subway trains that report a location.
+        Task<IReadOnlyList<MbtaVehicle>> GetSubwayVehiclesAsync();
+
+        // Gets the track shape of each subway route's typical trips.
+        Task<IReadOnlyList<MbtaShape>> GetSubwayShapesAsync();
     }
 }

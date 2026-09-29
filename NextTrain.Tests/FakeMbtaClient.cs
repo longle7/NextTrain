@@ -25,4 +25,18 @@ public class FakeMbtaClient : IMbtaClient
 
     public Task<IReadOnlyList<MbtaRouteDto>> GetSubwayRoutesAsync() =>
         Task.FromResult<IReadOnlyList<MbtaRouteDto>>(Routes);
+
+    // Set VehiclesError to simulate MBTA being down.
+    public List<MbtaVehicle> Vehicles { get; } = new();
+    public Exception? VehiclesError { get; set; }
+
+    public List<MbtaShape> Shapes { get; } = new();
+
+    public Task<IReadOnlyList<MbtaVehicle>> GetSubwayVehiclesAsync() =>
+        VehiclesError is not null
+            ? Task.FromException<IReadOnlyList<MbtaVehicle>>(VehiclesError)
+            : Task.FromResult<IReadOnlyList<MbtaVehicle>>(Vehicles);
+
+    public Task<IReadOnlyList<MbtaShape>> GetSubwayShapesAsync() =>
+        Task.FromResult<IReadOnlyList<MbtaShape>>(Shapes);
 }

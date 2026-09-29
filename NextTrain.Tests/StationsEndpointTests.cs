@@ -199,4 +199,33 @@ public class StationsEndpointTests : IDisposable
 
         Assert.Equal(new[] { "Park Street", "Government Center", "Alewife" }, stations!.Select(s => s.Name));
     }
+
+    [Fact]
+    public async Task GetVehicles_ReturnsLivePositions()
+    {
+        _mbta.Vehicles.Add(new MbtaVehicle("R-1", "Red", 1, 42.3, -71.06, 85, "STOPPED_AT", "Savin Hill"));
+
+        var vehicle = Assert.Single((await _client.GetFromJsonAsync<List<MbtaVehicle>>("/vehicles"))!);
+
+        Assert.Equal("Savin Hill", vehicle.StopName);
+        Assert.Equal(85, vehicle.Bearing);
+    }
+
+    [Fact]
+    public async Task GetVehicles_MbtaDown_Returns503()
+    {
+        _mbta.VehiclesError = new HttpRequestException("MBTA down");
+
+        Assert.Equal(HttpStatusCode.ServiceUnavailable, (await _client.GetAsync("/vehicles")).StatusCode);
+    }
+
+    [Fact]
+    public async Task GetRouteShapes_ReturnsPolylines()
+    {
+        _mbta.Shapes.Add(new MbtaShape("Red", "_p~iF~ps|U"));
+
+        var shape = Assert.Single((await _client.GetFromJsonAsync<List<MbtaShape>>("/routes/shapes"))!);
+
+        Assert.Equal("Red", shape.RouteId);
+    }
 }
