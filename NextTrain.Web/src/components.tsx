@@ -1,5 +1,6 @@
 import { Component, type ReactNode } from 'react'
 import { Link } from 'react-router'
+import { useOnline } from './usePolling'
 import { MAJOR_SEVERITY } from './alerts'
 import { ApiError, stationRouteIds, type Alert, type Route, type Station } from './api'
 
@@ -46,13 +47,17 @@ export function Card({ children, to }: { children: ReactNode; to?: string }) {
 }
 
 export function Status({ error, loading }: { error?: Error; loading?: boolean }) {
+  const online = useOnline()
   if (error) {
     return (
       <div className="flex items-center justify-between gap-3 rounded-xl bg-red-50 p-4 text-sm text-red-900 dark:bg-red-950 dark:text-red-100">
-        <p>{friendlyError(error)}</p>
-        <button onClick={() => location.reload()} className="shrink-0 rounded-lg bg-red-900/10 px-3 py-2 font-semibold dark:bg-white/10">
-          Try again
-        </button>
+        {/* Offline, a reload would only show the browser's error page; data refreshes by itself once back online. */}
+        <p>{online ? friendlyError(error) : "You're offline. NextTrain will refresh when you're back online."}</p>
+        {online && (
+          <button onClick={() => location.reload()} className="shrink-0 rounded-lg bg-red-900/10 px-3 py-2 font-semibold dark:bg-white/10">
+            Try again
+          </button>
+        )}
       </div>
     )
   }
@@ -70,7 +75,6 @@ export function Status({ error, loading }: { error?: Error; loading?: boolean })
 
 function friendlyError(error: Error): string {
   const status = error instanceof ApiError ? error.status : undefined
-  if (!navigator.onLine) return "You're offline. Check your connection and try again."
   if (status === 503) return 'MBTA live data is temporarily unavailable. Please try again in a moment.'
   if (status === 404) return "We couldn't find that. It may have moved or been removed."
   return "Couldn't load this right now. Please try again."

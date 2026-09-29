@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { Prediction } from './api'
-import { countdown, groupDepartures, secondsAgo } from './time'
+import { agoLabel, countdown, groupDepartures, secondsAgo } from './time'
 
 const now = new Date('2026-09-29T08:00:00-04:00')
 const at = (secondsFromNow: number) => new Date(now.getTime() + secondsFromNow * 1000).toISOString()
@@ -52,5 +52,16 @@ describe('secondsAgo', () => {
   it('never goes negative', () => {
     expect(secondsAgo(new Date(now.getTime() + 5000), now)).toBe(0)
     expect(secondsAgo(new Date(now.getTime() - 12_400), now)).toBe(12)
+  })
+})
+
+describe('agoLabel', () => {
+  it.each([
+    [0, '0s ago'],
+    [59, '59s ago'],
+    [60, '1 min ago'],
+    [185, '3 min ago'],
+  ])('%is is "%s"', (seconds, expected) => {
+    expect(agoLabel(seconds)).toBe(expected)
   })
 })

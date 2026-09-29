@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useSyncExternalStore } from 'react'
 
 interface PollState<T> {
   data: T | undefined
@@ -27,10 +27,13 @@ export function usePolling<T>(fetcher: () => Promise<T>, key: string, intervalMs
     const timer = intervalMs ? setInterval(() => !document.hidden && load(), intervalMs) : undefined
     const onVisible = () => !document.hidden && intervalMs && load()
     document.addEventListener('visibilitychange', onVisible)
+    // Back online (e.g. out of a tunnel): refetch everything, including one-off loads that failed while offline.
+    window.addEventListener('online', load)
     return () => {
       cancelled = true
       clearInterval(timer)
       document.removeEventListener('visibilitychange', onVisible)
+      window.removeEventListener('online', load)
     }
     // fetcher is recreated every render, so `key` (not fetcher) identifies what is being fetched.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -48,4 +51,16 @@ export function useNow(intervalMs = 1000): Date {
     return () => clearInterval(timer)
   }, [intervalMs])
   return now
+}
+
+/** Whether the device has a network connection, updated as it comes and goes. */
+export const useOnline = () => useSyncExternalStore(subscribeOnline, () => navigator.onLine)
+
+function subscribeOnline(onChange: () => void) {
+  window.addEventListener('online', onChange)
+  window.addEventListener('offline', onChange)
+  return () => {
+    window.removeEventListener('online', onChange)
+    window.removeEventListener('offline', onChange)
+  }
 }

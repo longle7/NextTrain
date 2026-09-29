@@ -1,6 +1,7 @@
 import { lazy, Suspense, useEffect, type ReactNode } from 'react'
 import { BrowserRouter, Link, NavLink, Route, Routes, useLocation, useNavigate } from 'react-router'
 import { AppLogo, ErrorBoundary, primaryButton, Status } from './components'
+import { useOnline } from './usePolling'
 import CommutePage from './pages/CommutePage'
 import HomePage from './pages/HomePage'
 import LinePage from './pages/LinePage'
@@ -54,6 +55,7 @@ function Pages() {
 function Header() {
   const location = useLocation()
   const navigate = useNavigate()
+  const online = useOnline()
 
   // BrowserRouter keeps the old scroll position between pages; start each page at the top.
   useEffect(() => {
@@ -89,6 +91,12 @@ function Header() {
           </button>
         )}
       </div>
+      {/* In the header so it stays in view on every page while offline (a common moment in the subway). */}
+      {!online && (
+        <p role="status" className="bg-amber-400 px-4 py-1.5 text-center text-sm font-semibold text-neutral-900">
+          You're offline. Times shown may be out of date.
+        </p>
+      )}
     </header>
   )
 }

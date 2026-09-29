@@ -37,5 +37,11 @@ export function secondsAgo(date: Date, now: Date): number {
   return Math.max(0, Math.round((now.getTime() - date.getTime()) / 1000))
 }
 
+/** Live times refresh every 10 seconds; older than this, something is wrong (offline, MBTA down). */
+export const STALE_AFTER_SECONDS = 30
+
+/** "45s ago" or "3 min ago". */
+export const agoLabel = (seconds: number) => (seconds < 60 ? `${seconds}s ago` : `${Math.floor(seconds / 60)} min ago`)
+
 /** "7:45 AM" in the device's locale. */
 export const clock = (time: Date | string) => new Date(time).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })

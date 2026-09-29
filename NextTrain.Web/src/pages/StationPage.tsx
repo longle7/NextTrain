@@ -2,7 +2,7 @@ import { Link, useParams } from 'react-router'
 import { alertsFor } from '../alerts'
 import { ALERTS_REFRESH_MS, api, getAlerts, getRoutes, stationRouteIds, type Prediction, type Station } from '../api'
 import { AlertBanner, Card, LineBadge, Status } from '../components'
-import { clock, countdown, groupDepartures, secondsAgo } from '../time'
+import { agoLabel, clock, countdown, groupDepartures, secondsAgo, STALE_AFTER_SECONDS } from '../time'
 import { useNow, usePolling } from '../usePolling'
 
 const REFRESH_MS = 10_000
@@ -21,6 +21,7 @@ export default function StationPage() {
   const alerts = usePolling(getAlerts, 'alerts', ALERTS_REFRESH_MS)
 
   const groups = predictions.data ? groupDepartures(predictions.data, now) : []
+  const age = predictions.updatedAt && secondsAgo(predictions.updatedAt, now)
   const stationAlerts =
     station.data && alerts.data
       ? alertsFor(alerts.data, { routeIds: stationRouteIds(station.data), stopId: station.data.mbtaStopId })
@@ -90,11 +91,15 @@ export default function StationPage() {
         })}
       </ul>
 
-      {predictions.updatedAt && (
-        <p className="text-center text-xs text-neutral-500">
-          Live from MBTA, updated {secondsAgo(predictions.updatedAt, now)}s ago
-        </p>
-      )}
+      {age !== undefined &&
+        (age > STALE_AFTER_SECONDS ? (
+          // The countdowns keep ticking from old predictions; say so rather than let them look live.
+          <p role="status" className="text-center text-sm font-semibold text-amber-700 dark:text-amber-400">
+            Times may be out of date. Last updated {agoLabel(age)}.
+          </p>
+        ) : (
+          <p className="text-center text-xs text-neutral-500">Live from MBTA, updated {agoLabel(age)}</p>
+        ))}
     </>
   )
 }
