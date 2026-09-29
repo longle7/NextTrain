@@ -2,7 +2,7 @@ import { useEffect } from 'react'
 import { Link, useParams } from 'react-router'
 import { alertsFor, majorAlert } from '../alerts'
 import { ALERTS_REFRESH_MS, api, getAlerts, getRoutes, stationRouteIds, type Prediction, type Station } from '../api'
-import { AlertBanner, Card, LineBadge, secondaryButton, Status } from '../components'
+import { AccessibleIcon, AlertBanner, Card, LineBadge, secondaryButton, Status } from '../components'
 import { rememberStation } from '../recent'
 import { agoLabel, clock, countdown, groupDepartures, noTrainsMessage, secondsAgo, STALE_AFTER_SECONDS } from '../time'
 import { useNow, usePolling, useTitle } from '../usePolling'
@@ -41,6 +41,13 @@ export default function StationPage() {
           {station.data &&
             stationRouteIds(station.data).map((id) => <LineBadge key={id} routeId={id} routes={routes.data} />)}
         </div>
+        {/* Wheelchair users need to know before they go; MBTA elevator outages show as alerts below. */}
+        {station.data?.isAccessible != null && (
+          <p className={`mt-2 flex items-center gap-1.5 text-sm font-semibold ${station.data.isAccessible ? 'text-blue-700 dark:text-blue-300' : 'text-neutral-500'}`}>
+            <AccessibleIcon className="size-5" />
+            {station.data.isAccessible ? 'Wheelchair accessible' : 'Not wheelchair accessible'}
+          </p>
+        )}
       </div>
 
       <div className="grid grid-cols-2 gap-2">

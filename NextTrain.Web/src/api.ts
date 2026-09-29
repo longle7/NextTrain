@@ -16,6 +16,7 @@ export interface Station {
   longitude: number
   routeId: string // comma-separated for transfer stations, e.g. "Orange,Red"
   averageWeekdayBoardings: number | null
+  isAccessible: boolean | null // step-free wheelchair access; null when MBTA has no information
 }
 
 export interface Prediction {

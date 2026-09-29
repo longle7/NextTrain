@@ -3,7 +3,7 @@ import type { Station } from './api'
 import { distanceMiles, nearestStations, walkLabel } from './geo'
 
 const station = (mbtaStopId: string, latitude: number, longitude: number): Station => ({
-  mbtaStopId, name: mbtaStopId, latitude, longitude, routeId: 'Red', averageWeekdayBoardings: null,
+  mbtaStopId, name: mbtaStopId, latitude, longitude, routeId: 'Red', averageWeekdayBoardings: null, isAccessible: null,
 })
 
 const parkStreet = station('place-pktrm', 42.3564, -71.0624)

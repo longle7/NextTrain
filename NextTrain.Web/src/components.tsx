@@ -98,6 +98,12 @@ export function StationLink({ station, routes, hideRoute, detail }: {
     <Link to={`/stations/${station.mbtaStopId}`} className="flex min-h-11 flex-1 items-center justify-between gap-2 py-1 hover:underline">
       <span>
         <span className="font-medium">{station.name}</span>
+        {station.isAccessible && (
+          <span className="ml-1.5 inline-flex align-[-2px] text-blue-600 dark:text-blue-400">
+            <AccessibleIcon className="size-4" />
+            <span className="sr-only">, wheelchair accessible</span>
+          </span>
+        )}
         {detail && <span className="block text-sm text-neutral-500">{detail}</span>}
       </span>
       <span className="flex flex-wrap justify-end gap-1">
@@ -156,6 +162,16 @@ export function AlertBanner({ alert }: { alert: Alert }) {
         )}
       </div>
     </details>
+  )
+}
+
+/** Wheelchair access symbol (drawn for NextTrain). */
+export function AccessibleIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" className={`fill-none stroke-current stroke-2 [stroke-linecap:round] [stroke-linejoin:round] ${className ?? ''}`} aria-hidden>
+      <circle cx="12" cy="4" r="1.6" className="fill-current stroke-none" />
+      <path d="M12 7.5v5h5l2.5 5.5M12 10h4M8.5 11.2a5 5 0 1 0 6.3 6.3" />
+    </svg>
   )
 }
 

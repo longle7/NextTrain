@@ -30,6 +30,21 @@ public class StationImportTests
         Assert.Equal("Green-B,Red", station.RouteId);
     }
 
+    [Theory]
+    [InlineData(1, true)]
+    [InlineData(2, false)]
+    [InlineData(0, null)]   // MBTA: no information
+    [InlineData(null, null)]
+    public void MergeStops_MapsWheelchairBoarding(int? wheelchairBoarding, bool? isAccessible)
+    {
+        var stop = Stop("place-harsq", "Harvard");
+        stop.Attributes.WheelchairBoarding = wheelchairBoarding;
+
+        var station = Assert.Single(StationImportService.MergeStops(new[] { ("Red", stop) }));
+
+        Assert.Equal(isAccessible, station.IsAccessible);
+    }
+
     [Fact]
     public void MergeStops_SkipsStopsWithoutCoordinates()
     {

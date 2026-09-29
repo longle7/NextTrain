@@ -24,6 +24,9 @@
         // Optional: direction info or platform grouping.
         public string? PlatformCode { get; set; }
 
+        // Step-free access for wheelchairs, from MBTA. Null when MBTA has no information.
+        public bool? IsAccessible { get; set; }
+
         // Average weekday boardings (all lines), from MBTA's published ridership counts. Null if unknown.
         public int? AverageWeekdayBoardings { get; set; }
 

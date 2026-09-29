@@ -3,7 +3,7 @@ import type { Route, Station, Vehicle } from './api'
 import { directionsDown, trainsByStation } from './lineTrains'
 
 const station = (id: string, name: string): Station => ({
-  mbtaStopId: id, name, latitude: 0, longitude: 0, routeId: 'Red', averageWeekdayBoardings: null,
+  mbtaStopId: id, name, latitude: 0, longitude: 0, routeId: 'Red', averageWeekdayBoardings: null, isAccessible: null,
 })
 
 // Red Line in line order, trimmed: Alewife at the top, both southern branches at the bottom.

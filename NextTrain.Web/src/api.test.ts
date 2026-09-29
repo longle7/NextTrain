@@ -2,7 +2,7 @@ import { expect, it } from 'vitest'
 import { searchStations, type Station } from './api'
 
 const station = (name: string): Station => ({
-  mbtaStopId: name, name, latitude: 0, longitude: 0, routeId: 'Red', averageWeekdayBoardings: null,
+  mbtaStopId: name, name, latitude: 0, longitude: 0, routeId: 'Red', averageWeekdayBoardings: null, isAccessible: null,
 })
 
 // Real station names (alphabetical, as the API returns them), plus "Parker" to test prefix ranking.
