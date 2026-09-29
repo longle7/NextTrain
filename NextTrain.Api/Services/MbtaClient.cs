@@ -67,6 +67,42 @@ namespace NextTrain.Api.Services
             return payload?.Data.OrderBy(r => r.Attributes.SortOrder).ToList() ?? new List<MbtaRouteDto>();
         }
 
+        public async Task<IReadOnlyList<MbtaVehicle>> GetSubwayVehiclesAsync()
+        {
+            var payload = await GetCachedAsync<MbtaIncludeResponseDto>(
+                "https://api-v3.mbta.com/vehicles?filter[route_type]=0,1&include=stop&fields[stop]=name" +
+                "&fields[vehicle]=latitude,longitude,bearing,direction_id,current_status", PredictionCacheDuration);
+            if (payload is null) return new List<MbtaVehicle>();
+
+            var stopNames = payload.Included.ToDictionary(s => s.Id, s => s.Attributes.Name);
+            return payload.Data
+                .Where(v => v.Attributes.Latitude is not null && v.Attributes.Longitude is not null)
+                .Select(v => new MbtaVehicle(
+                    v.Id, v.RelatedId("route") ?? "", v.Attributes.DirectionId,
+                    v.Attributes.Latitude!.Value, v.Attributes.Longitude!.Value,
+                    v.Attributes.Bearing, v.Attributes.CurrentStatus,
+                    stopNames.GetValueOrDefault(v.RelatedId("stop") ?? "")))
+                .ToList();
+        }
+
+        public async Task<IReadOnlyList<MbtaShape>> GetSubwayShapesAsync()
+        {
+            // Canonical patterns are the regular, non-diverted service. Direction 0 only: both directions share the track.
+            var routeIds = string.Join(",", (await GetSubwayRoutesAsync()).Select(r => r.Id));
+            var payload = await GetCachedAsync<MbtaIncludeResponseDto>(
+                $"https://api-v3.mbta.com/route_patterns?filter[route]={Uri.EscapeDataString(routeIds)}" +
+                "&filter[canonical]=true&filter[direction_id]=0&include=representative_trip.shape&fields[shape]=polyline",
+                RouteCacheDuration);
+            if (payload is null) return new List<MbtaShape>();
+
+            var polylines = payload.Included.Where(r => r.Type == "shape").ToDictionary(s => s.Id, s => s.Attributes.Polyline);
+            return payload.Included
+                .Where(r => r.Type == "trip")
+                .Select(t => new MbtaShape(t.RelatedId("route") ?? "", polylines.GetValueOrDefault(t.RelatedId("shape") ?? "") ?? ""))
+                .Where(s => s.Polyline != "")
+                .ToList();
+        }
+
         // Failures are not cached: GetOrCreateAsync stores nothing when the factory throws.
         private Task<T?> GetCachedAsync<T>(string url, TimeSpan duration) =>
             _cache.GetOrCreateAsync(url, entry =>

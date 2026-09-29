@@ -3,6 +3,7 @@ using System.Text;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Configuration;
 using NextTrain.Api.Services;
+using NextTrain.Core.Services;
 
 namespace NextTrain.Tests;
 
@@ -67,5 +68,49 @@ public class MbtaClientTests
         Assert.Equal(new[] { "Red", "Blue" }, routes.Select(r => r.Id));
         Assert.Equal("Red Line", routes[0].Attributes.LongName);
         Assert.Equal(new[] { "Ashmont/Braintree", "Alewife" }, routes[0].Attributes.DirectionDestinations);
+    }
+
+    [Fact]
+    public async Task GetSubwayVehiclesAsync_JoinsStopNames_SkipsTrainsWithoutLocation()
+    {
+        const string json = """
+            {"data":[
+              {"id":"R-1","attributes":{"latitude":42.3,"longitude":-71.06,"bearing":85,"direction_id":1,"current_status":"IN_TRANSIT_TO"},
+               "relationships":{"route":{"data":{"id":"Red"}},"stop":{"data":{"id":"70088"}}}},
+              {"id":"R-2","attributes":{"latitude":42.4,"longitude":-71.1,"bearing":null,"direction_id":0,"current_status":"STOPPED_AT"},
+               "relationships":{"route":{"data":{"id":"Red"}},"stop":{"data":null}}},
+              {"id":"R-3","attributes":{"latitude":null,"longitude":null,"direction_id":0},
+               "relationships":{"route":{"data":{"id":"Red"}}}}],
+             "included":[{"id":"70088","type":"stop","attributes":{"name":"Savin Hill"}}]}
+            """;
+        var client = new MbtaClient(new HttpClient(new StubHandler(json)), new ConfigurationBuilder().Build(),
+            new MemoryCache(new MemoryCacheOptions()));
+
+        var vehicles = await client.GetSubwayVehiclesAsync();
+
+        Assert.Equal(new[] { "R-1", "R-2" }, vehicles.Select(v => v.Id));
+        Assert.Equal(new MbtaVehicle("R-1", "Red", 1, 42.3, -71.06, 85, "IN_TRANSIT_TO", "Savin Hill"), vehicles[0]);
+        Assert.Null(vehicles[1].StopName);
+        Assert.Null(vehicles[1].Bearing);
+    }
+
+    [Fact]
+    public async Task GetSubwayShapesAsync_JoinsTripsToShapes_ForAllSubwayRoutes()
+    {
+        // Served for both the /routes and /route_patterns calls: each parse reads only the fields it needs.
+        const string json = """
+            {"data":[{"id":"Red","attributes":{"sort_order":1}}],
+             "included":[
+               {"id":"canonical-Red-C1-0","type":"trip","relationships":{"route":{"data":{"id":"Red"}},"shape":{"data":{"id":"s1"}}}},
+               {"id":"s1","type":"shape","attributes":{"polyline":"_p~iF~ps|U"}}]}
+            """;
+        var handler = new StubHandler(json);
+        var client = new MbtaClient(new HttpClient(handler), new ConfigurationBuilder().Build(),
+            new MemoryCache(new MemoryCacheOptions()));
+
+        var shape = Assert.Single(await client.GetSubwayShapesAsync());
+
+        Assert.Equal(new MbtaShape("Red", "_p~iF~ps|U"), shape);
+        Assert.Contains("filter[route]=Red&filter[canonical]=true", Uri.UnescapeDataString(handler.Urls[1]));
     }
 }
