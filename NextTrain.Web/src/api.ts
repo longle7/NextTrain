@@ -15,6 +15,7 @@ export interface Station {
   latitude: number
   longitude: number
   routeId: string // comma-separated for transfer stations, e.g. "Orange,Red"
+  averageWeekdayBoardings: number | null
 }
 
 export interface Prediction {

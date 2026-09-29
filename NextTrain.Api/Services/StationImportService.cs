@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text.Json;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
 using NextTrain.Api.Data;
@@ -20,6 +21,10 @@ namespace NextTrain.Api.Services
         {
             "Red", "Mattapan", "Orange", "Blue", "Green-B", "Green-C", "Green-D", "Green-E"
         };
+
+        // Station ID -> average weekday boardings, from the embedded MBTA ridership snapshot.
+        // ponytail: static Fall 2024 snapshot, refresh the JSON when MBTA publishes a new season.
+        private static readonly Lazy<Dictionary<string, int>> Ridership = new(LoadRidership);
 
         private readonly IMbtaClient _mbtaClient;
         private readonly NextTrainDbContext _dbContext;
@@ -41,6 +46,10 @@ namespace NextTrain.Api.Services
             }
 
             var imported = MergeStops(stopsByRoute);
+            foreach (var station in imported)
+            {
+                station.AverageWeekdayBoardings = Ridership.Value.TryGetValue(station.MbtaStopId, out var boardings) ? boardings : null;
+            }
 
             var existingById = await _dbContext.Stations.ToDictionaryAsync(s => s.MbtaStopId);
 
@@ -53,6 +62,7 @@ namespace NextTrain.Api.Services
                     existing.Longitude = station.Longitude;
                     existing.PlatformCode = station.PlatformCode;
                     existing.RouteId = station.RouteId;
+                    existing.AverageWeekdayBoardings = station.AverageWeekdayBoardings;
                     existing.UpdatedAtUtc = DateTime.UtcNow;
                 }
                 else
@@ -62,6 +72,15 @@ namespace NextTrain.Api.Services
             }
 
             await _dbContext.SaveChangesAsync();
+        }
+
+        private static Dictionary<string, int> LoadRidership()
+        {
+            using var stream = typeof(StationImportService).Assembly.GetManifestResourceStream("ridership.json")!;
+            using var json = JsonDocument.Parse(stream);
+            return json.RootElement.GetProperty("averageWeekdayBoardings")
+                .EnumerateObject()
+                .ToDictionary(p => p.Name, p => p.Value.GetInt32());
         }
 
         /// <summary>

@@ -24,6 +24,9 @@
         // Optional: direction info or platform grouping.
         public string? PlatformCode { get; set; }
 
+        // Average weekday boardings (all lines), from MBTA's published ridership counts. Null if unknown.
+        public int? AverageWeekdayBoardings { get; set; }
+
         // Timestamps for auditing/cache freshness.
         public DateTime CreatedAtUtc { get; set; } = DateTime.UtcNow;
         public DateTime? UpdatedAtUtc { get; set; }

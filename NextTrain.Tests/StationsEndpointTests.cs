@@ -25,8 +25,8 @@ public class StationsEndpointTests : IDisposable
         using (var db = TestDb.CreateClean())
         {
             db.Stations.AddRange(
-                new Station { MbtaStopId = "place-pktrm", Name = "Park Street", Latitude = 42.3564, Longitude = -71.0624, RouteId = "Green-B,Red" },
-                new Station { MbtaStopId = "place-gover", Name = "Government Center", Latitude = 42.3597, Longitude = -71.0592, RouteId = "Blue,Green-B" },
+                new Station { MbtaStopId = "place-pktrm", Name = "Park Street", Latitude = 42.3564, Longitude = -71.0624, RouteId = "Green-B,Red", AverageWeekdayBoardings = 41069 },
+                new Station { MbtaStopId = "place-gover", Name = "Government Center", Latitude = 42.3597, Longitude = -71.0592, RouteId = "Blue,Green-B", AverageWeekdayBoardings = 29846 },
                 new Station { MbtaStopId = "place-alfcl", Name = "Alewife", Latitude = 42.3958, Longitude = -71.1418, RouteId = "Red" });
             db.SaveChanges();
         }
@@ -69,6 +69,8 @@ public class StationsEndpointTests : IDisposable
     [InlineData("/stations/nearest?lon=-71")]
     [InlineData("/stations/nearest?lat=abc&lon=-71")]
     [InlineData("/stations/place-pktrm/predictions?direction=2")]
+    [InlineData("/stations?sort=line")] // line order needs a route
+    [InlineData("/stations?sort=bogus")]
     public async Task InvalidInput_Returns400(string url)
     {
         var response = await _client.GetAsync(url);
@@ -177,5 +179,24 @@ public class StationsEndpointTests : IDisposable
 
         Assert.Equal("#DA291C", route.Color);
         Assert.Equal("Alewife", route.DirectionDestinations[1]);
+    }
+
+    [Fact]
+    public async Task GetAll_SortByLine_FollowsMbtaOrder()
+    {
+        // MBTA order along the line, deliberately not alphabetical.
+        _mbta.StopsByRoute["Red"] = new() { new() { Id = "place-pktrm" }, new() { Id = "place-alfcl" } };
+
+        var stations = await _client.GetFromJsonAsync<List<Station>>("/stations?route=Red&sort=line");
+
+        Assert.Equal(new[] { "Park Street", "Alewife" }, stations!.Select(s => s.Name));
+    }
+
+    [Fact]
+    public async Task GetAll_SortByRidership_BusiestFirst_UnknownLast()
+    {
+        var stations = await _client.GetFromJsonAsync<List<Station>>("/stations?sort=ridership");
+
+        Assert.Equal(new[] { "Park Street", "Government Center", "Alewife" }, stations!.Select(s => s.Name));
     }
 }

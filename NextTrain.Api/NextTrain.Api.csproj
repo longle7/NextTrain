@@ -20,6 +20,10 @@
   </ItemGroup>
 
   <ItemGroup>
+    <EmbeddedResource Include="Data/ridership-fall-2024.json" LogicalName="ridership.json" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\NextTrain.Core\NextTrain.Core.csproj" />
   </ItemGroup>
 

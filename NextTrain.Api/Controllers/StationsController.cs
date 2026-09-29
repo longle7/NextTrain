@@ -1,4 +1,4 @@
-using System.ComponentModel.DataAnnotations;
+﻿using System.ComponentModel.DataAnnotations;
 using Microsoft.AspNetCore.Mvc;
 using NextTrain.Core.Domain;
 using NextTrain.Core.Services;
@@ -19,11 +19,42 @@ namespace NextTrain.Api.Controllers
             _lookup = lookup;
         }
 
-        // GET /stations?route=Red
+        // GET /stations?route=Red&sort=line
         [HttpGet]
-        public async Task<IReadOnlyList<Station>> GetAll([FromQuery] string? route)
+        public async Task<ActionResult<IEnumerable<Station>>> GetAll(
+            [FromServices] IMbtaClient mbta,
+            [FromQuery] string? route,
+            [FromQuery] StationSort sort = StationSort.Name)
         {
-            return await _lookup.GetAllStationsAsync(route);
+            var stations = await _lookup.GetAllStationsAsync(route); // A-Z
+
+            switch (sort)
+            {
+                case StationSort.Ridership:
+                    return Ok(stations.OrderByDescending(s => s.AverageWeekdayBoardings ?? -1));
+
+                case StationSort.Line when route is null:
+                    return ValidationProblem(new ValidationProblemDetails(new Dictionary<string, string[]>
+                    {
+                        ["sort"] = new[] { "sort=line requires a route." }
+                    }));
+
+                case StationSort.Line:
+                    IReadOnlyList<MbtaStopDto> lineOrder;
+                    try
+                    {
+                        lineOrder = await mbta.GetStopDtosAsync(route);
+                    }
+                    catch (Exception e) when (e is HttpRequestException or TaskCanceledException)
+                    {
+                        return Problem("MBTA line order is temporarily unavailable.", statusCode: StatusCodes.Status503ServiceUnavailable);
+                    }
+                    var position = lineOrder.Select((stop, i) => (stop.Id, i)).ToDictionary(x => x.Id, x => x.i);
+                    return Ok(stations.OrderBy(s => position.GetValueOrDefault(s.MbtaStopId, int.MaxValue)));
+
+                default:
+                    return Ok(stations);
+            }
         }
 
         // GET /stations/nearest?lat=42.3564&lon=-71.0624&route=Red
@@ -82,6 +113,13 @@ namespace NextTrain.Api.Controllers
                 .Where(p => p.ArrivalTime is not null || p.DepartureTime is not null) // skipped/cancelled stops
                 .OrderBy(p => p.DepartureTime ?? p.ArrivalTime));
         }
+    }
+
+    public enum StationSort
+    {
+        Name,
+        Line,      // MBTA's order along the route; requires a route
+        Ridership  // busiest first; stations without data last
     }
 
     public record PredictionResponse(
