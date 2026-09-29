@@ -1,6 +1,13 @@
-# Local stack: API on http://localhost:5080 (Swagger at /swagger) + SQL Server.
+# Local stack: web app on http://localhost:5173, API on http://localhost:5080 (Swagger at /swagger), SQL Server.
 # Optional: export MBTA_API_KEY=<key> before `docker compose up` for the higher rate limit.
 services:
+  web:
+    build: NextTrain.Web
+    depends_on:
+      - api
+    ports:
+      - "5173:80"
+
   sqlserver:
     image: mcr.microsoft.com/mssql/server:2022-latest
     environment:
