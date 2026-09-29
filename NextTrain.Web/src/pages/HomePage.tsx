@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Link } from 'react-router'
+import { Link, useNavigate } from 'react-router'
 import { alertsFor, majorAlert } from '../alerts'
 import {
   ALERTS_REFRESH_MS, api, getAlerts, getRoutes, getStations, searchStations, stationRouteIds,
@@ -15,6 +15,7 @@ import { useNow, usePolling, useTitle } from '../usePolling'
 export default function HomePage() {
   const routes = usePolling(getRoutes, 'routes')
   const stations = usePolling(getStations, 'stations')
+  const navigate = useNavigate()
   const alerts = usePolling(getAlerts, 'alerts', ALERTS_REFRESH_MS) // one poll shared by commutes and nearby
   const [query, setQuery] = useState('')
   const results = stations.data ? searchStations(stations.data, query) : []
@@ -26,7 +27,12 @@ export default function HomePage() {
     <>
       {/* The header shows the name; screen readers still need a page heading to start from. */}
       <h1 className="sr-only">NextTrain</h1>
-      <SearchInput value={query} onChange={setQuery} placeholder="Search stations" />
+      <SearchInput
+        value={query}
+        onChange={setQuery}
+        placeholder="Search stations"
+        onSubmit={() => results[0] && navigate(`/stations/${results[0].mbtaStopId}`)}
+      />
 
       <Status error={stations.error} loading={!!query.trim() && !stations.data && !stations.error} />
 

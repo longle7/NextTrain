@@ -175,7 +175,7 @@ function StationPicker({ stations, routes, onPick }: { stations: Station[] | und
   const results = stations ? (query.trim() ? searchStations(stations, query, 6) : recent) : []
   return (
     <div className="space-y-2">
-      <SearchInput value={query} onChange={setQuery} placeholder="Search stations" />
+      <SearchInput value={query} onChange={setQuery} placeholder="Search stations" onSubmit={() => results[0] && onPick(results[0].mbtaStopId)} />
       {!query.trim() && results.length > 0 && <p className="px-1 text-sm font-semibold text-neutral-500">Recent</p>}
       {results.map((s) => (
         <button key={s.mbtaStopId} onClick={() => onPick(s.mbtaStopId)} className="w-full text-left">

@@ -116,9 +116,22 @@ export function StationLink({ station, routes, hideRoute, detail }: {
   )
 }
 
-export function SearchInput({ value, onChange, placeholder }: { value: string; onChange: (value: string) => void; placeholder: string }) {
+/** Search box. The keyboard's Search key (Enter) calls `onSubmit`, e.g. to open the top result. */
+export function SearchInput({ value, onChange, placeholder, onSubmit }: {
+  value: string
+  onChange: (value: string) => void
+  placeholder: string
+  onSubmit?: () => void
+}) {
   return (
-    <label className="flex items-center gap-2 rounded-xl bg-white px-3 shadow-sm focus-within:ring-2 focus-within:ring-neutral-400 dark:bg-neutral-900">
+    <form
+      role="search"
+      onSubmit={(e) => {
+        e.preventDefault()
+        onSubmit?.()
+      }}
+      className="flex items-center gap-2 rounded-xl bg-white px-3 shadow-sm focus-within:ring-2 focus-within:ring-neutral-400 dark:bg-neutral-900"
+    >
       <svg viewBox="0 0 24 24" className="size-5 shrink-0 fill-none stroke-neutral-400 stroke-2" aria-hidden>
         <circle cx="11" cy="11" r="7" />
         <path d="m20 20-3.5-3.5" />
@@ -130,9 +143,10 @@ export function SearchInput({ value, onChange, placeholder }: { value: string; o
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
         aria-label={placeholder}
+        enterKeyHint="search"
         className="min-h-12 w-full bg-transparent text-base outline-none placeholder:text-neutral-400"
       />
-    </label>
+    </form>
   )
 }
 
