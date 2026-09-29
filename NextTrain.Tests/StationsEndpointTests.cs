@@ -1,17 +1,23 @@
 using System.Net;
 using System.Net.Http.Json;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.AspNetCore.TestHost;
+using Microsoft.Extensions.DependencyInjection;
+using NextTrain.Api.Controllers;
 using NextTrain.Core.Domain;
+using NextTrain.Core.Services;
 
 namespace NextTrain.Tests;
 
 /// <summary>
-/// Calls the /stations endpoints over HTTP against the real SQL Server test database.
+/// Calls the /stations endpoints over HTTP against the real SQL Server test database,
+/// with MBTA replaced by <see cref="FakeMbtaClient"/>.
 /// </summary>
 public class StationsEndpointTests : IDisposable
 {
     private readonly WebApplicationFactory<Program> _factory;
     private readonly HttpClient _client;
+    private readonly FakeMbtaClient _mbta = new();
 
     public StationsEndpointTests()
     {
@@ -25,7 +31,9 @@ public class StationsEndpointTests : IDisposable
         }
 
         _factory = new WebApplicationFactory<Program>()
-            .WithWebHostBuilder(b => b.UseSetting("ConnectionStrings:DefaultConnection", TestDb.ConnectionString));
+            .WithWebHostBuilder(b => b
+                .UseSetting("ConnectionStrings:DefaultConnection", TestDb.ConnectionString)
+                .ConfigureTestServices(services => services.AddSingleton<IMbtaClient>(_mbta)));
         _client = _factory.CreateClient();
     }
 
@@ -59,7 +67,8 @@ public class StationsEndpointTests : IDisposable
     [InlineData("/stations/nearest?lat=42&lon=-181")]
     [InlineData("/stations/nearest?lon=-71")]
     [InlineData("/stations/nearest?lat=abc&lon=-71")]
-    public async Task GetNearest_InvalidCoordinates_Returns400(string url)
+    [InlineData("/stations/place-pktrm/predictions?direction=2")]
+    public async Task InvalidInput_Returns400(string url)
     {
         var response = await _client.GetAsync(url);
 
@@ -69,6 +78,7 @@ public class StationsEndpointTests : IDisposable
     [Theory]
     [InlineData("/stations/nearest?lat=42.36&lon=-71.06&route=Orange")] // no stations on route
     [InlineData("/stations/place-unknown")]
+    [InlineData("/stations/place-unknown/predictions")]
     public async Task UnknownStation_Returns404(string url)
     {
         var response = await _client.GetAsync(url);
@@ -82,5 +92,44 @@ public class StationsEndpointTests : IDisposable
         var station = await _client.GetFromJsonAsync<Station>("/stations/place-alfcl");
 
         Assert.Equal("Alewife", station!.Name);
+    }
+
+    private static MbtaPredictionDto Prediction(string route, int direction, string? arrival, string? departure) => new()
+    {
+        Attributes = new MbtaPredictionAttributesDto
+        {
+            DirectionId = direction,
+            ArrivalTime = arrival is null ? null : DateTimeOffset.Parse(arrival),
+            DepartureTime = departure is null ? null : DateTimeOffset.Parse(departure),
+        },
+        Relationships = new MbtaPredictionRelationshipsDto { Route = new() { Data = new() { Id = route } } }
+    };
+
+    [Fact]
+    public async Task GetPredictions_FiltersByRouteAndDirection_SortedSoonestFirst()
+    {
+        _mbta.PredictionsByStop["place-pktrm"] = new()
+        {
+            Prediction("Red", 0, null, "2026-09-29T08:05:00-04:00"),
+            Prediction("Green-B", 1, "2026-09-29T08:01:00-04:00", null),
+            Prediction("Red", 1, "2026-09-29T08:02:30-04:00", "2026-09-29T08:03:00-04:00"),
+            Prediction("Red", 0, null, null), // skipped stop, dropped
+        };
+
+        var red = await _client.GetFromJsonAsync<List<PredictionResponse>>("/stations/place-pktrm/predictions?route=Red");
+        var redInbound = await _client.GetFromJsonAsync<List<PredictionResponse>>("/stations/place-pktrm/predictions?route=Red&direction=0");
+
+        Assert.Equal(new[] { 1, 0 }, red!.Select(p => p.DirectionId));
+        Assert.Equal(DateTimeOffset.Parse("2026-09-29T08:05:00-04:00"), Assert.Single(redInbound!).DepartureTime);
+    }
+
+    [Fact]
+    public async Task GetPredictions_MbtaDown_Returns503()
+    {
+        _mbta.PredictionsError = new HttpRequestException("MBTA is down");
+
+        var response = await _client.GetAsync("/stations/place-pktrm/predictions");
+
+        Assert.Equal(HttpStatusCode.ServiceUnavailable, response.StatusCode);
     }
 }
