@@ -16,6 +16,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\NextTrain.Core\NextTrain.Core.csproj" />
+    <ProjectReference Include="..\NextTrain.Api\NextTrain.Api.csproj" />
   </ItemGroup>
 
   <ItemGroup>
