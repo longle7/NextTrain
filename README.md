@@ -15,8 +15,20 @@ Built with .NET 10, ASP.NET Core, EF Core, and SQL Server, using the [MBTA V3 AP
 | GET | `/stations/{mbtaStopId}` | One station, e.g. `place-pktrm` |
 | GET | `/stations/{mbtaStopId}/predictions?route=&direction=` | Upcoming trains, soonest first |
 | POST | `/admin/import-stations` | Import subway stations from MBTA (Development only) |
+| GET | `/commutes` | Your saved commutes |
+| GET | `/commutes/{id}` | One saved commute |
+| POST | `/commutes` | Save a commute |
+| PUT | `/commutes/{id}` | Update a commute |
+| DELETE | `/commutes/{id}` | Delete a commute |
 
 Routes: `Red`, `Mattapan`, `Orange`, `Blue`, `Green-B`, `Green-C`, `Green-D`, `Green-E`. Direction is `0` or `1`.
+
+Commute endpoints require an `X-User-Id` header (placeholder until authentication is added). Example body:
+
+```json
+{ "mbtaStopId": "place-pktrm", "routeId": "Red", "directionId": 0,
+  "windowStart": "07:45", "windowEnd": "08:15", "activeDays": "Mon,Tue,Wed,Thu,Fri" }
+```
 
 ## Run with Docker
 
