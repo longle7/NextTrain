@@ -12,7 +12,12 @@ using NextTrain.Core.Services;
 namespace NextTrain.Api.Services
 {
     /// <summary>
-    /// Concrete implementation of IMbtaClient using HttpClient.
+    /// The only code that talks to the MBTA API. Every method follows the same pattern:
+    ///   1. Build the MBTA URL for what we need (filters narrow it to the subway; "fields" trims the payload).
+    ///   2. GetCachedAsync: return the cached copy if it's fresh enough, otherwise call MBTA and cache the answer.
+    ///   3. Reshape MBTA's JSON (via the DTO classes in NextTrain.Core) into what callers want.
+    /// Cache times are the constants below. Errors (MBTA down, timeout) are not caught here: they bubble up to
+    /// MbtaUnavailableFilter, which turns them into a 503.
     /// </summary>
     public class MbtaClient : IMbtaClient
     {
@@ -41,7 +46,7 @@ namespace NextTrain.Api.Services
             _httpClient = httpClient;
             _cache = cache;
 
-            // Optional API key from configuration (e.g., "Mbta:ApiKey")
+            // Optional API key (Mbta:ApiKey in configuration). Sent as a header on every request; see GetAsync.
             _apiKey = configuration["Mbta:ApiKey"];
         }
 
@@ -119,7 +124,9 @@ namespace NextTrain.Api.Services
             return payload?.Data ?? new List<MbtaAlertDto>();
         }
 
-        // Failures are not cached: GetOrCreateAsync stores nothing when the factory throws.
+        // The cache, keyed by URL: the first request fetches from MBTA; everyone else within `duration` gets the same
+        // answer from memory. So 1,000 people watching Park Street cost MBTA one request every 10 seconds.
+        // Failures are not cached: GetOrCreateAsync stores nothing when the fetch throws, so the next request retries.
         private Task<T?> GetCachedAsync<T>(string url, TimeSpan duration) =>
             _cache.GetOrCreateAsync(url, entry =>
             {

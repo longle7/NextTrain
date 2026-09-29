@@ -10,7 +10,8 @@ using NextTrain.Core.Services;
 namespace NextTrain.Api.Services
 {
     /// <summary>
-    /// EF Core-based station lookup service with haversine distance calculation.
+    /// Reads stations from the database (StationImportService puts them there). Controllers go through this
+    /// service instead of the DbContext so every station query lives in one place.
     /// </summary>
     public class StationLookupService : IStationLookupService
     {
@@ -21,100 +22,42 @@ namespace NextTrain.Api.Services
             _dbContext = dbContext;
         }
 
+        // The closest station by straight-line distance. There are only ~125 subway stations, so loading them and
+        // comparing in memory is simpler than a spatial database query, and plenty fast. Null when there are none.
         public async Task<Station?> GetNearestStationAsync(double latitude, double longitude, string? routeId = null)
         {
-            // Load stations (optionally filter by route).
-            IQueryable<Station> query = _dbContext.Stations;
-
-            if (!string.IsNullOrWhiteSpace(routeId))
-            {
-                query = WhereServesRoute(query, routeId);
-            }
-
-            var stations = await query.ToListAsync();
-
-            if (stations.Count == 0)
-            {
-                return null;
-            }
-
-            Station? nearest = null;
-            double nearestDistanceKm = double.MaxValue;
-
-            foreach (var station in stations)
-            {
-                var distanceKm = CalculateDistanceKm(
-                    latitude,
-                    longitude,
-                    station.Latitude,
-                    station.Longitude);
-
-                if (distanceKm < nearestDistanceKm)
-                {
-                    nearestDistanceKm = distanceKm;
-                    nearest = station;
-                }
-            }
-
-            return nearest;
+            var stations = await ServingRoute(routeId).ToListAsync();
+            return stations.MinBy(s => DistanceKm(latitude, longitude, s.Latitude, s.Longitude));
         }
 
-        public async Task<Station?> GetByMbtaStopIdAsync(string mbtaStopId)
+        public Task<Station?> GetByMbtaStopIdAsync(string mbtaStopId) =>
+            _dbContext.Stations.FirstOrDefaultAsync(s => s.MbtaStopId == mbtaStopId);
+
+        // All stations, or only one route's, A-Z.
+        public async Task<IReadOnlyList<Station>> GetAllStationsAsync(string? routeId = null) =>
+            await ServingRoute(routeId).OrderBy(s => s.Name).ToListAsync();
+
+        // Every station, or only those on routeId. This builds a database query; nothing runs until ToListAsync.
+        // A transfer station's RouteId lists all its lines ("Orange,Red"), so we match whole entries by wrapping in
+        // commas: ",Orange,Red," contains ",Red,", but ",Green-B,Red," does not contain ",Green,".
+        private IQueryable<Station> ServingRoute(string? routeId)
         {
-            return await _dbContext.Stations
-                .FirstOrDefaultAsync(s => s.MbtaStopId == mbtaStopId);
-        }
-
-        public async Task<IReadOnlyList<Station>> GetAllStationsAsync(string? routeId = null)
-        {
-            IQueryable<Station> query = _dbContext.Stations;
-
-            if (!string.IsNullOrWhiteSpace(routeId))
-            {
-                query = WhereServesRoute(query, routeId);
-            }
-
-            var stations = await query
-                .OrderBy(s => s.Name)
-                .ToListAsync();
-
-            return stations;
-        }
-
-        // RouteId is comma-separated for transfer stations (e.g., "Orange,Red"),
-        // so match whole entries: ",Orange,Red," contains ",Red,".
-        private static IQueryable<Station> WhereServesRoute(IQueryable<Station> query, string routeId)
-        {
+            if (string.IsNullOrWhiteSpace(routeId)) return _dbContext.Stations;
             var needle = "," + routeId + ",";
-            return query.Where(s => ("," + s.RouteId + ",").Contains(needle));
+            return _dbContext.Stations.Where(s => ("," + s.RouteId + ",").Contains(needle));
         }
 
-        // Haversine formula for distance in kilometers between two lat/lon points.
-        private static double CalculateDistanceKm(
-            double lat1,
-            double lon1,
-            double lat2,
-            double lon2)
+        // Great-circle ("haversine") distance in kilometers: the straight line between two points over the Earth's curve.
+        private static double DistanceKm(double lat1, double lon1, double lat2, double lon2)
         {
             const double EarthRadiusKm = 6371.0;
+            static double Radians(double degrees) => degrees * Math.PI / 180.0;
 
-            double dLat = DegreesToRadians(lat2 - lat1);
-            double dLon = DegreesToRadians(lon2 - lon1);
-
-            double a =
-                Math.Sin(dLat / 2) * Math.Sin(dLat / 2) +
-                Math.Cos(DegreesToRadians(lat1)) *
-                Math.Cos(DegreesToRadians(lat2)) *
-                Math.Sin(dLon / 2) * Math.Sin(dLon / 2);
-
-            double c = 2 * Math.Atan2(Math.Sqrt(a), Math.Sqrt(1 - a));
-
-            return EarthRadiusKm * c;
-        }
-
-        private static double DegreesToRadians(double degrees)
-        {
-            return degrees * Math.PI / 180.0;
+            var dLat = Radians(lat2 - lat1);
+            var dLon = Radians(lon2 - lon1);
+            var a = Math.Sin(dLat / 2) * Math.Sin(dLat / 2) +
+                    Math.Cos(Radians(lat1)) * Math.Cos(Radians(lat2)) * Math.Sin(dLon / 2) * Math.Sin(dLon / 2);
+            return EarthRadiusKm * 2 * Math.Atan2(Math.Sqrt(a), Math.Sqrt(1 - a));
         }
     }
 }
