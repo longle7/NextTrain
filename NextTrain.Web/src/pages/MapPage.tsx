@@ -2,7 +2,7 @@ import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router'
-import { api, getRoutes, type Route, type RouteShape, type Station, type Vehicle } from '../api'
+import { api, getRoutes, getStations, type Route, type RouteShape, type Vehicle } from '../api'
 import { Status } from '../components'
 import { decodePolyline } from '../polyline'
 import { usePolling } from '../usePolling'
@@ -34,7 +34,7 @@ function trainIcon(color: string, bearing: number | null) {
 export default function MapPage() {
   const navigate = useNavigate()
   const routes = usePolling(getRoutes, 'routes')
-  const stations = usePolling(() => api<Station[]>('/stations'), 'stations')
+  const stations = usePolling(getStations, 'stations')
   const shapes = usePolling(() => api<RouteShape[]>('/routes/shapes'), 'shapes')
   const vehicles = usePolling(() => api<Vehicle[]>('/vehicles'), 'vehicles', REFRESH_MS)
 
