@@ -49,7 +49,8 @@ export function Card({ children, to }: { children: ReactNode; to?: string }) {
   )
 }
 
-export function Status({ error, loading }: { error?: Error; loading?: boolean }) {
+/** An error box with a way out, or `rows` placeholder cards while loading. */
+export function Status({ error, loading, rows = 3 }: { error?: Error; loading?: boolean; rows?: number }) {
   const online = useOnline()
   if (error) {
     return (
@@ -67,7 +68,7 @@ export function Status({ error, loading }: { error?: Error; loading?: boolean })
   if (loading) {
     return (
       <div className="space-y-2" role="status" aria-label="Loading">
-        {[0, 1, 2].map((i) => (
+        {Array.from({ length: rows }, (_, i) => (
           <div key={i} className="h-16 rounded-xl bg-neutral-200 motion-safe:animate-pulse dark:bg-neutral-800" />
         ))}
       </div>

@@ -50,6 +50,12 @@ builder.Services.AddSwaggerGen();
 
 var app = builder.Build();
 
+// Without a key MBTA allows 20 requests a minute, shared by every user: fine for development, not for release.
+if (!app.Environment.IsDevelopment() && string.IsNullOrWhiteSpace(app.Configuration["Mbta:ApiKey"]))
+{
+    app.Logger.LogWarning("No MBTA API key (Mbta:ApiKey): MBTA allows only 20 requests a minute without one. Get a free key at https://api-v3.mbta.com.");
+}
+
 app.UseResponseCompression();
 if (!app.Environment.IsDevelopment())
 {

@@ -198,7 +198,8 @@ function MyCommutes({ routes, alerts }: { routes: Route[] | undefined; alerts: A
           </Link>
         )}
       </div>
-      <Status error={commutes.error} />
+      {/* One placeholder card, the size of a commute, so Home doesn't jump when they arrive. */}
+      <Status error={commutes.error} loading={!commutes.data && !commutes.error} rows={1} />
       {commutes.data?.length === 0 && (
         <Card>
           <p className="text-neutral-500">Save the trips you take every day. When it's time to go, your next train shows up right here.</p>
