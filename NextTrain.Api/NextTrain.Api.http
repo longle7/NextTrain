@@ -1,6 +1,6 @@
 @host = http://localhost:5112
 
-GET {{host}}/admin/import-stations
+POST {{host}}/admin/import-stations
 
 ###
 
