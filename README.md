@@ -31,7 +31,7 @@ Commutes belong to an anonymous ID stored on the device (sent as `X-User-Id`) un
 | GET | `/stations/{mbtaStopId}` | One station, e.g. `place-pktrm` |
 | GET | `/stations/{mbtaStopId}/predictions?route=&direction=` | Upcoming trains, soonest first |
 | GET | `/health` | Health probe for hosting: 200 when the database is reachable, 503 when not |
-| POST | `/admin/import-stations` | Import subway stations from MBTA (Development only) |
+| POST | `/admin/import-stations` | Re-import subway stations from MBTA now (Development only; it also happens automatically) |
 | GET | `/commutes` | Your saved commutes |
 | GET | `/commutes/{id}` | One saved commute |
 | POST | `/commutes` | Save a commute |
@@ -52,7 +52,6 @@ Commute and `/me` endpoints require an `X-User-Id` header (placeholder until aut
 
 ```
 docker compose up --build
-curl -X POST http://localhost:5080/admin/import-stations
 ```
 
 Web app at http://localhost:5173, API at http://localhost:5080, Swagger at http://localhost:5080/swagger.
@@ -66,7 +65,7 @@ dotnet run --project NextTrain.Api        # API at http://localhost:5112, databa
 cd NextTrain.Web && npm install && npm run dev   # web app at http://localhost:5173
 ```
 
-Import stations once with `POST http://localhost:5112/admin/import-stations`. The web dev server forwards `/api/*` to the API.
+Stations import from MBTA automatically when the API starts. The web dev server forwards `/api/*` to the API.
 
 ## MBTA API key
 
@@ -95,7 +94,7 @@ API tests run against a real SQL Server database (`NextTrainDb_Tests` on `localh
 
 ## Design notes
 
-- Stations are imported per subway route because MBTA only reports a stop's route when filtering by a single route. Transfer stations store all routes, e.g. `Green-B,Green-C,Green-D,Green-E,Red`.
+- Stations import from MBTA when the API starts and every 24 hours after (`Stations:RefreshHours`; 0 turns it off), so a fresh deployment is never empty and new or renamed stations appear on their own. A failed import retries in 5 minutes. They're imported per subway route because MBTA only reports a stop's route when filtering by a single route. Transfer stations store all routes, e.g. `Green-B,Green-C,Green-D,Green-E,Red`.
 - Ridership is average weekday boardings per station from MassDOT's Fall 2024 counts (embedded snapshot, applied on import). Mattapan stops are not in the dataset.
 - Predictions and train positions are cached in memory for 10 seconds, alerts for 1 minute, route info and shapes for 1 hour. MBTA calls time out after 10 seconds and retry transient failures twice. If MBTA is unavailable the API returns 503.
 - Errors are always problem JSON (RFC 9457): validation errors list what's wrong, unknown paths and IDs get a 404 body, and unexpected failures return a 500 without internals outside Development. Responses are compressed (Brotli or gzip), which cuts `/stations` from 33 KB to 8 KB and each 10-second `/vehicles` refresh from 15 KB to 4 KB.

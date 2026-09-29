@@ -21,6 +21,9 @@ builder.Services.AddHttpClient<IMbtaClient, MbtaClient>(client => client.Timeout
 builder.Services.AddScoped<IStationImportService, StationImportService>();
 builder.Services.AddScoped<IStationLookupService, StationLookupService>();
 
+// Stations import themselves at startup and daily (Stations:RefreshHours), so production is never empty.
+builder.Services.AddHostedService<StationRefreshService>();
+
 builder.Services.AddControllers();
 
 // The iPhone app runs the web app from capacitor://localhost and calls this API cross-origin.
