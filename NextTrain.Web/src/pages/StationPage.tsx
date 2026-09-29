@@ -1,10 +1,10 @@
 import { useEffect } from 'react'
 import { Link, useParams } from 'react-router'
-import { alertsFor } from '../alerts'
+import { alertsFor, majorAlert } from '../alerts'
 import { ALERTS_REFRESH_MS, api, getAlerts, getRoutes, stationRouteIds, type Prediction, type Station } from '../api'
-import { AlertBanner, Card, LineBadge, Status } from '../components'
+import { AlertBanner, Card, LineBadge, secondaryButton, Status } from '../components'
 import { rememberStation } from '../recent'
-import { agoLabel, clock, countdown, groupDepartures, secondsAgo, STALE_AFTER_SECONDS } from '../time'
+import { agoLabel, clock, countdown, groupDepartures, noTrainsMessage, secondsAgo, STALE_AFTER_SECONDS } from '../time'
 import { useNow, usePolling, useTitle } from '../usePolling'
 
 const REFRESH_MS = 10_000
@@ -35,18 +35,30 @@ export default function StationPage() {
 
   return (
     <>
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-bold">{station.data?.name ?? 'Station'}</h1>
-          <div className="mt-1 flex flex-wrap gap-1">
-            {station.data &&
-              stationRouteIds(station.data).map((id) => <LineBadge key={id} routeId={id} routes={routes.data} />)}
-          </div>
+      <div>
+        <h1 className="text-2xl font-bold">{station.data?.name ?? 'Station'}</h1>
+        <div className="mt-1 flex flex-wrap gap-1">
+          {station.data &&
+            stationRouteIds(station.data).map((id) => <LineBadge key={id} routeId={id} routes={routes.data} />)}
         </div>
-        <Link
-          to={`/commutes/new?station=${encodeURIComponent(stopId)}`}
-          className="flex min-h-11 shrink-0 items-center gap-1 rounded-xl bg-white px-3 text-sm font-semibold shadow-sm dark:bg-neutral-900"
-        >
+      </div>
+
+      <div className="grid grid-cols-2 gap-2">
+        {/* Apple Maps walking directions from where you are (opens the Maps app on iPhone). */}
+        {station.data && (
+          <a
+            href={`https://maps.apple.com/?daddr=${station.data.latitude},${station.data.longitude}&dirflg=w`}
+            target="_blank"
+            rel="noreferrer"
+            className={secondaryButton}
+          >
+            <svg viewBox="0 0 24 24" className="size-5 fill-current" aria-hidden>
+              <path d="M21 3 3 10.5l7.5 2.9L13.5 21z" />
+            </svg>
+            Directions
+          </a>
+        )}
+        <Link to={`/commutes/new?station=${encodeURIComponent(stopId)}`} className={secondaryButton}>
           <svg viewBox="0 0 24 24" className="size-5 fill-none stroke-current stroke-2" aria-hidden>
             <path d="M12 5v14M5 12h14" />
           </svg>
@@ -62,7 +74,7 @@ export default function StationPage() {
 
       {predictions.data && groups.length === 0 && (
         <Card>
-          <p className="text-neutral-500">No upcoming trains right now. The subway runs about 5 AM to 1 AM.</p>
+          <p className="text-neutral-500">{noTrainsMessage(!!majorAlert(stationAlerts), now)}</p>
         </Card>
       )}
 

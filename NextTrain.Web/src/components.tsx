@@ -9,6 +9,9 @@ export const primaryButton =
   'flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-neutral-900 px-4 font-semibold text-white transition active:opacity-80 disabled:opacity-40 dark:bg-white dark:text-neutral-900'
 /** Text action in the tint color ("Edit", "+ Add"). */
 export const linkButton = 'flex min-h-11 items-center px-2 font-semibold text-blue-600 active:opacity-60 dark:text-blue-400'
+/** Compact action beside others ("Directions", "Add commute"). */
+export const secondaryButton =
+  'flex min-h-11 items-center justify-center gap-1.5 rounded-xl bg-white px-3 text-sm font-semibold shadow-sm active:opacity-70 dark:bg-neutral-900'
 /** Destructive action ("Delete commute"). */
 export const dangerButton =
   'flex min-h-12 w-full items-center justify-center rounded-xl font-semibold text-red-600 active:opacity-60 disabled:opacity-40 dark:text-red-400'

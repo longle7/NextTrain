@@ -45,3 +45,11 @@ export const agoLabel = (seconds: number) => (seconds < 60 ? `${seconds}s ago` :
 
 /** "7:45 AM" in the device's locale. */
 export const clock = (time: Date | string) => new Date(time).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
+
+/** Why a station shows no departures: a service alert, the overnight closure (about 1 to 5 AM), or nothing predicted yet. */
+export function noTrainsMessage(hasMajorAlert: boolean, now: Date): string {
+  if (hasMajorAlert) return 'No trains are predicted here right now. See the service alert above.'
+  const hour = now.getHours()
+  if (hour >= 1 && hour < 5) return 'The subway is closed overnight. Trains start again around 5 AM.'
+  return 'No trains are predicted here right now. Check back in a minute.'
+}
