@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router'
 import { alertsFor, majorAlert } from '../alerts'
 import {
-  ALERTS_REFRESH_MS, api, getAlerts, getRoutes, getStations, searchStations,
+  ALERTS_REFRESH_MS, api, getAlerts, getRoutes, getStations, searchStations, stationRouteIds,
   type Alert, type Commute, type Prediction, type Route, type Station,
 } from '../api'
 import { commuteTiming, daysLabel, sortCommutes, timingLabel, windowLabel } from '../commutes'
@@ -14,6 +14,7 @@ import { useNow, usePolling } from '../usePolling'
 export default function HomePage() {
   const routes = usePolling(getRoutes, 'routes')
   const stations = usePolling(getStations, 'stations')
+  const alerts = usePolling(getAlerts, 'alerts', ALERTS_REFRESH_MS) // one poll shared by commutes and nearby
   const [query, setQuery] = useState('')
   const results = stations.data ? searchStations(stations.data, query) : []
 
@@ -32,21 +33,21 @@ export default function HomePage() {
         </section>
       ) : (
         <>
-          <MyCommutes routes={routes.data} />
-          {stations.data && <Nearby stations={stations.data} routes={routes.data} />}
+          <MyCommutes routes={routes.data} alerts={alerts.data} />
+          {stations.data && <Nearby stations={stations.data} routes={routes.data} alerts={alerts.data} />}
         </>
       )}
     </>
   )
 }
 
-function StationList({ stations, routes, details }: { stations: Station[]; routes: Route[] | undefined; details?: string[] }) {
+function StationList({ stations, routes }: { stations: Station[]; routes: Route[] | undefined }) {
   return (
     <ul className="space-y-2">
-      {stations.map((station, i) => (
+      {stations.map((station) => (
         <li key={station.mbtaStopId}>
           <Card>
-            <StationLink station={station} routes={routes} detail={details?.[i]} />
+            <StationLink station={station} routes={routes} />
           </Card>
         </li>
       ))}
@@ -56,7 +57,7 @@ function StationList({ stations, routes, details }: { stations: Station[]; route
 
 type Located = { state: 'idle' | 'locating' } | { state: 'error'; message: string } | { state: 'found'; coords: GeolocationCoordinates }
 
-function Nearby({ stations, routes }: { stations: Station[]; routes: Route[] | undefined }) {
+function Nearby({ stations, routes, alerts }: { stations: Station[]; routes: Route[] | undefined; alerts: Alert[] | undefined }) {
   const [location, setLocation] = useState<Located>({ state: 'idle' })
 
   const locate = () => {
@@ -89,11 +90,16 @@ function Nearby({ stations, routes }: { stations: Station[]; routes: Route[] | u
           </p>
         </Card>
       ) : location.state === 'found' ? (
-        <StationList
-          stations={nearest.map((n) => n.station)}
-          routes={routes}
-          details={nearest.map((n) => walkLabel(n.miles))}
-        />
+        <ul className="space-y-2">
+          {nearest.map(({ station, miles }, i) => (
+            <li key={station.mbtaStopId}>
+              <Card>
+                <StationLink station={station} routes={routes} detail={walkLabel(miles)} />
+                {i === 0 && <NextTrains station={station} routes={routes} alerts={alerts} />}
+              </Card>
+            </li>
+          ))}
+        </ul>
       ) : (
         <Card>
           <p className="text-neutral-500">
@@ -116,10 +122,51 @@ function Nearby({ stations, routes }: { stations: Station[]; routes: Route[] | u
   )
 }
 
-function MyCommutes({ routes }: { routes: Route[] | undefined }) {
+// The closest station's next train each way, right on Home: the answer when you're already at the station.
+const NEARBY_ROWS = 6
+
+function NextTrains({ station, routes, alerts }: { station: Station; routes: Route[] | undefined; alerts: Alert[] | undefined }) {
+  const now = useNow()
+  const path = `/stations/${encodeURIComponent(station.mbtaStopId)}/predictions`
+  const predictions = usePolling(() => api<Prediction[]>(path), path, 10_000)
+  const groups = predictions.data ? groupDepartures(predictions.data, now, 1) : []
+  const alert = alerts && majorAlert(alertsFor(alerts, { routeIds: stationRouteIds(station), stopId: station.mbtaStopId }))
+
+  return (
+    <Link to={`/stations/${station.mbtaStopId}`} className="mt-2 block border-t border-neutral-100 pt-2 dark:border-neutral-800">
+      {alert && (
+        <p className="flex items-start gap-1.5 py-1 text-sm font-semibold text-amber-700 dark:text-amber-400">
+          <WarningIcon className="mt-0.5 size-4 shrink-0" />
+          {alert.summary}
+        </p>
+      )}
+      {predictions.error ? (
+        <p className="py-1 text-sm text-neutral-500">Live times unavailable</p>
+      ) : !predictions.data ? (
+        <div className="my-1 h-16 rounded-lg bg-neutral-100 motion-safe:animate-pulse dark:bg-neutral-800" role="status" aria-label="Loading" />
+      ) : groups.length === 0 ? (
+        <p className="py-1 text-sm text-neutral-500">No trains predicted right now</p>
+      ) : (
+        <ul>
+          {groups.slice(0, NEARBY_ROWS).map((g) => (
+            <li key={`${g.routeId}|${g.directionId}`} className="flex items-center justify-between gap-2 py-1.5">
+              <span className="flex min-w-0 items-center gap-2">
+                <LineBadge routeId={g.routeId} routes={routes} />
+                <span className="truncate">to {routes?.find((r) => r.id === g.routeId)?.directionDestinations[g.directionId] ?? '…'}</span>
+              </span>
+              <span className="shrink-0 font-bold tabular-nums">{countdown(g.departures[0], now)}</span>
+            </li>
+          ))}
+          {groups.length > NEARBY_ROWS && <li className="pt-1 text-sm font-semibold text-blue-600 dark:text-blue-400">All departures ›</li>}
+        </ul>
+      )}
+    </Link>
+  )
+}
+
+function MyCommutes({ routes, alerts }: { routes: Route[] | undefined; alerts: Alert[] | undefined }) {
   const now = useNow(15_000)
   const commutes = usePolling(() => api<Commute[]>('/commutes'), 'commutes')
-  const alerts = usePolling(getAlerts, 'alerts', ALERTS_REFRESH_MS)
 
   return (
     <section className="space-y-2">
@@ -153,10 +200,8 @@ function MyCommutes({ routes }: { routes: Route[] | undefined }) {
                 routes={routes}
                 now={now}
                 alert={
-                  alerts.data &&
-                  majorAlert(
-                    alertsFor(alerts.data, { routeIds: [commute.routeId], stopId: commute.mbtaStopId, directionId: commute.directionId }),
-                  )
+                  alerts &&
+                  majorAlert(alertsFor(alerts, { routeIds: [commute.routeId], stopId: commute.mbtaStopId, directionId: commute.directionId }))
                 }
               />
             </li>
