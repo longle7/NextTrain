@@ -101,6 +101,23 @@ public class CommutesEndpointTests : IDisposable
     }
 
     [Fact]
+    public async Task Create_OverTheLimit_Returns400_WithAMessage()
+    {
+        using var alice = ClientFor("alice");
+        for (var i = 0; i < CommutesController.MaxCommutesPerUser; i++)
+        {
+            Assert.Equal(HttpStatusCode.Created, (await alice.PostAsJsonAsync("/commutes", Request())).StatusCode);
+        }
+
+        var response = await alice.PostAsJsonAsync("/commutes", Request());
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Contains("up to 20 commutes", await response.Content.ReadAsStringAsync());
+        using var bob = ClientFor("bob");
+        Assert.Equal(HttpStatusCode.Created, (await bob.PostAsJsonAsync("/commutes", Request())).StatusCode); // per user
+    }
+
+    [Fact]
     public async Task MissingUserIdHeader_Returns400()
     {
         using var anonymous = _factory.CreateClient();

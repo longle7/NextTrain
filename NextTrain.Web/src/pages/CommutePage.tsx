@@ -5,6 +5,7 @@ import {
   type Commute, type CommuteInput, type Route, type Station,
 } from '../api'
 import { WEEK } from '../commutes'
+import { recentStationIds } from '../recent'
 import { Card, dangerButton, LineBadge, linkButton, primaryButton, SearchInput, Status } from '../components'
 import { usePolling, useTitle } from '../usePolling'
 
@@ -168,10 +169,14 @@ function CommuteForm({ existing, initialStopId }: { existing: Commute | undefine
 
 function StationPicker({ stations, routes, onPick }: { stations: Station[] | undefined; routes: Route[] | undefined; onPick: (id: string) => void }) {
   const [query, setQuery] = useState('')
-  const results = stations ? searchStations(stations, query, 6) : []
+  const [recentIds] = useState(recentStationIds)
+  // Before typing, offer the stations you looked at last: often the one you're about to save.
+  const recent = recentIds.flatMap((id) => stations?.find((s) => s.mbtaStopId === id) ?? [])
+  const results = stations ? (query.trim() ? searchStations(stations, query, 6) : recent) : []
   return (
     <div className="space-y-2">
       <SearchInput value={query} onChange={setQuery} placeholder="Search stations" />
+      {!query.trim() && results.length > 0 && <p className="px-1 text-sm font-semibold text-neutral-500">Recent</p>}
       {results.map((s) => (
         <button key={s.mbtaStopId} onClick={() => onPick(s.mbtaStopId)} className="w-full text-left">
           <Card>

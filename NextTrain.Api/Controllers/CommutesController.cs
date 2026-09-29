@@ -16,6 +16,9 @@ namespace NextTrain.Api.Controllers
     {
         private static readonly string[] ValidDays = { "Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun" };
 
+        // Far more than anyone commutes; stops a buggy or abusive client from filling the database.
+        public const int MaxCommutesPerUser = 20;
+
         private readonly NextTrainDbContext _db;
 
         public CommutesController(NextTrainDbContext db)
@@ -50,6 +53,12 @@ namespace NextTrain.Api.Controllers
             CommuteRequest request,
             [FromHeader(Name = "X-User-Id"), Required, MaxLength(100)] string userId)
         {
+            if (await _db.UserCommutes.CountAsync(c => c.UserId == userId) >= MaxCommutesPerUser)
+            {
+                ModelState.AddModelError("", $"You can save up to {MaxCommutesPerUser} commutes. Delete one to add another.");
+                return ValidationProblem();
+            }
+
             var commute = new UserCommute { UserId = userId };
             if (!await TryApplyAsync(commute, request))
             {
