@@ -99,9 +99,7 @@ function StationLink({ station, routes, currentRoute, showRidership }: {
   const transfers = stationRouteIds(station).filter((id) => id !== currentRoute)
   // Several Green branches read better as one "GL" badge.
   const greens = transfers.filter((id) => id.startsWith('Green-'))
-  const badges = greens.length > 1
-    ? [...transfers.filter((id) => !id.startsWith('Green-')), greens[0]]
-    : transfers
+  const badges = [...new Set(transfers.map((id) => (greens.length > 1 && id.startsWith('Green-') ? 'Green' : id)))]
   return (
     <Link to={`/stations/${station.mbtaStopId}`} className="flex min-h-11 flex-1 items-center justify-between gap-2 py-1 hover:underline">
       <span>
@@ -114,7 +112,7 @@ function StationLink({ station, routes, currentRoute, showRidership }: {
       </span>
       <span className="flex flex-wrap justify-end gap-1">
         {badges.map((id) => (
-          <LineBadge key={id} routeId={id} routes={routes} label={greens.length > 1 && id === greens[0] ? 'GL' : undefined} />
+          <LineBadge key={id} routeId={id} routes={routes} />
         ))}
       </span>
     </Link>

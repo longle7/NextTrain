@@ -24,7 +24,7 @@ namespace NextTrain.Api.Services
 
         // Station ID -> average weekday boardings, from the embedded MBTA ridership snapshot.
         // ponytail: static Fall 2024 snapshot, refresh the JSON when MBTA publishes a new season.
-        private static readonly Lazy<Dictionary<string, int>> Ridership = new(LoadRidership);
+        private static readonly Dictionary<string, int> Ridership = LoadRidership();
 
         private readonly IMbtaClient _mbtaClient;
         private readonly NextTrainDbContext _dbContext;
@@ -48,7 +48,7 @@ namespace NextTrain.Api.Services
             var imported = MergeStops(stopsByRoute);
             foreach (var station in imported)
             {
-                station.AverageWeekdayBoardings = Ridership.Value.TryGetValue(station.MbtaStopId, out var boardings) ? boardings : null;
+                station.AverageWeekdayBoardings = Ridership.TryGetValue(station.MbtaStopId, out var boardings) ? boardings : null;
             }
 
             var existingById = await _dbContext.Stations.ToDictionaryAsync(s => s.MbtaStopId);

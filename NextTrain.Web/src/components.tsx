@@ -12,9 +12,9 @@ export function TLogo() {
 }
 
 /** Colored line pill, e.g. "RL" in red. Gray until routes load. */
-export function LineBadge({ routeId, routes, label: labelOverride }: { routeId: string; routes: Route[] | undefined; label?: string }) {
-  const route = routes?.find((r) => r.id === routeId)
-  const label = labelOverride ?? (routeId.startsWith('Green-') ? `GL ${routeId.slice(6)}` : routeId === 'Mattapan' ? 'M' : `${routeId[0]}L`)
+export function LineBadge({ routeId, routes }: { routeId: string; routes: Route[] | undefined }) {
+  const route = routes?.find((r) => r.id.startsWith(routeId)) // 'Green' matches any branch
+  const label = routeId.startsWith('Green-') ? `GL ${routeId.slice(6)}` : routeId === 'Mattapan' ? 'M' : `${routeId[0]}L`
   return (
     <span
       className="inline-flex h-6 min-w-9 items-center justify-center rounded-full bg-mbta-silver px-2 text-xs font-bold text-white"
