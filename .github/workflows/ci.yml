@@ -28,9 +28,9 @@ jobs:
       NEXTTRAIN_TEST_DB: Server=localhost,1433;Database=NextTrainDb_Tests;User Id=sa;Password=CiTest!Passw0rd;TrustServerCertificate=True;
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/setup-dotnet@v6
         with:
           dotnet-version: 10.0.x
 
