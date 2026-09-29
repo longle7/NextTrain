@@ -108,15 +108,14 @@ Location permission is optional; it's only used on the device to find nearby sta
 2. **Host the API** over HTTPS with SQL Server. Set `ConnectionStrings:DefaultConnection`, `Mbta:ApiKey` (a free key raises MBTA's limit from 20 to 1,000 requests a minute), and `Cors:AllowedOrigins`, and point the host's health probe at `/health`. Stations import themselves on first start.
 3. **Host the web app** as well, so `/privacy` has a public URL for the listing.
 4. **Switch map tiles** from the public OpenStreetMap servers to a commercial tile provider; OpenStreetMap's tile policy doesn't cover app traffic.
-5. **Wrap with Capacitor** on a Mac:
+5. **Build the iPhone app** on a Mac. The Xcode project is already in `NextTrain.Web/ios`: iPhone-only, portrait, app icon, branded launch screen, and the Info.plist strings above. If you want a different bundle ID than `com.longle7.nexttrain`, change it in `capacitor.config.ts` and in Xcode *before* the first upload, because it can't change afterwards.
    ```
    cd NextTrain.Web
-   npm i @capacitor/core @capacitor/ios && npm i -D @capacitor/cli
-   npx cap init NextTrain <your.bundle.id> --web-dir dist
-   VITE_API_URL=https://<your-api-host> npm run build
-   npx cap add ios && npx cap open ios
+   npm ci
+   VITE_API_URL=https://<your-api-host> npm run ios   # build the web app and copy it into the iOS project
+   npx cap open ios                                    # opens Xcode: set your signing team, then Run or Archive
    ```
-   In Xcode: set your signing team, make it iPhone-only, add the Info.plist strings above, and use `NextTrain.Web/assets/app-store-icon.png` (1024 × 1024, no alpha) as the app icon.
+   For the Simulator against your local API, use `VITE_API_URL=http://localhost:5112` instead (the app allows local-network HTTP for this).
 6. **Ship to TestFlight first** and try it on the subway, including the offline banner in a tunnel.
 
 **Guideline 4.2 risk:** Apple rejects apps that are "just a website". NextTrain's native-feeling UI, location, offline handling, and live features help. Adding **push notifications for commutes** ("your train leaves in 5 minutes"; the `NotificationSubscription` table is ready) is the strongest answer if Review pushes back. Sign in with Apple is **not** required, because the app offers no third-party login.
