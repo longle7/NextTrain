@@ -1,0 +1,5 @@
+<Solution>
+  <Project Path="NextTrain.Api/NextTrain.Api.csproj" />
+  <Project Path="NextTrain.Core/NextTrain.Core.csproj" />
+  <Project Path="NextTrain.Tests/NextTrain.Tests.csproj" />
+</Solution>
