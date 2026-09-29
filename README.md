@@ -10,6 +10,7 @@ Built with .NET 10, ASP.NET Core, EF Core, and SQL Server, using the [MBTA V3 AP
 
 | Method | Path | Description |
 |---|---|---|
+| GET | `/routes` | Subway lines with colors and direction destinations |
 | GET | `/stations?route=Red` | List stations, optionally filtered by route |
 | GET | `/stations/nearest?lat=&lon=&route=` | Nearest station to a location |
 | GET | `/stations/{mbtaStopId}` | One station, e.g. `place-pktrm` |
@@ -75,4 +76,4 @@ Tests run against a real SQL Server database (`NextTrainDb_Tests` on `localhost`
 ## Design notes
 
 - Stations are imported per subway route because MBTA only reports a stop's route when filtering by a single route. Transfer stations store all routes, e.g. `Green-B,Green-C,Green-D,Green-E,Red`.
-- Predictions are cached in memory for 30 seconds per station. MBTA calls time out after 10 seconds and retry transient failures twice. If MBTA is unavailable the API returns 503.
+- Predictions are cached in memory for 10 seconds per station; route info for 1 hour. MBTA calls time out after 10 seconds and retry transient failures twice. If MBTA is unavailable the API returns 503.

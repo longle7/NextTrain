@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Net.Http;
 using System.Net.Http.Json;
 using System.Text.Json;
@@ -15,8 +16,11 @@ namespace NextTrain.Api.Services
     /// </summary>
     public class MbtaClient : IMbtaClient
     {
-        // MBTA predictions change every ~30s, and the keyless rate limit is 20 requests/minute.
-        public static readonly TimeSpan PredictionCacheDuration = TimeSpan.FromSeconds(30);
+        // Matches the web app's 10s refresh. Needs an MBTA API key under load (keyless limit is 20 requests/minute).
+        public static readonly TimeSpan PredictionCacheDuration = TimeSpan.FromSeconds(10);
+
+        // Route names and colors almost never change.
+        public static readonly TimeSpan RouteCacheDuration = TimeSpan.FromHours(1);
 
         // MBTA JSON uses snake_case (e.g., "arrival_time", "platform_code").
         private static readonly JsonSerializerOptions JsonOptions = new()
@@ -51,15 +55,24 @@ namespace NextTrain.Api.Services
             var url = $"https://api-v3.mbta.com/predictions?filter[stop]={Uri.EscapeDataString(mbtaStopId)}" +
                       $"&filter[route]={Uri.EscapeDataString(routeIds)}";
 
-            var predictions = await _cache.GetOrCreateAsync(url, async entry =>
-            {
-                entry.AbsoluteExpirationRelativeToNow = PredictionCacheDuration;
-                var payload = await GetAsync<MbtaPredictionsResponseDto>(url);
-                return payload?.Data ?? new List<MbtaPredictionDto>();
-            });
-
-            return predictions!;
+            var payload = await GetCachedAsync<MbtaPredictionsResponseDto>(url, PredictionCacheDuration);
+            return payload?.Data ?? new List<MbtaPredictionDto>();
         }
+
+        public async Task<IReadOnlyList<MbtaRouteDto>> GetSubwayRoutesAsync()
+        {
+            var payload = await GetCachedAsync<MbtaRoutesResponseDto>(
+                "https://api-v3.mbta.com/routes?filter[type]=0,1", RouteCacheDuration);
+            return payload?.Data.OrderBy(r => r.Attributes.SortOrder).ToList() ?? new List<MbtaRouteDto>();
+        }
+
+        // Failures are not cached: GetOrCreateAsync stores nothing when the factory throws.
+        private Task<T?> GetCachedAsync<T>(string url, TimeSpan duration) =>
+            _cache.GetOrCreateAsync(url, entry =>
+            {
+                entry.AbsoluteExpirationRelativeToNow = duration;
+                return GetAsync<T>(url);
+            });
 
         private async Task<T?> GetAsync<T>(string url)
         {

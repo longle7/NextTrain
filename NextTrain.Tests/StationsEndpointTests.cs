@@ -159,4 +159,23 @@ public class StationsEndpointTests : IDisposable
 
         Assert.Equal(HttpStatusCode.NotFound, post.StatusCode);
     }
+
+    [Fact]
+    public async Task GetRoutes_ReturnsDisplayInfo_WithHashColors()
+    {
+        _mbta.Routes.Add(new MbtaRouteDto
+        {
+            Id = "Red",
+            Attributes = new()
+            {
+                LongName = "Red Line", Color = "DA291C", TextColor = "FFFFFF",
+                DirectionNames = new() { "South", "North" }, DirectionDestinations = new() { "Ashmont/Braintree", "Alewife" }
+            }
+        });
+
+        var route = Assert.Single((await _client.GetFromJsonAsync<List<RouteResponse>>("/routes"))!);
+
+        Assert.Equal("#DA291C", route.Color);
+        Assert.Equal("Alewife", route.DirectionDestinations[1]);
+    }
 }

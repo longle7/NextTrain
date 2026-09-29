@@ -16,5 +16,8 @@ namespace NextTrain.Core.Services
         // Gets predictions at a station (parent IDs like "place-pktrm" include all platforms)
         // for a comma-separated list of routes (e.g., "Orange,Red").
         Task<IReadOnlyList<MbtaPredictionDto>> GetPredictionsAsync(string mbtaStopId, string routeIds);
+
+        // Gets subway routes (types 0 and 1) with colors and direction names, in MBTA sort order.
+        Task<IReadOnlyList<MbtaRouteDto>> GetSubwayRoutesAsync();
     }
 }
