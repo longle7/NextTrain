@@ -1,5 +1,4 @@
 using Microsoft.EntityFrameworkCore;
-using NextTrain.Api.Data;
 using NextTrain.Api.Services;
 using NextTrain.Core.Services;
 
@@ -7,7 +6,7 @@ namespace NextTrain.Tests;
 
 /// <summary>
 /// MergeStops unit tests, plus an end-to-end import against a real SQL Server test database
-/// with a fake MBTA client. Connection string defaults to local SQL Server; override with NEXTTRAIN_TEST_DB.
+/// (see <see cref="TestDb"/>) with a fake MBTA client.
 /// </summary>
 public class StationImportTests
 {
@@ -44,10 +43,6 @@ public class StationImportTests
         Assert.Equal("place-alfcl", Assert.Single(stations).MbtaStopId);
     }
 
-    private static readonly string ConnectionString =
-        Environment.GetEnvironmentVariable("NEXTTRAIN_TEST_DB")
-        ?? "Server=localhost;Database=NextTrainDb_Tests;Trusted_Connection=True;TrustServerCertificate=True;";
-
     private class FakeMbtaClient : IMbtaClient
     {
         public Dictionary<string, List<MbtaStopDto>> StopsByRoute { get; } = new();
@@ -56,19 +51,10 @@ public class StationImportTests
             Task.FromResult<IReadOnlyList<MbtaStopDto>>(StopsByRoute.GetValueOrDefault(routeId) ?? new());
     }
 
-    private static NextTrainDbContext CreateCleanDb()
-    {
-        var db = new NextTrainDbContext(new DbContextOptionsBuilder<NextTrainDbContext>()
-            .UseSqlServer(ConnectionString).Options);
-        db.Database.Migrate();
-        db.Stations.ExecuteDelete();
-        return db;
-    }
-
     [Fact]
     public async Task Import_InsertsThenUpdates_AndRouteFilterMatchesTransferStations()
     {
-        using var db = CreateCleanDb();
+        using var db = TestDb.CreateClean();
         var mbta = new FakeMbtaClient();
         mbta.StopsByRoute["Red"] = new() { Stop("place-pktrm", "Park Street"), Stop("place-alfcl", "Alewife") };
         mbta.StopsByRoute["Green-B"] = new() { Stop("place-pktrm", "Park Street") };
