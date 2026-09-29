@@ -10,10 +10,11 @@ namespace NextTrain.Api.Controllers
     /// A user's saved commutes (create, read, update, delete).
     ///
     /// Who is the user? The app makes up a random ID once per device and sends it as the X-User-Id header on
-    /// every request. Each endpoint only touches rows with that ID, and someone else's commute answers 404
-    /// (not 403), so IDs can't be discovered by guessing.
-    /// Saving (POST/PUT): check the limit, then TryApplyAsync validates the request against the database and
-    /// copies it onto the entity; any problem returns a 400 listing what's wrong.
+    /// every request. Each endpoint only touches rows with that ID. Someone else's commute answers 404 (not 403),
+    /// so nobody can tell whether another user's commute exists.
+    /// Saving: creating (POST) first checks the per-user limit; then both POST and PUT run TryApplyAsync, which
+    /// validates the request against the database and copies it onto the entity. Any problem returns a 400
+    /// listing what's wrong.
     /// ponytail: header is trusted as-is, replace with the authenticated user's ID when login exists.
     /// </summary>
     [ApiController]
