@@ -10,19 +10,13 @@ namespace NextTrain.Api.Controllers
     [Route("alerts")]
     public class AlertsController : ControllerBase
     {
-        // GET /alerts
+        // GET /alerts: every subway alert in effect now, most severe first. We send them all (one cached response
+        // for everyone); the app picks the ones that match each line, station, and commute (see alerts.ts).
         [HttpGet]
-        public async Task<ActionResult<IEnumerable<AlertResponse>>> GetAll([FromServices] IMbtaClient mbta)
+        public async Task<IEnumerable<AlertResponse>> GetAll([FromServices] IMbtaClient mbta)
         {
-            try
-            {
-                var alerts = await mbta.GetSubwayAlertsAsync();
-                return Ok(alerts.OrderByDescending(a => a.Attributes.Severity).Select(AlertResponse.From));
-            }
-            catch (Exception e) when (e is HttpRequestException or TaskCanceledException)
-            {
-                return Problem("MBTA alerts are temporarily unavailable.", statusCode: StatusCodes.Status503ServiceUnavailable);
-            }
+            var alerts = await mbta.GetSubwayAlertsAsync();
+            return alerts.OrderByDescending(a => a.Attributes.Severity).Select(AlertResponse.From);
         }
     }
 

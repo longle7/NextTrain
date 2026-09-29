@@ -87,6 +87,8 @@ API tests run against a real SQL Server database (`NextTrainDb_Tests` on `localh
 
 ## Project layout
 
+New to the code? Start with **[docs/backend.md](docs/backend.md)**: how requests flow, where data comes from, caching, errors, and how to add an endpoint.
+
 - `NextTrain.Core`: domain entities, service interfaces, MBTA DTOs
 - `NextTrain.Api`: controllers, EF Core DbContext and migrations, MBTA client, station import and lookup
 - `NextTrain.Tests`: xUnit unit, integration, and HTTP endpoint tests

@@ -4,46 +4,31 @@ using NextTrain.Core.Services;
 namespace NextTrain.Api.Controllers
 {
     /// <summary>
-    /// Subway lines with display names, colors, and direction labels.
+    /// Subway lines: names, colors, direction labels, and the track each one runs on.
+    /// Both endpoints are a thin layer over IMbtaClient, which fetches from MBTA and caches for an hour.
+    /// If MBTA is down, MbtaUnavailableFilter turns the error into a 503.
     /// </summary>
     [ApiController]
     [Route("routes")]
     public class RoutesController : ControllerBase
     {
-        // GET /routes
+        // GET /routes: the lines in MBTA's display order, reshaped from MBTA's format into what the app needs.
         [HttpGet]
-        public async Task<ActionResult<IEnumerable<RouteResponse>>> GetAll([FromServices] IMbtaClient mbta)
+        public async Task<IEnumerable<RouteResponse>> GetAll([FromServices] IMbtaClient mbta)
         {
-            try
-            {
-                var routes = await mbta.GetSubwayRoutesAsync();
-                return Ok(routes.Select(r => new RouteResponse(
-                    r.Id,
-                    r.Attributes.LongName,
-                    "#" + r.Attributes.Color,
-                    "#" + r.Attributes.TextColor,
-                    r.Attributes.DirectionNames,
-                    r.Attributes.DirectionDestinations)));
-            }
-            catch (Exception e) when (e is HttpRequestException or TaskCanceledException)
-            {
-                return Problem("MBTA routes are temporarily unavailable.", statusCode: StatusCodes.Status503ServiceUnavailable);
-            }
+            var routes = await mbta.GetSubwayRoutesAsync();
+            return routes.Select(r => new RouteResponse(
+                r.Id,
+                r.Attributes.LongName,
+                "#" + r.Attributes.Color,     // MBTA sends "DA291C"; CSS wants "#DA291C"
+                "#" + r.Attributes.TextColor,
+                r.Attributes.DirectionNames,
+                r.Attributes.DirectionDestinations));
         }
 
-        // GET /routes/shapes
+        // GET /routes/shapes: each line's track as an encoded polyline, drawn on the map.
         [HttpGet("shapes")]
-        public async Task<ActionResult<IEnumerable<MbtaShape>>> GetShapes([FromServices] IMbtaClient mbta)
-        {
-            try
-            {
-                return Ok(await mbta.GetSubwayShapesAsync());
-            }
-            catch (Exception e) when (e is HttpRequestException or TaskCanceledException)
-            {
-                return Problem("MBTA route shapes are temporarily unavailable.", statusCode: StatusCodes.Status503ServiceUnavailable);
-            }
-        }
+        public Task<IReadOnlyList<MbtaShape>> GetShapes([FromServices] IMbtaClient mbta) => mbta.GetSubwayShapesAsync();
     }
 
     // Direction lists are indexed by direction ID (0 or 1).

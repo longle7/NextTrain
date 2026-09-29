@@ -4,24 +4,15 @@ using NextTrain.Core.Services;
 namespace NextTrain.Api.Controllers
 {
     /// <summary>
-    /// Live subway train positions for the map.
+    /// Live subway train positions for the map and the line diagrams. IMbtaClient caches them for 10 seconds,
+    /// so however many people are looking, MBTA is asked at most once per refresh.
     /// </summary>
     [ApiController]
     [Route("vehicles")]
     public class VehiclesController : ControllerBase
     {
-        // GET /vehicles
+        // GET /vehicles (a 503 when MBTA is down comes from MbtaUnavailableFilter)
         [HttpGet]
-        public async Task<ActionResult<IEnumerable<MbtaVehicle>>> GetAll([FromServices] IMbtaClient mbta)
-        {
-            try
-            {
-                return Ok(await mbta.GetSubwayVehiclesAsync());
-            }
-            catch (Exception e) when (e is HttpRequestException or TaskCanceledException)
-            {
-                return Problem("MBTA train positions are temporarily unavailable.", statusCode: StatusCodes.Status503ServiceUnavailable);
-            }
-        }
+        public Task<IReadOnlyList<MbtaVehicle>> GetAll([FromServices] IMbtaClient mbta) => mbta.GetSubwayVehiclesAsync();
     }
 }
