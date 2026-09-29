@@ -35,6 +35,7 @@ export interface Vehicle {
   bearing: number | null // degrees clockwise from north
   currentStatus: 'INCOMING_AT' | 'STOPPED_AT' | 'IN_TRANSIT_TO' | null
   stopName: string | null // the stop it's at or heading to
+  stationId: string | null // that stop's station, e.g. "place-harsq"
 }
 
 export interface RouteShape {

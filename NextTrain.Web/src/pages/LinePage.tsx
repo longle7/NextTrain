@@ -1,7 +1,8 @@
 import { useParams, useSearchParams } from 'react-router'
 import { alertsFor } from '../alerts'
-import { ALERTS_REFRESH_MS, api, getAlerts, getRoutes, type Station } from '../api'
+import { ALERTS_REFRESH_MS, api, getAlerts, getRoutes, type Station, type Vehicle } from '../api'
 import { AlertBanner, Card, Status, StationLink } from '../components'
+import { directionsDown, trainsByStation, type LineTrain } from '../lineTrains'
 import { usePolling } from '../usePolling'
 
 const SORTS = [
@@ -23,8 +24,19 @@ export default function LinePage() {
     `${routeId}|${sort}`,
   )
   const alerts = usePolling(getAlerts, 'alerts', ALERTS_REFRESH_MS)
+  // Live trains only show on the line-order strip, so only poll for them there.
+  const lineOrder = sort === 'line'
+  const vehicles = usePolling(
+    () => (lineOrder ? api<Vehicle[]>('/vehicles') : Promise.resolve<Vehicle[]>([])),
+    `vehicles|${lineOrder}`,
+    lineOrder ? 10_000 : undefined,
+  )
   const route = routes.data?.find((r) => r.id === routeId)
   const color = route?.color ?? 'var(--color-mbta-silver)'
+  const trains = lineOrder && route && stations.data && vehicles.data ? trainsByStation(vehicles.data, route, stations.data) : undefined
+  const trainsAt = (station: Station, down: boolean) => trains?.get(station.mbtaStopId)?.filter((t) => t.down === down) ?? []
+  // For the caption: which direction (by ID) runs down the list, i.e. on the left.
+  const sides = lineOrder && route && stations.data?.length ? directionsDown(stations.data, route.directionDestinations) : undefined
 
   return (
     <>
@@ -54,11 +66,13 @@ export default function LinePage() {
       {stations.data?.length === 0 && <p className="text-neutral-500">No stations imported for this line yet.</p>}
 
       {sort === 'line' && stations.data && stations.data.length > 0 ? (
-        // Route strip: a colored line with a stop marker per station, like MBTA line maps.
+        // Route strip: a colored line with a stop marker per station, like MBTA line maps, and live trains
+        // beside it: trains moving down the list on the left, up the list on the right.
         <Card>
           <ol>
             {stations.data.map((station, i) => (
-              <li key={station.mbtaStopId} className="relative flex items-stretch gap-3">
+              <li key={station.mbtaStopId} className="relative flex items-stretch gap-2">
+                <TrainColumn trains={trainsAt(station, true)} color={color} />
                 <span className="relative w-5 shrink-0">
                   <span
                     className="absolute inset-x-1.5 w-2"
@@ -66,6 +80,7 @@ export default function LinePage() {
                   />
                   <span className="absolute top-1/2 left-0 size-5 -translate-y-1/2 rounded-full border-4 bg-white dark:bg-neutral-900" style={{ borderColor: color }} />
                 </span>
+                <TrainColumn trains={trainsAt(station, false)} color={color} />
                 <StationLink station={station} routes={routes.data} hideRoute={routeId} />
               </li>
             ))}
@@ -91,6 +106,13 @@ export default function LinePage() {
         </ul>
       )}
 
+      {sides && route && (
+        <p className="text-center text-xs text-neutral-500">
+          Live trains, updated every 10 seconds: left side to {route.directionDestinations[sides.indexOf(true)]}, right side
+          to {route.directionDestinations[sides.indexOf(false)]}.
+        </p>
+      )}
+
       {sort === 'ridership' && (
         <p className="text-center text-xs text-neutral-500">
           Average weekday boardings at the station (all lines), MBTA Fall 2024 counts.
@@ -102,3 +124,26 @@ export default function LinePage() {
 
 const ridershipLabel = (station: Station) =>
   station.averageWeekdayBoardings === null ? 'No data' : `${station.averageWeekdayBoardings.toLocaleString()} weekday boardings`
+
+// Stopped trains sit level with their station; approaching ones at the edge they're coming from.
+function TrainColumn({ trains, color }: { trains: LineTrain[]; color: string }) {
+  return (
+    <span className="relative w-5 shrink-0">
+      {trains.map((t) => (
+        <span
+          key={t.id}
+          role="img"
+          aria-label={t.label}
+          title={t.label}
+          className="absolute left-0 z-10 size-5 -translate-y-1/2"
+          style={{ top: t.atStation ? '50%' : t.down ? '0%' : '100%' }}
+        >
+          <svg viewBox="0 0 24 24" className={`size-5 ${t.down ? 'rotate-180' : ''}`} aria-hidden>
+            <circle cx="12" cy="12" r="10.5" style={{ fill: color }} stroke="white" strokeWidth="2" />
+            <path d="M12 6.5 16.5 14h-9z" fill="white" />
+          </svg>
+        </span>
+      ))}
+    </span>
+  )
+}

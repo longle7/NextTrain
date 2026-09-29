@@ -77,14 +77,19 @@ namespace NextTrain.Api.Services
                 "&fields[vehicle]=latitude,longitude,bearing,direction_id,current_status", PredictionCacheDuration);
             if (payload is null) return new List<MbtaVehicle>();
 
-            var stopNames = payload.Included.ToDictionary(s => s.Id, s => s.Attributes.Name);
+            // Vehicles report a platform stop; its parent_station is the station the app knows.
+            var stops = payload.Included.ToDictionary(s => s.Id);
             return payload.Data
                 .Where(v => v.Attributes.Latitude is not null && v.Attributes.Longitude is not null)
-                .Select(v => new MbtaVehicle(
-                    v.Id, v.RelatedId("route") ?? "", v.Attributes.DirectionId,
-                    v.Attributes.Latitude!.Value, v.Attributes.Longitude!.Value,
-                    v.Attributes.Bearing, v.Attributes.CurrentStatus,
-                    stopNames.GetValueOrDefault(v.RelatedId("stop") ?? "")))
+                .Select(v =>
+                {
+                    var stop = stops.GetValueOrDefault(v.RelatedId("stop") ?? "");
+                    return new MbtaVehicle(
+                        v.Id, v.RelatedId("route") ?? "", v.Attributes.DirectionId,
+                        v.Attributes.Latitude!.Value, v.Attributes.Longitude!.Value,
+                        v.Attributes.Bearing, v.Attributes.CurrentStatus,
+                        stop?.Attributes.Name, stop?.RelatedId("parent_station") ?? stop?.Id);
+                })
                 .ToList();
         }
 

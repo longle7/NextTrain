@@ -81,7 +81,8 @@ public class MbtaClientTests
                "relationships":{"route":{"data":{"id":"Red"}},"stop":{"data":null}}},
               {"id":"R-3","attributes":{"latitude":null,"longitude":null,"direction_id":0},
                "relationships":{"route":{"data":{"id":"Red"}}}}],
-             "included":[{"id":"70088","type":"stop","attributes":{"name":"Savin Hill"}}]}
+             "included":[{"id":"70088","type":"stop","attributes":{"name":"Savin Hill"},
+               "relationships":{"parent_station":{"data":{"id":"place-shmnl","type":"stop"}}}}]}
             """;
         var client = new MbtaClient(new HttpClient(new StubHandler(json)), new ConfigurationBuilder().Build(),
             new MemoryCache(new MemoryCacheOptions()));
@@ -89,8 +90,9 @@ public class MbtaClientTests
         var vehicles = await client.GetSubwayVehiclesAsync();
 
         Assert.Equal(new[] { "R-1", "R-2" }, vehicles.Select(v => v.Id));
-        Assert.Equal(new MbtaVehicle("R-1", "Red", 1, 42.3, -71.06, 85, "IN_TRANSIT_TO", "Savin Hill"), vehicles[0]);
+        Assert.Equal(new MbtaVehicle("R-1", "Red", 1, 42.3, -71.06, 85, "IN_TRANSIT_TO", "Savin Hill", "place-shmnl"), vehicles[0]);
         Assert.Null(vehicles[1].StopName);
+        Assert.Null(vehicles[1].StationId);
         Assert.Null(vehicles[1].Bearing);
     }
 
