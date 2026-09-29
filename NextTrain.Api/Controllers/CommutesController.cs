@@ -7,7 +7,14 @@ using NextTrain.Core.Domain;
 namespace NextTrain.Api.Controllers
 {
     /// <summary>
-    /// A user's saved commutes. The user is identified by the X-User-Id header.
+    /// A user's saved commutes (create, read, update, delete).
+    ///
+    /// Who is the user? The app makes up a random ID once per device and sends it as the X-User-Id header on
+    /// every request. Each endpoint only touches rows with that ID. Someone else's commute answers 404 (not 403),
+    /// so nobody can tell whether another user's commute exists.
+    /// Saving: creating (POST) first checks the per-user limit; then both POST and PUT run TryApplyAsync, which
+    /// validates the request against the database and copies it onto the entity. Any problem returns a 400
+    /// listing what's wrong.
     /// ponytail: header is trusted as-is, replace with the authenticated user's ID when login exists.
     /// </summary>
     [ApiController]
@@ -15,6 +22,9 @@ namespace NextTrain.Api.Controllers
     public class CommutesController : ControllerBase
     {
         private static readonly string[] ValidDays = { "Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun" };
+
+        // Far more than anyone commutes; stops a buggy or abusive client from filling the database.
+        public const int MaxCommutesPerUser = 20;
 
         private readonly NextTrainDbContext _db;
 
@@ -50,6 +60,12 @@ namespace NextTrain.Api.Controllers
             CommuteRequest request,
             [FromHeader(Name = "X-User-Id"), Required, MaxLength(100)] string userId)
         {
+            if (await _db.UserCommutes.CountAsync(c => c.UserId == userId) >= MaxCommutesPerUser)
+            {
+                ModelState.AddModelError("", $"You can save up to {MaxCommutesPerUser} commutes. Delete one to add another.");
+                return ValidationProblem();
+            }
+
             var commute = new UserCommute { UserId = userId };
             if (!await TryApplyAsync(commute, request))
             {

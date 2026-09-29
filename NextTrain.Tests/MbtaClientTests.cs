@@ -81,7 +81,8 @@ public class MbtaClientTests
                "relationships":{"route":{"data":{"id":"Red"}},"stop":{"data":null}}},
               {"id":"R-3","attributes":{"latitude":null,"longitude":null,"direction_id":0},
                "relationships":{"route":{"data":{"id":"Red"}}}}],
-             "included":[{"id":"70088","type":"stop","attributes":{"name":"Savin Hill"}}]}
+             "included":[{"id":"70088","type":"stop","attributes":{"name":"Savin Hill"},
+               "relationships":{"parent_station":{"data":{"id":"place-shmnl","type":"stop"}}}}]}
             """;
         var client = new MbtaClient(new HttpClient(new StubHandler(json)), new ConfigurationBuilder().Build(),
             new MemoryCache(new MemoryCacheOptions()));
@@ -89,9 +90,34 @@ public class MbtaClientTests
         var vehicles = await client.GetSubwayVehiclesAsync();
 
         Assert.Equal(new[] { "R-1", "R-2" }, vehicles.Select(v => v.Id));
-        Assert.Equal(new MbtaVehicle("R-1", "Red", 1, 42.3, -71.06, 85, "IN_TRANSIT_TO", "Savin Hill"), vehicles[0]);
+        Assert.Equal(new MbtaVehicle("R-1", "Red", 1, 42.3, -71.06, 85, "IN_TRANSIT_TO", "Savin Hill", "place-shmnl"), vehicles[0]);
         Assert.Null(vehicles[1].StopName);
+        Assert.Null(vehicles[1].StationId);
         Assert.Null(vehicles[1].Bearing);
+    }
+
+    [Fact]
+    public async Task GetSubwayAlertsAsync_ParsesSnakeCase_ForSubwayAlertsInEffectNow()
+    {
+        const string json = """
+            {"data":[{"id":"1033333","attributes":{"effect":"SUSPENSION","severity":7,
+              "header":"Green Line: No trains between North Station & Kenmore.","description":"Use shuttle buses.",
+              "service_effect":"Suspension of service on Green Line","timeframe":"through Sunday","url":null,
+              "informed_entity":[{"route":"Green-B","stop":"place-pktrm","direction_id":null,"activities":["BOARD"]}]}}]}
+            """;
+        var handler = new StubHandler(json);
+        var client = new MbtaClient(new HttpClient(handler), new ConfigurationBuilder().Build(),
+            new MemoryCache(new MemoryCacheOptions()));
+
+        var alert = Assert.Single(await client.GetSubwayAlertsAsync());
+
+        Assert.Equal("SUSPENSION", alert.Attributes.Effect);
+        Assert.Equal(7, alert.Attributes.Severity);
+        Assert.Equal("Suspension of service on Green Line", alert.Attributes.ServiceEffect);
+        Assert.Equal("through Sunday", alert.Attributes.Timeframe);
+        var entity = Assert.Single(alert.Attributes.InformedEntity);
+        Assert.Equal(("Green-B", "place-pktrm", (int?)null), (entity.Route, entity.Stop, entity.DirectionId));
+        Assert.Contains("filter[route_type]=0,1&filter[datetime]=NOW", Uri.UnescapeDataString(handler.Urls[0]));
     }
 
     [Fact]

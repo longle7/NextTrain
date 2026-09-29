@@ -1,11 +1,12 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using NextTrain.Core.Domain;
-using static System.Collections.Specialized.BitVector32;
 
 namespace NextTrain.Api.Data
 {
     /// <summary>
-    /// EF Core DbContext for NextTrain, mapping domain entities to SQL Server tables.
+    /// The database, as EF Core sees it: each DbSet below is a table, and OnModelCreating spells out keys,
+    /// indexes, and column sizes. After changing an entity or this file, add a migration
+    /// (dotnet ef migrations add <Name> --project NextTrain.Api); the API applies pending migrations at startup.
     /// </summary>
     public class NextTrainDbContext : DbContext
     {
@@ -16,11 +17,9 @@ namespace NextTrain.Api.Data
 
         // DbSets = tables
         public DbSet<Station> Stations { get; set; } = null!;
-        public DbSet<CachedPrediction> CachedPredictions { get; set; } = null!;
         public DbSet<UserCommute> UserCommutes { get; set; } = null!;
         public DbSet<NotificationSubscription> NotificationSubscriptions { get; set; } = null!;
         public DbSet<UserLocationPreference> UserLocationPreferences { get; set; } = null!;
-        public DbSet<VehicleStatus> VehicleStatuses { get; set; } = null!; // optional
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -49,34 +48,6 @@ namespace NextTrain.Api.Data
 
                 entity.Property(s => s.PlatformCode)
                       .HasMaxLength(50);
-            });
-
-            // CachedPrediction configuration.
-            modelBuilder.Entity<CachedPrediction>(entity =>
-            {
-                entity.ToTable("CachedPredictions");
-
-                entity.HasKey(cp => cp.Id);
-
-                entity.HasIndex(cp => new { cp.StationId, cp.RouteId, cp.DirectionId });
-
-                entity.Property(cp => cp.RouteId)
-                      .IsRequired()
-                      .HasMaxLength(50);
-
-                entity.Property(cp => cp.TripId)
-                      .HasMaxLength(100);
-
-                entity.Property(cp => cp.VehicleId)
-                      .HasMaxLength(50);
-
-                entity.Property(cp => cp.OccupancyStatus)
-                      .HasMaxLength(50);
-
-                entity.HasOne(cp => cp.Station)
-                      .WithMany()
-                      .HasForeignKey(cp => cp.StationId)
-                      .OnDelete(DeleteBehavior.Cascade);
             });
 
             // UserCommute configuration.
@@ -149,30 +120,6 @@ namespace NextTrain.Api.Data
 
                 entity.Property(ulp => ulp.Label)
                       .IsRequired()
-                      .HasMaxLength(50);
-            });
-
-            // VehicleStatus configuration (optional).
-            modelBuilder.Entity<VehicleStatus>(entity =>
-            {
-                entity.ToTable("VehicleStatuses");
-
-                entity.HasKey(vs => vs.Id);
-
-                entity.HasIndex(vs => vs.VehicleId);
-
-                entity.Property(vs => vs.VehicleId)
-                      .IsRequired()
-                      .HasMaxLength(50);
-
-                entity.Property(vs => vs.RouteId)
-                      .IsRequired()
-                      .HasMaxLength(50);
-
-                entity.Property(vs => vs.CurrentStatus)
-                      .HasMaxLength(50);
-
-                entity.Property(vs => vs.OccupancyStatus)
                       .HasMaxLength(50);
             });
         }

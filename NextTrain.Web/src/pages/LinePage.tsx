@@ -1,7 +1,9 @@
-import { Link, useParams, useSearchParams } from 'react-router'
-import { api, getRoutes, stationRouteIds, type Route, type Station } from '../api'
-import { Card, LineBadge, Status } from '../components'
-import { usePolling } from '../usePolling'
+import { useParams, useSearchParams } from 'react-router'
+import { alertsFor } from '../alerts'
+import { ALERTS_REFRESH_MS, api, getAlerts, getRoutes, type Station, type Vehicle } from '../api'
+import { AlertBanner, Card, Status, StationLink } from '../components'
+import { directionsDown, trainsByStation, type LineTrain } from '../lineTrains'
+import { usePolling, useTitle } from '../usePolling'
 
 const SORTS = [
   { id: 'line', label: 'Line order' },
@@ -21,8 +23,21 @@ export default function LinePage() {
     () => api<Station[]>(`/stations?route=${encodeURIComponent(routeId)}&sort=${sort}`),
     `${routeId}|${sort}`,
   )
+  const alerts = usePolling(getAlerts, 'alerts', ALERTS_REFRESH_MS)
+  // Live trains only show on the line-order strip, so only poll for them there.
+  const lineOrder = sort === 'line'
+  const vehicles = usePolling(
+    () => (lineOrder ? api<Vehicle[]>('/vehicles') : Promise.resolve<Vehicle[]>([])),
+    `vehicles|${lineOrder}`,
+    lineOrder ? 10_000 : undefined,
+  )
   const route = routes.data?.find((r) => r.id === routeId)
   const color = route?.color ?? 'var(--color-mbta-silver)'
+  useTitle(route?.name ?? routeId)
+  const trains = lineOrder && route && stations.data && vehicles.data ? trainsByStation(vehicles.data, route, stations.data) : undefined
+  const trainsAt = (station: Station, down: boolean) => trains?.get(station.mbtaStopId)?.filter((t) => t.down === down) ?? []
+  // For the caption: which direction (by ID) runs down the list, i.e. on the left.
+  const sides = lineOrder && route && stations.data?.length ? directionsDown(stations.data, route.directionDestinations) : undefined
 
   return (
     <>
@@ -30,6 +45,9 @@ export default function LinePage() {
         <span className="h-7 w-1.5 rounded-full" style={{ backgroundColor: color }} />
         {route?.name ?? routeId}
       </h1>
+
+      {alerts.data &&
+        alertsFor(alerts.data, { routeIds: [routeId] }).map((alert) => <AlertBanner key={alert.id} alert={alert} />)}
 
       <div role="radiogroup" aria-label="Sort stations" className="grid grid-cols-3 rounded-lg bg-neutral-200 p-1 text-sm font-semibold dark:bg-neutral-800">
         {SORTS.map((s) => (
@@ -49,11 +67,13 @@ export default function LinePage() {
       {stations.data?.length === 0 && <p className="text-neutral-500">No stations imported for this line yet.</p>}
 
       {sort === 'line' && stations.data && stations.data.length > 0 ? (
-        // Route strip: a colored line with a stop marker per station, like MBTA line maps.
+        // Route strip: a colored line with a stop marker per station, like MBTA line maps, and live trains
+        // beside it: trains moving down the list on the left, up the list on the right.
         <Card>
           <ol>
             {stations.data.map((station, i) => (
-              <li key={station.mbtaStopId} className="relative flex items-stretch gap-3">
+              <li key={station.mbtaStopId} className="relative flex items-stretch gap-2">
+                <TrainColumn trains={trainsAt(station, true)} color={color} />
                 <span className="relative w-5 shrink-0">
                   <span
                     className="absolute inset-x-1.5 w-2"
@@ -61,7 +81,8 @@ export default function LinePage() {
                   />
                   <span className="absolute top-1/2 left-0 size-5 -translate-y-1/2 rounded-full border-4 bg-white dark:bg-neutral-900" style={{ borderColor: color }} />
                 </span>
-                <StationLink station={station} routes={routes.data} currentRoute={routeId} />
+                <TrainColumn trains={trainsAt(station, false)} color={color} />
+                <StationLink station={station} routes={routes.data} hideRoute={routeId} />
               </li>
             ))}
           </ol>
@@ -72,13 +93,25 @@ export default function LinePage() {
             <li key={station.mbtaStopId}>
               <Card>
                 <div className="flex items-center gap-3">
-                  {sort === 'ridership' && <span className="w-6 text-right text-sm font-bold text-neutral-400 tabular-nums">{i + 1}</span>}
-                  <StationLink station={station} routes={routes.data} currentRoute={routeId} showRidership={sort === 'ridership'} />
+                  {sort === 'ridership' && <span className="w-6 text-right text-sm font-bold text-neutral-500 tabular-nums">{i + 1}</span>}
+                  <StationLink
+                    station={station}
+                    routes={routes.data}
+                    hideRoute={routeId}
+                    detail={sort === 'ridership' && ridershipLabel(station)}
+                  />
                 </div>
               </Card>
             </li>
           ))}
         </ul>
+      )}
+
+      {sides && route && (
+        <p className="text-center text-xs text-neutral-500">
+          Live trains, updated every 10 seconds: left side to {route.directionDestinations[sides.indexOf(true)]}, right side
+          to {route.directionDestinations[sides.indexOf(false)]}.
+        </p>
       )}
 
       {sort === 'ridership' && (
@@ -90,31 +123,28 @@ export default function LinePage() {
   )
 }
 
-function StationLink({ station, routes, currentRoute, showRidership }: {
-  station: Station
-  routes: Route[] | undefined
-  currentRoute: string
-  showRidership?: boolean
-}) {
-  const transfers = stationRouteIds(station).filter((id) => id !== currentRoute)
-  // Several Green branches read better as one "GL" badge.
-  const greens = transfers.filter((id) => id.startsWith('Green-'))
-  const badges = [...new Set(transfers.map((id) => (greens.length > 1 && id.startsWith('Green-') ? 'Green' : id)))]
+const ridershipLabel = (station: Station) =>
+  station.averageWeekdayBoardings === null ? 'No data' : `${station.averageWeekdayBoardings.toLocaleString()} weekday boardings`
+
+// Stopped trains sit level with their station; approaching ones at the edge they're coming from.
+function TrainColumn({ trains, color }: { trains: LineTrain[]; color: string }) {
   return (
-    <Link to={`/stations/${station.mbtaStopId}`} className="flex min-h-11 flex-1 items-center justify-between gap-2 py-1 hover:underline">
-      <span>
-        <span className="font-medium">{station.name}</span>
-        {showRidership && (
-          <span className="block text-sm text-neutral-500">
-            {station.averageWeekdayBoardings === null ? 'No data' : `${station.averageWeekdayBoardings.toLocaleString()} weekday boardings`}
-          </span>
-        )}
-      </span>
-      <span className="flex flex-wrap justify-end gap-1">
-        {badges.map((id) => (
-          <LineBadge key={id} routeId={id} routes={routes} />
-        ))}
-      </span>
-    </Link>
+    <span className="relative w-5 shrink-0">
+      {trains.map((t) => (
+        <span
+          key={t.id}
+          role="img"
+          aria-label={t.label}
+          title={t.label}
+          className="absolute left-0 z-10 size-5 -translate-y-1/2"
+          style={{ top: t.atStation ? '50%' : t.down ? '0%' : '100%' }}
+        >
+          <svg viewBox="0 0 24 24" className={`size-5 ${t.down ? 'rotate-180' : ''}`} aria-hidden>
+            <circle cx="12" cy="12" r="10.5" style={{ fill: color }} stroke="white" strokeWidth="2" />
+            <path d="M12 6.5 16.5 14h-9z" fill="white" />
+          </svg>
+        </span>
+      ))}
+    </span>
   )
 }

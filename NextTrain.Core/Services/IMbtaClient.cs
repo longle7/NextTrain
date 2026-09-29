@@ -1,11 +1,9 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Text;
-
-namespace NextTrain.Core.Services
+﻿namespace NextTrain.Core.Services
 {
     /// <summary>
-    /// Absraction over the MBTA API
+    /// Everything the app needs from the MBTA API. The real implementation is MbtaClient (NextTrain.Api), which
+    /// caches each answer. Code depends on this interface rather than MbtaClient, so tests can swap in
+    /// FakeMbtaClient and never call the real MBTA.
     /// </summary>
     public interface IMbtaClient
     {
@@ -25,5 +23,8 @@ namespace NextTrain.Core.Services
 
         // Gets the track shape of each subway route's typical trips.
         Task<IReadOnlyList<MbtaShape>> GetSubwayShapesAsync();
+
+        // Gets subway service alerts in effect right now (delays, suspensions, station closures, ...).
+        Task<IReadOnlyList<MbtaAlertDto>> GetSubwayAlertsAsync();
     }
 }

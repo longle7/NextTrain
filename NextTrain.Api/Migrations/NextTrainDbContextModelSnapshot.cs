@@ -22,53 +22,6 @@ namespace NextTrain.Api.Migrations
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
 
-            modelBuilder.Entity("NextTrain.Core.Domain.CachedPrediction", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<DateTime?>("ArrivalTimeUtc")
-                        .HasColumnType("datetime2");
-
-                    b.Property<DateTime?>("DepartureTimeUtc")
-                        .HasColumnType("datetime2");
-
-                    b.Property<int>("DirectionId")
-                        .HasColumnType("int");
-
-                    b.Property<DateTime>("LastUpdatedUtc")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("OccupancyStatus")
-                        .HasMaxLength(50)
-                        .HasColumnType("nvarchar(50)");
-
-                    b.Property<string>("RouteId")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("nvarchar(50)");
-
-                    b.Property<int>("StationId")
-                        .HasColumnType("int");
-
-                    b.Property<string>("TripId")
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
-
-                    b.Property<string>("VehicleId")
-                        .HasMaxLength(50)
-                        .HasColumnType("nvarchar(50)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("StationId", "RouteId", "DirectionId");
-
-                    b.ToTable("CachedPredictions", (string)null);
-                });
-
             modelBuilder.Entity("NextTrain.Core.Domain.NotificationSubscription", b =>
                 {
                     b.Property<int>("Id")
@@ -129,6 +82,9 @@ namespace NextTrain.Api.Migrations
 
                     b.Property<DateTime>("CreatedAtUtc")
                         .HasColumnType("datetime2");
+
+                    b.Property<bool?>("IsAccessible")
+                        .HasColumnType("bit");
 
                     b.Property<double>("Latitude")
                         .HasColumnType("float");
@@ -254,62 +210,6 @@ namespace NextTrain.Api.Migrations
                     b.HasIndex("UserId");
 
                     b.ToTable("UserLocationPreferences", (string)null);
-                });
-
-            modelBuilder.Entity("NextTrain.Core.Domain.VehicleStatus", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<string>("CurrentStatus")
-                        .HasMaxLength(50)
-                        .HasColumnType("nvarchar(50)");
-
-                    b.Property<int>("DirectionId")
-                        .HasColumnType("int");
-
-                    b.Property<DateTime>("LastUpdatedUtc")
-                        .HasColumnType("datetime2");
-
-                    b.Property<double?>("Latitude")
-                        .HasColumnType("float");
-
-                    b.Property<double?>("Longitude")
-                        .HasColumnType("float");
-
-                    b.Property<string>("OccupancyStatus")
-                        .HasMaxLength(50)
-                        .HasColumnType("nvarchar(50)");
-
-                    b.Property<string>("RouteId")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("nvarchar(50)");
-
-                    b.Property<string>("VehicleId")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("nvarchar(50)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("VehicleId");
-
-                    b.ToTable("VehicleStatuses", (string)null);
-                });
-
-            modelBuilder.Entity("NextTrain.Core.Domain.CachedPrediction", b =>
-                {
-                    b.HasOne("NextTrain.Core.Domain.Station", "Station")
-                        .WithMany()
-                        .HasForeignKey("StationId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Station");
                 });
 
             modelBuilder.Entity("NextTrain.Core.Domain.UserCommute", b =>

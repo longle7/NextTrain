@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useSyncExternalStore } from 'react'
 
 interface PollState<T> {
   data: T | undefined
@@ -7,7 +7,7 @@ interface PollState<T> {
 }
 
 /**
- * Calls `fetcher` now and every `intervalMs` (if given) while mounted or until `key` changes.
+ * Calls `fetcher` now and every `intervalMs` (if given) while mounted and visible, or until `key` changes.
  * Keeps the last good data when a refresh fails.
  */
 export function usePolling<T>(fetcher: () => Promise<T>, key: string, intervalMs?: number): PollState<T> {
@@ -23,10 +23,17 @@ export function usePolling<T>(fetcher: () => Promise<T>, key: string, intervalMs
         (error: Error) => !cancelled && setState((s) => ({ ...s, key, error })),
       )
     load()
-    const timer = intervalMs ? setInterval(load, intervalMs) : undefined
+    // Don't poll in the background; refresh as soon as the app is back on screen (iOS pauses timers anyway).
+    const timer = intervalMs ? setInterval(() => !document.hidden && load(), intervalMs) : undefined
+    const onVisible = () => !document.hidden && intervalMs && load()
+    document.addEventListener('visibilitychange', onVisible)
+    // Back online (e.g. out of a tunnel): refetch everything, including one-off loads that failed while offline.
+    window.addEventListener('online', load)
     return () => {
       cancelled = true
       clearInterval(timer)
+      document.removeEventListener('visibilitychange', onVisible)
+      window.removeEventListener('online', load)
     }
     // fetcher is recreated every render, so `key` (not fetcher) identifies what is being fetched.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -44,4 +51,23 @@ export function useNow(intervalMs = 1000): Date {
     return () => clearInterval(timer)
   }, [intervalMs])
   return now
+}
+
+/** Whether the device has a network connection, updated as it comes and goes. */
+export const useOnline = () => useSyncExternalStore(subscribeOnline, () => navigator.onLine)
+
+function subscribeOnline(onChange: () => void) {
+  window.addEventListener('online', onChange)
+  window.addEventListener('offline', onChange)
+  return () => {
+    window.removeEventListener('online', onChange)
+    window.removeEventListener('offline', onChange)
+  }
+}
+
+/** The browser tab / history title: "Park Street · NextTrain" (VoiceOver announces it on navigation). */
+export function useTitle(title: string | undefined) {
+  useEffect(() => {
+    document.title = title ? `${title} · NextTrain` : 'NextTrain'
+  }, [title])
 }

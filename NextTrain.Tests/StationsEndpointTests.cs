@@ -34,6 +34,7 @@ public class StationsEndpointTests : IDisposable
         _factory = new WebApplicationFactory<Program>()
             .WithWebHostBuilder(b => b
                 .UseSetting("ConnectionStrings:DefaultConnection", TestDb.ConnectionString)
+                .UseSetting("Stations:RefreshHours", "0")
                 .ConfigureTestServices(services => services.AddSingleton<IMbtaClient>(_mbta)));
         _client = _factory.CreateClient();
     }
@@ -203,12 +204,26 @@ public class StationsEndpointTests : IDisposable
     [Fact]
     public async Task GetVehicles_ReturnsLivePositions()
     {
-        _mbta.Vehicles.Add(new MbtaVehicle("R-1", "Red", 1, 42.3, -71.06, 85, "STOPPED_AT", "Savin Hill"));
+        _mbta.Vehicles.Add(new MbtaVehicle("R-1", "Red", 1, 42.3, -71.06, 85, "STOPPED_AT", "Savin Hill", "place-shmnl"));
 
         var vehicle = Assert.Single((await _client.GetFromJsonAsync<List<MbtaVehicle>>("/vehicles"))!);
 
         Assert.Equal("Savin Hill", vehicle.StopName);
+        Assert.Equal("place-shmnl", vehicle.StationId);
         Assert.Equal(85, vehicle.Bearing);
+    }
+
+    [Fact]
+    public async Task UnexpectedError_InProduction_Returns500ProblemJson_WithoutInternals()
+    {
+        _mbta.VehiclesError = new InvalidOperationException("secret internal detail");
+        using var prodClient = _factory.WithWebHostBuilder(b => b.UseEnvironment("Production")).CreateClient();
+
+        var response = await prodClient.GetAsync("/vehicles");
+
+        Assert.Equal(HttpStatusCode.InternalServerError, response.StatusCode);
+        Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
+        Assert.DoesNotContain("secret internal detail", await response.Content.ReadAsStringAsync());
     }
 
     [Fact]
@@ -217,6 +232,37 @@ public class StationsEndpointTests : IDisposable
         _mbta.VehiclesError = new HttpRequestException("MBTA down");
 
         Assert.Equal(HttpStatusCode.ServiceUnavailable, (await _client.GetAsync("/vehicles")).StatusCode);
+    }
+
+    [Fact]
+    public async Task GetAlerts_MostSevereFirst_WithShortSummary_AndDistinctEntities()
+    {
+        MbtaAlertDto Alert(string id, int severity, string? serviceEffect, params MbtaInformedEntityDto[] entities) => new()
+        {
+            Id = id,
+            Attributes = new()
+            {
+                Effect = "DELAY", Severity = severity, Header = $"Header {id}", ServiceEffect = serviceEffect,
+                InformedEntity = entities.ToList()
+            }
+        };
+        var redLine = new MbtaInformedEntityDto { Route = "Red" };
+        _mbta.Alerts.Add(Alert("minor", 1, "Station issue at Savin Hill", redLine));
+        _mbta.Alerts.Add(Alert("major", 7, null, redLine, new MbtaInformedEntityDto { Route = "Red" })); // repeated per activity
+
+        var alerts = (await _client.GetFromJsonAsync<List<AlertResponse>>("/alerts"))!;
+
+        Assert.Equal(new[] { "major", "minor" }, alerts.Select(a => a.Id));
+        Assert.Equal("Header major", alerts[0].Summary); // no service_effect: falls back to the header
+        Assert.Equal(new AlertEntity("Red", null, null), Assert.Single(alerts[0].Entities));
+    }
+
+    [Fact]
+    public async Task GetAlerts_MbtaDown_Returns503()
+    {
+        _mbta.AlertsError = new HttpRequestException("MBTA down");
+
+        Assert.Equal(HttpStatusCode.ServiceUnavailable, (await _client.GetAsync("/alerts")).StatusCode);
     }
 
     [Fact]

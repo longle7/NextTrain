@@ -6,7 +6,12 @@ using NextTrain.Core.Services;
 namespace NextTrain.Api.Controllers
 {
     /// <summary>
-    /// Read-only access to the imported subway stations.
+    /// Stations and their live departures.
+    ///
+    /// Where the data comes from: station details (name, location, lines) live in our SQL Server database,
+    /// imported from MBTA by StationImportService, and are read through IStationLookupService.
+    /// Live data (departures, line order) comes straight from MBTA through IMbtaClient, which caches it briefly.
+    /// If MBTA is down, MbtaUnavailableFilter turns the error into a 503.
     /// </summary>
     [ApiController]
     [Route("stations")]
@@ -20,33 +25,28 @@ namespace NextTrain.Api.Controllers
         }
 
         // GET /stations?route=Red&sort=line
+        // Stations come from the database sorted A-Z; the other sorts reorder that list.
         [HttpGet]
         public async Task<ActionResult<IEnumerable<Station>>> GetAll(
             [FromServices] IMbtaClient mbta,
             [FromQuery] string? route,
             [FromQuery] StationSort sort = StationSort.Name)
         {
-            var stations = await _lookup.GetAllStationsAsync(route); // A-Z
+            var stations = await _lookup.GetAllStationsAsync(route);
 
             switch (sort)
             {
                 case StationSort.Ridership:
-                    return Ok(stations.OrderByDescending(s => s.AverageWeekdayBoardings ?? -1));
+                    return Ok(stations.OrderByDescending(s => s.AverageWeekdayBoardings ?? -1)); // no data sorts last
 
                 case StationSort.Line when route is null:
                     ModelState.AddModelError("sort", "sort=line requires a route.");
-                    return ValidationProblem();
+                    return ValidationProblem(); // 400 with the message above
 
                 case StationSort.Line:
-                    IReadOnlyList<MbtaStopDto> lineOrder;
-                    try
-                    {
-                        lineOrder = await mbta.GetStopDtosAsync(route);
-                    }
-                    catch (Exception e) when (e is HttpRequestException or TaskCanceledException)
-                    {
-                        return Problem("MBTA line order is temporarily unavailable.", statusCode: StatusCodes.Status503ServiceUnavailable);
-                    }
+                    // MBTA lists a route's stops in the order trains visit them. Number each stop by its place in
+                    // that list, then sort our stations by that number (anything MBTA didn't list goes last).
+                    var lineOrder = await mbta.GetStopDtosAsync(route);
                     var position = lineOrder.Select((stop, i) => (stop.Id, i)).ToDictionary(x => x.Id, x => x.i);
                     return Ok(stations.OrderBy(s => position.GetValueOrDefault(s.MbtaStopId, int.MaxValue)));
 
@@ -75,6 +75,8 @@ namespace NextTrain.Api.Controllers
         }
 
         // GET /stations/place-pktrm/predictions?route=Red&direction=0
+        // Flow: find the station in our database (404 if unknown) -> ask MBTA for its upcoming trains (cached
+        // 10 seconds) -> reshape, filter, and sort them for the app.
         [HttpGet("{mbtaStopId}/predictions")]
         public async Task<ActionResult<IEnumerable<PredictionResponse>>> GetPredictions(
             string mbtaStopId,
@@ -88,16 +90,9 @@ namespace NextTrain.Api.Controllers
                 return NotFound();
             }
 
-            IReadOnlyList<MbtaPredictionDto> predictions;
-            try
-            {
-                // Always fetch all of the station's routes so every filter combination shares one cache entry.
-                predictions = await mbta.GetPredictionsAsync(station.MbtaStopId, station.RouteId);
-            }
-            catch (Exception e) when (e is HttpRequestException or TaskCanceledException)
-            {
-                return Problem("MBTA predictions are temporarily unavailable.", statusCode: StatusCodes.Status503ServiceUnavailable);
-            }
+            // Always fetch all of the station's routes, then filter below: that way every route/direction
+            // combination for this station shares one cached MBTA response.
+            var predictions = await mbta.GetPredictionsAsync(station.MbtaStopId, station.RouteId);
 
             return Ok(predictions
                 .Select(p => new PredictionResponse(

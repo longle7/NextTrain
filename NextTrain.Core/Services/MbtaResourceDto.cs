@@ -43,10 +43,11 @@ namespace NextTrain.Core.Services
         public string? Polyline { get; set; }
     }
 
-    // A train's live position. StopName is the stop it's at or heading to.
+    // A train's live position. StopName is the stop it's at or heading to; StationId is that stop's
+    // parent station (e.g. "place-shmnl"), which is what stations are keyed by.
     public record MbtaVehicle(
         string Id, string RouteId, int DirectionId, double Latitude, double Longitude,
-        int? Bearing, string? CurrentStatus, string? StopName);
+        int? Bearing, string? CurrentStatus, string? StopName, string? StationId);
 
     // The track a route runs on, as a Google encoded polyline. Red has two (Ashmont and Braintree branches).
     public record MbtaShape(string RouteId, string Polyline);

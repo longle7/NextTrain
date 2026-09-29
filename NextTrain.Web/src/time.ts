@@ -36,3 +36,20 @@ export function groupDepartures(predictions: Prediction[], now: Date, perGroup =
 export function secondsAgo(date: Date, now: Date): number {
   return Math.max(0, Math.round((now.getTime() - date.getTime()) / 1000))
 }
+
+/** Live times refresh every 10 seconds; older than this, something is wrong (offline, MBTA down). */
+export const STALE_AFTER_SECONDS = 30
+
+/** "45s ago" or "3 min ago". */
+export const agoLabel = (seconds: number) => (seconds < 60 ? `${seconds}s ago` : `${Math.floor(seconds / 60)} min ago`)
+
+/** "7:45 AM" in the device's locale. */
+export const clock = (time: Date | string) => new Date(time).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
+
+/** Why a station shows no departures: a service alert, the overnight closure (about 1 to 5 AM), or nothing predicted yet. */
+export function noTrainsMessage(hasMajorAlert: boolean, now: Date): string {
+  if (hasMajorAlert) return 'No trains are predicted here right now. See the service alert above.'
+  const hour = now.getHours()
+  if (hour >= 1 && hour < 5) return 'The subway is closed overnight. Trains start again around 5 AM.'
+  return 'No trains are predicted here right now. Check back in a minute.'
+}

@@ -15,14 +15,18 @@ public static class TestDb
         Environment.GetEnvironmentVariable("NEXTTRAIN_TEST_DB")
         ?? "Server=localhost;Database=NextTrainDb_Tests;Trusted_Connection=True;TrustServerCertificate=True;";
 
-    /// <summary>Migrates the test database and deletes all commutes and stations.</summary>
+    public static NextTrainDbContext Open() =>
+        new(new DbContextOptionsBuilder<NextTrainDbContext>().UseSqlServer(ConnectionString).Options);
+
+    /// <summary>Migrates the test database and deletes all stations and user data.</summary>
     public static NextTrainDbContext CreateClean()
     {
-        var db = new NextTrainDbContext(new DbContextOptionsBuilder<NextTrainDbContext>()
-            .UseSqlServer(ConnectionString).Options);
+        var db = Open();
         db.Database.Migrate();
         db.UserCommutes.ExecuteDelete(); // FK to Stations, delete first
         db.Stations.ExecuteDelete();
+        db.NotificationSubscriptions.ExecuteDelete();
+        db.UserLocationPreferences.ExecuteDelete();
         return db;
     }
 }

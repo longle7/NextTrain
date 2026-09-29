@@ -5,11 +5,10 @@
     /// </summary>
     public class UserCommute
     {
-        // Primary key for your own database.
+        // Database ID (primary key).
         public int Id { get; set; }
 
-        // Identify the user (for now you can treat this as a simple string).
-        // Later, you could integrate with ASP.NET Identity and make this a GUID/foreign key.
+        // The anonymous ID the app sends as X-User-Id (see CommutesController).
         public string UserId { get; set; } = string.Empty;
 
         // Station where the user boards (FK to Station.Id).
