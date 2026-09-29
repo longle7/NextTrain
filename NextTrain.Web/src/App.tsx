@@ -1,6 +1,7 @@
 import { useEffect, type ReactNode } from 'react'
 import { BrowserRouter, Link, NavLink, Route, Routes, useLocation, useNavigate } from 'react-router'
 import { TLogo } from './components'
+import CommutePage from './pages/CommutePage'
 import HomePage from './pages/HomePage'
 import LinePage from './pages/LinePage'
 import LinesPage from './pages/LinesPage'
@@ -21,6 +22,8 @@ export default function App() {
           <Route path="/lines/:routeId" element={<LinePage />} />
           <Route path="/stations/:stopId" element={<StationPage />} />
           <Route path="/map" element={<MapPage />} />
+          <Route path="/commutes/new" element={<CommutePage />} />
+          <Route path="/commutes/:id" element={<CommutePage />} />
         </Routes>
       </main>
       <TabBar />

@@ -42,13 +42,62 @@ export interface RouteShape {
   polyline: string // Google encoded polyline
 }
 
-export async function api<T>(path: string): Promise<T> {
-  const response = await fetch(`/api${path}`)
-  if (!response.ok) {
-    throw new Error(`${response.status} ${response.statusText}`)
-  }
-  return response.json() as Promise<T>
+export interface Commute {
+  id: number
+  mbtaStopId: string
+  stationName: string
+  routeId: string
+  directionId: number
+  windowStart: string // "07:45:00", Boston local time
+  windowEnd: string
+  activeDays: string // "Mon,Tue,Wed,Thu,Fri"
+  isEnabled: boolean
 }
+
+export type CommuteInput = Pick<Commute, 'mbtaStopId' | 'routeId' | 'directionId' | 'windowStart' | 'windowEnd' | 'activeDays'>
+
+/** An HTTP error with the API's own message (e.g. a validation error) when it sent one. */
+export class ApiError extends Error {
+  status: number
+  constructor(status: number, message: string) {
+    super(message)
+    this.status = status
+  }
+}
+
+export async function api<T>(path: string, init?: RequestInit): Promise<T> {
+  const response = await fetch(`/api${path}`, {
+    ...init,
+    headers: { 'Content-Type': 'application/json', 'X-User-Id': userId(), ...init?.headers },
+  })
+  if (!response.ok) {
+    // ASP.NET problem details: { title, errors: { Field: ["message"] } }
+    const problem = await response.json().catch(() => undefined)
+    const firstError = Object.values(problem?.errors ?? {}).flat()[0] as string | undefined
+    throw new ApiError(response.status, firstError ?? problem?.title ?? response.statusText)
+  }
+  return (response.status === 204 ? undefined : response.json()) as Promise<T>
+}
+
+// Anonymous per-device ID that owns this device's saved commutes.
+// ponytail: whoever knows the ID can read its commutes; replace with real sign-in (e.g. Sign in with Apple) before launch.
+let sessionUserId: string | undefined
+function userId(): string {
+  try {
+    let id = localStorage.getItem('nexttrain.userId')
+    if (!id) {
+      id = randomId()
+      localStorage.setItem('nexttrain.userId', id)
+    }
+    return id
+  } catch {
+    return (sessionUserId ??= randomId()) // storage blocked: commutes last for this visit only
+  }
+}
+
+// randomUUID needs HTTPS; getRandomValues also works over plain HTTP (e.g. testing on a phone over Wi-Fi).
+const randomId = () =>
+  crypto.randomUUID?.() ?? Array.from(crypto.getRandomValues(new Uint8Array(16)), (b) => b.toString(16).padStart(2, '0')).join('')
 
 // Fetches `path` once per page load and shares the result; a failure allows a retry.
 function fetchOnce<T>(path: string): () => Promise<T> {

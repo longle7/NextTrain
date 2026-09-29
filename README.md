@@ -6,6 +6,17 @@ Real-time train times for Boston MBTA subway commuters: browse lines and station
 
 Built with .NET 10, ASP.NET Core, EF Core, and SQL Server, with a React + TypeScript + Tailwind web app, using the [MBTA V3 API](https://api-v3.mbta.com).
 
+## Web app
+
+Mobile-first, with a bottom tab bar like an iPhone app:
+
+- **Home**: your saved commutes (the one happening now shows live next-train times), station search, and the stations nearest you with walking distance.
+- **Lines**: each line's stations in line order, A-Z, or by ridership.
+- **Map**: every line, station, and live train with its direction of travel.
+- **Station**: live departures by line and direction, and a button to save it as a commute.
+
+Commutes belong to an anonymous ID stored on the device (sent as `X-User-Id`) until sign-in exists. On an iPhone, Safari's **Share → Add to Home Screen** installs it full screen with its own icon.
+
 ## Endpoints
 
 | Method | Path | Description |
@@ -69,7 +80,7 @@ dotnet test
 cd NextTrain.Web && npm run lint && npm test && npm run build
 ```
 
-API tests run against a real SQL Server database (`NextTrainDb_Tests` on `localhost` by default; override with the `NEXTTRAIN_TEST_DB` connection string). MBTA calls are faked. Web tests (Vitest) cover the countdown and departure grouping logic. CI runs all of it on every pull request.
+API tests run against a real SQL Server database (`NextTrainDb_Tests` on `localhost` by default; override with the `NEXTTRAIN_TEST_DB` connection string). MBTA calls are faked. Web tests (Vitest) cover countdowns, departure grouping, commute timing, station search, distance, and polyline decoding. CI runs all of it on every pull request.
 
 ## Project layout
 
@@ -84,3 +95,12 @@ API tests run against a real SQL Server database (`NextTrainDb_Tests` on `localh
 - Ridership is average weekday boardings per station from MassDOT's Fall 2024 counts (embedded snapshot, applied on import). Mattapan stops are not in the dataset.
 - Predictions and train positions are cached in memory for 10 seconds; route info and shapes for 1 hour. MBTA calls time out after 10 seconds and retry transient failures twice. If MBTA is unavailable the API returns 503.
 - The live map (`/map`) uses Leaflet with OpenStreetMap tiles. Line shapes are MBTA's canonical (regular service) patterns.
+
+## Road to the App Store
+
+The web app is built to be wrapped as a native iPhone app with [Capacitor](https://capacitorjs.com). Still to do:
+
+1. **Host the API over HTTPS** and point the app at it (the web app calls a relative `/api` today), with CORS allowing the Capacitor origin.
+2. **Sign in with Apple** to replace the anonymous device ID, plus in-app account deletion (App Store requirement once accounts exist).
+3. **Push notifications** for commutes ("your train leaves in 5 min") via APNs. The `NotificationSubscription` table is ready for it, and it gives the app native value beyond a website (App Review guideline 4.2).
+4. **Wrap and ship**: `npm i @capacitor/core @capacitor/ios`, `npx cap add ios`, and build in Xcode on a Mac. Needs an Apple Developer account, a privacy policy URL, and a location usage description (`NSLocationWhenInUseUsageDescription`) for "Near you".

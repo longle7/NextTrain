@@ -1,12 +1,10 @@
-import { useParams } from 'react-router'
+import { Link, useParams } from 'react-router'
 import { api, getRoutes, stationRouteIds, type Prediction, type Station } from '../api'
 import { Card, LineBadge, Status } from '../components'
-import { countdown, groupDepartures, secondsAgo } from '../time'
+import { clock, countdown, groupDepartures, secondsAgo } from '../time'
 import { useNow, usePolling } from '../usePolling'
 
 const REFRESH_MS = 10_000
-
-const clock = (iso: string) => new Date(iso).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
 
 export default function StationPage() {
   const { stopId = '' } = useParams()
@@ -23,12 +21,23 @@ export default function StationPage() {
 
   return (
     <>
-      <div>
-        <h1 className="text-2xl font-bold">{station.data?.name ?? 'Station'}</h1>
-        <div className="mt-1 flex flex-wrap gap-1">
-          {station.data &&
-            stationRouteIds(station.data).map((id) => <LineBadge key={id} routeId={id} routes={routes.data} />)}
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-bold">{station.data?.name ?? 'Station'}</h1>
+          <div className="mt-1 flex flex-wrap gap-1">
+            {station.data &&
+              stationRouteIds(station.data).map((id) => <LineBadge key={id} routeId={id} routes={routes.data} />)}
+          </div>
         </div>
+        <Link
+          to={`/commutes/new?station=${encodeURIComponent(stopId)}`}
+          className="flex min-h-11 shrink-0 items-center gap-1 rounded-xl bg-white px-3 text-sm font-semibold shadow-sm dark:bg-neutral-900"
+        >
+          <svg viewBox="0 0 24 24" className="size-5 fill-none stroke-current stroke-2" aria-hidden>
+            <path d="M12 5v14M5 12h14" />
+          </svg>
+          Add commute
+        </Link>
       </div>
 
       <Status error={station.error ?? predictions.error} loading={!predictions.data && !predictions.error} />

@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 import { Link } from 'react-router'
-import { stationRouteIds, type Route, type Station } from './api'
+import { ApiError, stationRouteIds, type Route, type Station } from './api'
 
 /** The MBTA "T" roundel. */
 export function TLogo() {
@@ -17,7 +17,7 @@ export function LineBadge({ routeId, routes }: { routeId: string; routes: Route[
   const label = routeId.startsWith('Green-') ? `GL ${routeId.slice(6)}` : routeId === 'Mattapan' ? 'M' : `${routeId[0]}L`
   return (
     <span
-      className="inline-flex h-6 min-w-9 items-center justify-center rounded-full bg-mbta-silver px-2 text-xs font-bold text-white"
+      className="inline-flex h-6 min-w-9 shrink-0 items-center justify-center rounded-full bg-mbta-silver px-2 text-xs font-bold whitespace-nowrap text-white"
       style={route && { backgroundColor: route.color, color: route.textColor }}
       title={route?.name ?? routeId}
     >
@@ -61,9 +61,10 @@ export function Status({ error, loading }: { error?: Error; loading?: boolean })
 }
 
 function friendlyError(error: Error): string {
+  const status = error instanceof ApiError ? error.status : undefined
   if (!navigator.onLine) return "You're offline. Check your connection and try again."
-  if (error.message.startsWith('503')) return 'MBTA live data is temporarily unavailable. Please try again in a moment.'
-  if (error.message.startsWith('404')) return "We couldn't find that. It may have moved or been removed."
+  if (status === 503) return 'MBTA live data is temporarily unavailable. Please try again in a moment.'
+  if (status === 404) return "We couldn't find that. It may have moved or been removed."
   return "Couldn't load this right now. Please try again."
 }
 

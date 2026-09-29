@@ -1,0 +1,47 @@
+import { describe, expect, it } from 'vitest'
+import { commuteTiming, daysLabel, sortCommutes, timingLabel } from './commutes'
+
+// Tuesday 29 Sep 2026, 7:50 AM device time.
+const now = new Date(2026, 8, 29, 7, 50)
+const commute = (windowStart: string, windowEnd: string, activeDays = 'Mon,Tue,Wed,Thu,Fri') => ({ windowStart, windowEnd, activeDays })
+
+describe('commuteTiming', () => {
+  it('is "now" inside the window', () => {
+    expect(commuteTiming(commute('07:45:00', '08:15:00'), now)).toEqual({ state: 'now', ends: new Date(2026, 8, 29, 8, 15) })
+  })
+
+  it('is "soon" within an hour of the start', () => {
+    expect(commuteTiming(commute('08:30:00', '09:00:00'), now)).toEqual({ state: 'soon', starts: new Date(2026, 8, 29, 8, 30) })
+  })
+
+  it('is "later" today, or on the next active day once today\'s window has passed', () => {
+    expect(commuteTiming(commute('17:00:00', '17:30:00'), now)).toEqual({ state: 'later', starts: new Date(2026, 8, 29, 17, 0) })
+    expect(commuteTiming(commute('07:00:00', '07:30:00'), now)).toEqual({ state: 'later', starts: new Date(2026, 8, 30, 7, 0) })
+    expect(commuteTiming(commute('07:00:00', '07:30:00', 'Sat'), now)).toEqual({ state: 'later', starts: new Date(2026, 9, 3, 7, 0) })
+  })
+
+  it('is "never" with no days', () => {
+    expect(commuteTiming(commute('07:00:00', '07:30:00', ''), now)).toEqual({ state: 'never' })
+  })
+})
+
+it('sortCommutes puts the one in progress first, then soonest', () => {
+  const evening = commute('17:00:00', '17:30:00')
+  const current = commute('07:45:00', '08:15:00')
+  const soon = commute('08:30:00', '09:00:00')
+  expect(sortCommutes([evening, soon, current], now)).toEqual([current, soon, evening])
+})
+
+it('timingLabel counts down to a commute starting soon', () => {
+  expect(timingLabel(commuteTiming(commute('08:30:00', '09:00:00'), now), now)).toBe('In 40 min')
+  expect(timingLabel(commuteTiming(commute('07:00:00', '07:30:00'), now), now)).toMatch(/^Tomorrow /)
+})
+
+it.each([
+  ['Mon,Tue,Wed,Thu,Fri', 'Weekdays'],
+  ['Sun,Sat', 'Weekends'],
+  ['Mon,Tue,Wed,Thu,Fri,Sat,Sun', 'Every day'],
+  ['Fri,Mon,Wed', 'Mon, Wed, Fri'],
+])('daysLabel(%s) is %s', (days, expected) => {
+  expect(daysLabel(days)).toBe(expected)
+})

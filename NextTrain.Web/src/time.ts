@@ -36,3 +36,6 @@ export function groupDepartures(predictions: Prediction[], now: Date, perGroup =
 export function secondsAgo(date: Date, now: Date): number {
   return Math.max(0, Math.round((now.getTime() - date.getTime()) / 1000))
 }
+
+/** "7:45 AM" in the device's locale. */
+export const clock = (time: Date | string) => new Date(time).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
