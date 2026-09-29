@@ -64,3 +64,10 @@ function subscribeOnline(onChange: () => void) {
     window.removeEventListener('offline', onChange)
   }
 }
+
+/** The browser tab / history title: "Park Street · NextTrain" (VoiceOver announces it on navigation). */
+export function useTitle(title: string | undefined) {
+  useEffect(() => {
+    document.title = title ? `${title} · NextTrain` : 'NextTrain'
+  }, [title])
+}

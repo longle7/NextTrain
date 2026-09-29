@@ -6,13 +6,14 @@ import {
 } from '../api'
 import { WEEK } from '../commutes'
 import { Card, dangerButton, LineBadge, linkButton, primaryButton, SearchInput, Status } from '../components'
-import { usePolling } from '../usePolling'
+import { usePolling, useTitle } from '../usePolling'
 
 // /commutes/new (optionally ?station=place-pktrm) and /commutes/:id
 export default function CommutePage() {
   const { id } = useParams()
   const [params] = useSearchParams()
   const existing = usePolling(() => (id ? api<Commute>(`/commutes/${id}`) : Promise.resolve(undefined)), id ?? 'new')
+  useTitle(id ? 'Edit commute' : 'New commute')
 
   if (id && !existing.data) return <Status error={existing.error} loading={!existing.error} />
   return <CommuteForm key={id ?? 'new'} existing={existing.data} initialStopId={params.get('station') ?? ''} />

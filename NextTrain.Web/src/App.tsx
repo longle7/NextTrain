@@ -1,7 +1,7 @@
-import { lazy, Suspense, useEffect, type ReactNode } from 'react'
+import { lazy, Suspense, useEffect, useRef, type ReactNode } from 'react'
 import { BrowserRouter, Link, NavLink, Route, Routes, useLocation, useNavigate } from 'react-router'
 import { AppLogo, ErrorBoundary, primaryButton, Status } from './components'
-import { useOnline } from './usePolling'
+import { useOnline, useTitle } from './usePolling'
 import CommutePage from './pages/CommutePage'
 import HomePage from './pages/HomePage'
 import LinePage from './pages/LinePage'
@@ -20,7 +20,8 @@ export default function App() {
     <BrowserRouter>
       <Header />
       {/* Bottom padding keeps the last item clear of the tab bar and the iPhone home indicator. */}
-      <main className="mx-auto max-w-xl space-y-4 px-4 pt-4 pb-[calc(5.5rem+env(safe-area-inset-bottom))]">
+      {/* Focusable (but not tabbable) so navigation can move focus here; see Header. */}
+      <main tabIndex={-1} className="mx-auto max-w-xl space-y-4 px-4 pt-4 pb-[calc(5.5rem+env(safe-area-inset-bottom))] outline-none">
         <Pages />
       </main>
       <TabBar />
@@ -56,10 +57,17 @@ function Header() {
   const location = useLocation()
   const navigate = useNavigate()
   const online = useOnline()
+  const firstPage = useRef(true)
 
-  // BrowserRouter keeps the old scroll position between pages; start each page at the top.
+  // BrowserRouter keeps the old scroll position between pages; start each page at the top. After navigating,
+  // move focus to the new page so VoiceOver reads it rather than staying on the link that just disappeared.
   useEffect(() => {
     window.scrollTo(0, 0)
+    if (firstPage.current) {
+      firstPage.current = false
+      return
+    }
+    document.querySelector('main')?.focus({ preventScroll: true })
   }, [location.pathname])
 
   return (
@@ -131,6 +139,7 @@ function Tab({ to, label, icon }: { to: string; label: string; icon: ReactNode }
 }
 
 function NotFound() {
+  useTitle('Page not found')
   return (
     <div className="space-y-4 pt-8 text-center">
       <h1 className="text-2xl font-bold">Page not found</h1>

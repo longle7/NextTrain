@@ -6,7 +6,7 @@ import { api, getRoutes, getStations, type Route, type RouteShape, type Vehicle 
 import { Status } from '../components'
 import { locationErrorMessage, nearestStations, OUT_OF_AREA_MILES } from '../geo'
 import { decodePolyline } from '../polyline'
-import { usePolling } from '../usePolling'
+import { usePolling, useTitle } from '../usePolling'
 
 const REFRESH_MS = 10_000
 const BOSTON: L.LatLngExpression = [42.355, -71.08]
@@ -45,6 +45,7 @@ export default function MapPage() {
   const [map, setMap] = useState<L.Map>()
   const [locating, setLocating] = useState(false)
   const [locateMessage, setLocateMessage] = useState<string>()
+  useTitle('Live map')
 
   useEffect(() => {
     const m = L.map(container.current!).setView(BOSTON, 12)
@@ -101,6 +102,8 @@ export default function MapPage() {
         marker = L.marker([v.latitude, v.longitude]).bindPopup('').addTo(map)
         trains.current.set(v.id, marker)
       }
+      // Leaflet makes markers keyboard buttons; `title` (applied when setIcon rebuilds the icon) names them for VoiceOver.
+      marker.options.title = describe(v, route).replace('\n', '. ')
       marker
         .setLatLng([v.latitude, v.longitude])
         .setIcon(trainIcon(route?.color ?? 'gray', v.bearing))

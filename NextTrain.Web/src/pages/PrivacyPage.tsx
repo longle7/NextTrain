@@ -1,8 +1,10 @@
 import type { ReactNode } from 'react'
+import { useTitle } from '../usePolling'
 
 // Keep this in step with what the app actually does. Once the web app is hosted, this page's URL is the
 // "Privacy Policy URL" App Store Connect asks for.
 export default function PrivacyPage() {
+  useTitle('Privacy policy')
   return (
     <article className="space-y-4 pb-4">
       <div>

@@ -1,11 +1,12 @@
 import { alertsFor, effectLabel, majorAlert } from '../alerts'
 import { ALERTS_REFRESH_MS, getAlerts, getRoutes, type Alert } from '../api'
 import { Card, Status, WarningIcon } from '../components'
-import { usePolling } from '../usePolling'
+import { usePolling, useTitle } from '../usePolling'
 
 export default function LinesPage() {
   const routes = usePolling(getRoutes, 'routes')
   const alerts = usePolling(getAlerts, 'alerts', ALERTS_REFRESH_MS)
+  useTitle('Subway lines')
 
   return (
     <>

@@ -3,7 +3,7 @@ import { alertsFor } from '../alerts'
 import { ALERTS_REFRESH_MS, api, getAlerts, getRoutes, type Station, type Vehicle } from '../api'
 import { AlertBanner, Card, Status, StationLink } from '../components'
 import { directionsDown, trainsByStation, type LineTrain } from '../lineTrains'
-import { usePolling } from '../usePolling'
+import { usePolling, useTitle } from '../usePolling'
 
 const SORTS = [
   { id: 'line', label: 'Line order' },
@@ -33,6 +33,7 @@ export default function LinePage() {
   )
   const route = routes.data?.find((r) => r.id === routeId)
   const color = route?.color ?? 'var(--color-mbta-silver)'
+  useTitle(route?.name ?? routeId)
   const trains = lineOrder && route && stations.data && vehicles.data ? trainsByStation(vehicles.data, route, stations.data) : undefined
   const trainsAt = (station: Station, down: boolean) => trains?.get(station.mbtaStopId)?.filter((t) => t.down === down) ?? []
   // For the caption: which direction (by ID) runs down the list, i.e. on the left.

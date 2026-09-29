@@ -9,7 +9,7 @@ import { commuteTiming, daysLabel, sortCommutes, timingLabel, windowLabel } from
 import { Card, LineBadge, linkButton, primaryButton, SearchInput, StationLink, Status, WarningIcon } from '../components'
 import { locationErrorMessage, nearestStations, OUT_OF_AREA_MILES, walkLabel } from '../geo'
 import { countdown, groupDepartures } from '../time'
-import { useNow, usePolling } from '../usePolling'
+import { useNow, usePolling, useTitle } from '../usePolling'
 
 export default function HomePage() {
   const routes = usePolling(getRoutes, 'routes')
@@ -17,9 +17,12 @@ export default function HomePage() {
   const alerts = usePolling(getAlerts, 'alerts', ALERTS_REFRESH_MS) // one poll shared by commutes and nearby
   const [query, setQuery] = useState('')
   const results = stations.data ? searchStations(stations.data, query) : []
+  useTitle(undefined)
 
   return (
     <>
+      {/* The header shows the name; screen readers still need a page heading to start from. */}
+      <h1 className="sr-only">NextTrain</h1>
       <SearchInput value={query} onChange={setQuery} placeholder="Search stations" />
 
       <Status error={stations.error} loading={!!query.trim() && !stations.data && !stations.error} />

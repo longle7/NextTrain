@@ -2,11 +2,13 @@ import { useState, type ReactNode } from 'react'
 import { Link } from 'react-router'
 import { api, forgetUserId } from '../api'
 import { Card, dangerButton } from '../components'
+import { useTitle } from '../usePolling'
 
 const SUPPORT_URL = 'https://github.com/longle7/NextTrain/issues'
 
 export default function SettingsPage() {
   const [deletion, setDeletion] = useState<'idle' | 'deleting' | 'done' | 'failed'>('idle')
+  useTitle('Settings')
 
   const deleteMyData = async () => {
     if (!confirm("Delete your saved commutes from NextTrain? This can't be undone.")) return
