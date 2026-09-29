@@ -57,6 +57,7 @@ public class StationImportTests
         Assert.Equal(2, (await lookup.GetAllStationsAsync("Red")).Count);
         Assert.Equal("place-pktrm", Assert.Single(await lookup.GetAllStationsAsync("Green-B")).MbtaStopId);
         Assert.Empty(await lookup.GetAllStationsAsync("Green")); // no partial matches
+        Assert.True((await lookup.GetByMbtaStopIdAsync("place-pktrm"))!.AverageWeekdayBoardings > 0); // from ridership snapshot
 
         // Re-import with a renamed stop updates the existing row instead of inserting.
         mbta.StopsByRoute["Red"][1] = Stop("place-alfcl", "Alewife Renamed");
