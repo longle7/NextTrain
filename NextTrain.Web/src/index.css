@@ -56,3 +56,18 @@ body {
     color: #a3a3a3;
   }
 }
+
+/* iPhone app only (main.tsx adds .native): long-pressing a link shouldn't open Safari's link preview, and quick
+   taps shouldn't select text. Native apps do neither. Form fields stay selectable. */
+.native a,
+.native button {
+  -webkit-touch-callout: none;
+}
+.native body {
+  -webkit-user-select: none;
+  user-select: none;
+}
+.native input {
+  -webkit-user-select: text;
+  user-select: text;
+}
