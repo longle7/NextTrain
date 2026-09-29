@@ -10,10 +10,10 @@ Built with .NET 10, ASP.NET Core, EF Core, and SQL Server, with a React + TypeSc
 
 Mobile-first, with a bottom tab bar like an iPhone app:
 
-- **Home**: your saved commutes (the one happening now shows live next-train times), station search, and the stations nearest you with walking distance.
-- **Lines**: each line's stations in line order, A-Z, or by ridership.
+- **Home**: your saved commutes (the one happening now shows live next-train times, and any service alert on it), station search, and the stations nearest you with walking distance.
+- **Lines**: each line's status ("Normal service", "Delays", "Suspension", ...), and its stations in line order, A-Z, or by ridership, with its alerts on top.
 - **Map**: every line, station, and live train with its direction of travel.
-- **Station**: live departures by line and direction, and a button to save it as a commute.
+- **Station**: service alerts that affect it, live departures by line and direction, and a button to save it as a commute.
 - **Settings** (gear icon): privacy policy, report a problem, version, and **Delete my data**.
 
 Commutes belong to an anonymous ID stored on the device (sent as `X-User-Id`) until sign-in exists. On an iPhone, Safari's **Share → Add to Home Screen** installs it full screen with its own icon.
@@ -25,6 +25,7 @@ Commutes belong to an anonymous ID stored on the device (sent as `X-User-Id`) un
 | GET | `/routes` | Subway lines with colors and direction destinations |
 | GET | `/routes/shapes` | Track of each line as Google encoded polylines (for the map) |
 | GET | `/vehicles` | Live train positions, bearing, direction, and current/next stop |
+| GET | `/alerts` | Service alerts in effect now (delays, suspensions, station closures), most severe first |
 | GET | `/stations?route=Red&sort=line` | List stations, optionally by route; `sort` is `name` (default), `line` (order along the route), or `ridership` |
 | GET | `/stations/nearest?lat=&lon=&route=` | Nearest station to a location |
 | GET | `/stations/{mbtaStopId}` | One station, e.g. `place-pktrm` |
@@ -95,7 +96,8 @@ API tests run against a real SQL Server database (`NextTrainDb_Tests` on `localh
 
 - Stations are imported per subway route because MBTA only reports a stop's route when filtering by a single route. Transfer stations store all routes, e.g. `Green-B,Green-C,Green-D,Green-E,Red`.
 - Ridership is average weekday boardings per station from MassDOT's Fall 2024 counts (embedded snapshot, applied on import). Mattapan stops are not in the dataset.
-- Predictions and train positions are cached in memory for 10 seconds; route info and shapes for 1 hour. MBTA calls time out after 10 seconds and retry transient failures twice. If MBTA is unavailable the API returns 503.
+- Predictions and train positions are cached in memory for 10 seconds, alerts for 1 minute, route info and shapes for 1 hour. MBTA calls time out after 10 seconds and retry transient failures twice. If MBTA is unavailable the API returns 503.
+- `/alerts` returns every subway alert with the routes, stations, and directions it covers; the app decides what each line, station, and commute shows. A line's status counts alerts of severity 3 and up (MBTA uses 1-2 for things like a closed staircase, which still show on that station's page).
 - The live map (`/map`) uses Leaflet with OpenStreetMap tiles, loaded only when the map opens. Line shapes are MBTA's canonical (regular service) patterns. OpenStreetMap's tile servers are for light use; switch to a commercial tile provider before launch.
 
 ## Road to the App Store

@@ -1,6 +1,7 @@
 import { Component, type ReactNode } from 'react'
 import { Link } from 'react-router'
-import { ApiError, stationRouteIds, type Route, type Station } from './api'
+import { MAJOR_SEVERITY } from './alerts'
+import { ApiError, stationRouteIds, type Alert, type Route, type Station } from './api'
 
 /** Full-width main action ("Save commute"). Works on <button> and <Link>. */
 export const primaryButton =
@@ -120,6 +121,46 @@ export function SearchInput({ value, onChange, placeholder }: { value: string; o
     </label>
   )
 }
+
+/** A service alert: its short summary and timeframe, tap to read the details. Major ones are amber. */
+export function AlertBanner({ alert }: { alert: Alert }) {
+  const major = alert.severity >= MAJOR_SEVERITY
+  return (
+    <details
+      className={`group rounded-xl p-4 ${major ? 'bg-amber-50 text-amber-950 dark:bg-amber-950/50 dark:text-amber-50' : 'bg-white shadow-sm dark:bg-neutral-900'}`}
+    >
+      <summary className="flex cursor-pointer list-none items-start gap-3 [&::-webkit-details-marker]:hidden">
+        <WarningIcon className={`mt-0.5 size-5 shrink-0 ${major ? 'text-amber-600 dark:text-amber-400' : 'text-neutral-500'}`} />
+        <span className="min-w-0 flex-1">
+          <span className="block font-semibold">{alert.summary}</span>
+          {alert.timeframe && <span className="block text-sm opacity-75">{capitalize(alert.timeframe)}</span>}
+        </span>
+        <svg viewBox="0 0 24 24" className="mt-0.5 size-5 shrink-0 fill-none stroke-current stroke-2 opacity-60 transition group-open:rotate-180" aria-hidden>
+          <path d="m6 9 6 6 6-6" />
+        </svg>
+      </summary>
+      <div className="mt-3 space-y-2 pl-8 text-sm whitespace-pre-line">
+        <p>{alert.header}</p>
+        {alert.description && <p className="opacity-80">{alert.description}</p>}
+        {alert.url && (
+          <a href={alert.url} target="_blank" rel="noreferrer" className="inline-block font-semibold underline">
+            More details
+          </a>
+        )}
+      </div>
+    </details>
+  )
+}
+
+export function WarningIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" className={`fill-current ${className ?? ''}`} aria-hidden>
+      <path d="M10.3 3.9 1.9 18a2 2 0 0 0 1.7 3h16.8a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0zM12 9a1 1 0 0 1 1 1v4a1 1 0 1 1-2 0v-4a1 1 0 0 1 1-1zm0 8.5a1.25 1.25 0 1 1 0-2.5 1.25 1.25 0 0 1 0 2.5z" />
+    </svg>
+  )
+}
+
+const capitalize = (text: string) => text.charAt(0).toUpperCase() + text.slice(1)
 
 /** Catches a crash anywhere below it and offers a reload instead of a blank screen. */
 export class ErrorBoundary extends Component<{ children: ReactNode }, { crashed: boolean }> {

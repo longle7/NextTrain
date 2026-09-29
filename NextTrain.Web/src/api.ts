@@ -42,6 +42,25 @@ export interface RouteShape {
   polyline: string // Google encoded polyline
 }
 
+export interface Alert {
+  id: string
+  effect: string // "SUSPENSION", "DELAY", "STATION_CLOSURE", ...
+  severity: number // 0 (information) to 10 (worst)
+  summary: string // short, e.g. "Symphony closed"
+  header: string // a sentence or two
+  description: string | null
+  timeframe: string | null // "through Sunday", "ongoing"
+  url: string | null
+  entities: AlertEntity[]
+}
+
+// null means "all": every route, the whole route, or both directions.
+export interface AlertEntity {
+  routeId: string | null
+  stopId: string | null
+  directionId: number | null
+}
+
 export interface Commute {
   id: number
   mbtaStopId: string
@@ -119,6 +138,10 @@ function fetchOnce<T>(path: string): () => Promise<T> {
       throw e
     }))
 }
+
+// Alerts change within minutes; pages poll them once a minute.
+export const ALERTS_REFRESH_MS = 60_000
+export const getAlerts = () => api<Alert[]>('/alerts')
 
 // Routes and stations almost never change.
 export const getRoutes = fetchOnce<Route[]>('/routes')

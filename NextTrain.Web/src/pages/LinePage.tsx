@@ -1,6 +1,7 @@
 import { useParams, useSearchParams } from 'react-router'
-import { api, getRoutes, type Station } from '../api'
-import { Card, Status, StationLink } from '../components'
+import { alertsFor } from '../alerts'
+import { ALERTS_REFRESH_MS, api, getAlerts, getRoutes, type Station } from '../api'
+import { AlertBanner, Card, Status, StationLink } from '../components'
 import { usePolling } from '../usePolling'
 
 const SORTS = [
@@ -21,6 +22,7 @@ export default function LinePage() {
     () => api<Station[]>(`/stations?route=${encodeURIComponent(routeId)}&sort=${sort}`),
     `${routeId}|${sort}`,
   )
+  const alerts = usePolling(getAlerts, 'alerts', ALERTS_REFRESH_MS)
   const route = routes.data?.find((r) => r.id === routeId)
   const color = route?.color ?? 'var(--color-mbta-silver)'
 
@@ -30,6 +32,9 @@ export default function LinePage() {
         <span className="h-7 w-1.5 rounded-full" style={{ backgroundColor: color }} />
         {route?.name ?? routeId}
       </h1>
+
+      {alerts.data &&
+        alertsFor(alerts.data, { routeIds: [routeId] }).map((alert) => <AlertBanner key={alert.id} alert={alert} />)}
 
       <div role="radiogroup" aria-label="Sort stations" className="grid grid-cols-3 rounded-lg bg-neutral-200 p-1 text-sm font-semibold dark:bg-neutral-800">
         {SORTS.map((s) => (

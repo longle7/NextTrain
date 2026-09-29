@@ -1,6 +1,7 @@
 import { Link, useParams } from 'react-router'
-import { api, getRoutes, stationRouteIds, type Prediction, type Station } from '../api'
-import { Card, LineBadge, Status } from '../components'
+import { alertsFor } from '../alerts'
+import { ALERTS_REFRESH_MS, api, getAlerts, getRoutes, stationRouteIds, type Prediction, type Station } from '../api'
+import { AlertBanner, Card, LineBadge, Status } from '../components'
 import { clock, countdown, groupDepartures, secondsAgo } from '../time'
 import { useNow, usePolling } from '../usePolling'
 
@@ -17,7 +18,13 @@ export default function StationPage() {
     REFRESH_MS,
   )
 
+  const alerts = usePolling(getAlerts, 'alerts', ALERTS_REFRESH_MS)
+
   const groups = predictions.data ? groupDepartures(predictions.data, now) : []
+  const stationAlerts =
+    station.data && alerts.data
+      ? alertsFor(alerts.data, { routeIds: stationRouteIds(station.data), stopId: station.data.mbtaStopId })
+      : []
 
   return (
     <>
@@ -39,6 +46,10 @@ export default function StationPage() {
           Add commute
         </Link>
       </div>
+
+      {stationAlerts.map((alert) => (
+        <AlertBanner key={alert.id} alert={alert} />
+      ))}
 
       <Status error={station.error ?? predictions.error} loading={!predictions.data && !predictions.error} />
 

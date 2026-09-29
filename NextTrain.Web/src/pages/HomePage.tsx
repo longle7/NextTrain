@@ -1,8 +1,12 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router'
-import { api, getRoutes, getStations, searchStations, type Commute, type Prediction, type Route, type Station } from '../api'
+import { alertsFor, majorAlert } from '../alerts'
+import {
+  ALERTS_REFRESH_MS, api, getAlerts, getRoutes, getStations, searchStations,
+  type Alert, type Commute, type Prediction, type Route, type Station,
+} from '../api'
 import { commuteTiming, daysLabel, sortCommutes, timingLabel, windowLabel } from '../commutes'
-import { Card, LineBadge, linkButton, primaryButton, SearchInput, StationLink, Status } from '../components'
+import { Card, LineBadge, linkButton, primaryButton, SearchInput, StationLink, Status, WarningIcon } from '../components'
 import { locationErrorMessage, nearestStations, OUT_OF_AREA_MILES, walkLabel } from '../geo'
 import { countdown, groupDepartures } from '../time'
 import { useNow, usePolling } from '../usePolling'
@@ -115,6 +119,7 @@ function Nearby({ stations, routes }: { stations: Station[]; routes: Route[] | u
 function MyCommutes({ routes }: { routes: Route[] | undefined }) {
   const now = useNow(15_000)
   const commutes = usePolling(() => api<Commute[]>('/commutes'), 'commutes')
+  const alerts = usePolling(getAlerts, 'alerts', ALERTS_REFRESH_MS)
 
   return (
     <section className="space-y-2">
@@ -142,7 +147,18 @@ function MyCommutes({ routes }: { routes: Route[] | undefined }) {
         {commutes.data &&
           sortCommutes(commutes.data, now).map((commute) => (
             <li key={commute.id}>
-              <CommuteCard commute={commute} route={routes?.find((r) => r.id === commute.routeId)} routes={routes} now={now} />
+              <CommuteCard
+                commute={commute}
+                route={routes?.find((r) => r.id === commute.routeId)}
+                routes={routes}
+                now={now}
+                alert={
+                  alerts.data &&
+                  majorAlert(
+                    alertsFor(alerts.data, { routeIds: [commute.routeId], stopId: commute.mbtaStopId, directionId: commute.directionId }),
+                  )
+                }
+              />
             </li>
           ))}
       </ul>
@@ -150,7 +166,13 @@ function MyCommutes({ routes }: { routes: Route[] | undefined }) {
   )
 }
 
-function CommuteCard({ commute, route, routes, now }: { commute: Commute; route: Route | undefined; routes: Route[] | undefined; now: Date }) {
+function CommuteCard({ commute, route, routes, now, alert }: {
+  commute: Commute
+  route: Route | undefined
+  routes: Route[] | undefined
+  now: Date
+  alert: Alert | undefined // the worst service alert on this commute's line, station, and direction
+}) {
   const timing = commuteTiming(commute, now)
   const live = timing.state === 'now' || timing.state === 'soon'
   return (
@@ -168,6 +190,12 @@ function CommuteCard({ commute, route, routes, now }: { commute: Commute; route:
           </span>
         </div>
         <p className="mt-1 font-medium">to {route?.directionDestinations[commute.directionId] ?? '…'}</p>
+        {alert && (
+          <p className="mt-2 flex items-start gap-1.5 text-sm font-semibold text-amber-700 dark:text-amber-400">
+            <WarningIcon className="mt-0.5 size-4 shrink-0" />
+            {alert.summary}
+          </p>
+        )}
       </Link>
       <div className="flex items-center justify-between gap-2 text-sm text-neutral-500">
         <span>
