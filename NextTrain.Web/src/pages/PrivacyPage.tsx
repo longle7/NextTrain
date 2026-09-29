@@ -19,6 +19,10 @@ export default function PrivacyPage() {
           Only the commutes you save: the station, line, direction, times, and days you choose. They're linked to a random ID
           that the app creates on your device, not to your name, email, phone number, or Apple ID.
         </p>
+        <p>
+          The last few stations you looked at are remembered on your device only, to list them on Home. They're never sent
+          to us.
+        </p>
         <p>There are no accounts, no ads, and no analytics or tracking.</p>
       </Section>
 
@@ -51,8 +55,9 @@ export default function PrivacyPage() {
 
       <Section title="Deleting your data">
         <p>
-          Settings → Delete my data removes your saved commutes from our server right away. Deleting the app removes its ID
-          from your device, but not commutes already saved on our server, so use Delete my data first.
+          Settings → Delete my data removes your saved commutes from our server right away and clears your recent stations
+          on this device. Deleting the app removes its ID from your device, but not commutes already saved on our server,
+          so use Delete my data first.
         </p>
       </Section>
 

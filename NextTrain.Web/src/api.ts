@@ -154,12 +154,41 @@ export const getStations = fetchOnce<Station[]>('/stations')
 
 export const stationRouteIds = (station: Station) => station.routeId.split(',')
 
-/** Case-insensitive name search, names starting with the query first. */
+// How people type station names: "st" for Street or Saint, "sq" for Square, "ctr" for Center (or Newton Centre).
+const ALTERNATIVES: Record<string, string[]> = {
+  st: ['street', 'saint'],
+  sq: ['square'],
+  ctr: ['center', 'centre'],
+  center: ['centre'],
+  centre: ['center'],
+  govt: ['government'],
+  xing: ['crossing'],
+  mfa: ['museum'],
+}
+// Often added to names that don't have them: "Harvard Square" for Harvard, "Park Street Station".
+const OPTIONAL = new Set(['square', 'sq', 'station', 'stop', 't'])
+
+const words = (text: string) => text.toLowerCase().replaceAll("'", '').split(/[^a-z0-9]+/).filter(Boolean)
+
+/**
+ * Station search that forgives how people type. Best first: names starting with the query, then names where every
+ * word of the query starts a word of the name (abbreviations and extra "square"/"station" allowed), then substrings.
+ */
 export function searchStations(stations: Station[], query: string, limit = 8): Station[] {
-  const q = query.trim().toLowerCase()
-  if (!q) return []
+  const q = words(query)
+  if (q.length === 0) return []
+  const rank = (station: Station) => {
+    const name = words(station.name)
+    const matches = (w: string) => name.some((n) => n.startsWith(w) || ALTERNATIVES[w]?.some((alt) => n.startsWith(alt)))
+    if (name.join(' ').startsWith(q.join(' '))) return 0
+    if (q.some(matches) && q.every((w) => matches(w) || OPTIONAL.has(w))) return 1
+    if (name.join(' ').includes(q.join(' '))) return 2
+    return undefined
+  }
   return stations
-    .filter((s) => s.name.toLowerCase().includes(q))
-    .sort((a, b) => Number(!a.name.toLowerCase().startsWith(q)) - Number(!b.name.toLowerCase().startsWith(q)))
+    .map((station) => ({ station, rank: rank(station) }))
+    .filter((r): r is { station: Station; rank: number } => r.rank !== undefined)
+    .sort((a, b) => a.rank - b.rank)
     .slice(0, limit)
+    .map((r) => r.station)
 }

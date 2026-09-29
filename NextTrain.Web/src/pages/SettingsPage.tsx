@@ -2,6 +2,7 @@ import { useState, type ReactNode } from 'react'
 import { Link } from 'react-router'
 import { api, forgetUserId } from '../api'
 import { Card, dangerButton } from '../components'
+import { forgetRecentStations } from '../recent'
 import { useTitle } from '../usePolling'
 
 const SUPPORT_URL = 'https://github.com/longle7/NextTrain/issues'
@@ -16,6 +17,7 @@ export default function SettingsPage() {
     try {
       await api('/me', { method: 'DELETE' })
       forgetUserId()
+      forgetRecentStations()
       setDeletion('done')
     } catch {
       setDeletion('failed')
@@ -30,7 +32,7 @@ export default function SettingsPage() {
         <Card>
           <p className="text-sm text-neutral-500">
             NextTrain has no accounts. Your saved commutes are stored under a random ID created on this device, never your
-            name, email, or location.
+            name, email, or location. Recently viewed stations stay on this device.
           </p>
           <button onClick={deleteMyData} disabled={deletion === 'deleting'} className={`mt-2 ${dangerButton}`}>
             {deletion === 'deleting' ? 'Deleting…' : 'Delete my data'}

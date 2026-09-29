@@ -1,7 +1,9 @@
+import { useEffect } from 'react'
 import { Link, useParams } from 'react-router'
 import { alertsFor } from '../alerts'
 import { ALERTS_REFRESH_MS, api, getAlerts, getRoutes, stationRouteIds, type Prediction, type Station } from '../api'
 import { AlertBanner, Card, LineBadge, Status } from '../components'
+import { rememberStation } from '../recent'
 import { agoLabel, clock, countdown, groupDepartures, secondsAgo, STALE_AFTER_SECONDS } from '../time'
 import { useNow, usePolling, useTitle } from '../usePolling'
 
@@ -20,6 +22,9 @@ export default function StationPage() {
 
   const alerts = usePolling(getAlerts, 'alerts', ALERTS_REFRESH_MS)
   useTitle(station.data?.name)
+  useEffect(() => {
+    if (station.data) rememberStation(station.data.mbtaStopId)
+  }, [station.data])
 
   const groups = predictions.data ? groupDepartures(predictions.data, now) : []
   const age = predictions.updatedAt && secondsAgo(predictions.updatedAt, now)

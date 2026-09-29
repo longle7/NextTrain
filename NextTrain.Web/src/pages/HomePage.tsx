@@ -8,6 +8,7 @@ import {
 import { commuteTiming, daysLabel, sortCommutes, timingLabel, windowLabel } from '../commutes'
 import { Card, LineBadge, linkButton, primaryButton, SearchInput, StationLink, Status, WarningIcon } from '../components'
 import { locationErrorMessage, nearestStations, OUT_OF_AREA_MILES, walkLabel } from '../geo'
+import { recentStationIds } from '../recent'
 import { countdown, groupDepartures } from '../time'
 import { useNow, usePolling, useTitle } from '../usePolling'
 
@@ -17,6 +18,8 @@ export default function HomePage() {
   const alerts = usePolling(getAlerts, 'alerts', ALERTS_REFRESH_MS) // one poll shared by commutes and nearby
   const [query, setQuery] = useState('')
   const results = stations.data ? searchStations(stations.data, query) : []
+  const [recentIds] = useState(recentStationIds) // read once per visit to Home
+  const recent = recentIds.flatMap((id) => stations.data?.find((s) => s.mbtaStopId === id) ?? [])
   useTitle(undefined)
 
   return (
@@ -37,6 +40,20 @@ export default function HomePage() {
       ) : (
         <>
           <MyCommutes routes={routes.data} alerts={alerts.data} />
+          {recent.length > 0 && (
+            <section className="space-y-2">
+              <h2 className="px-1 text-lg font-bold">Recent</h2>
+              <Card>
+                <ul className="-my-1 divide-y divide-neutral-100 dark:divide-neutral-800">
+                  {recent.map((station) => (
+                    <li key={station.mbtaStopId} className="flex">
+                      <StationLink station={station} routes={routes.data} />
+                    </li>
+                  ))}
+                </ul>
+              </Card>
+            </section>
+          )}
           {stations.data && <Nearby stations={stations.data} routes={routes.data} alerts={alerts.data} />}
         </>
       )}
