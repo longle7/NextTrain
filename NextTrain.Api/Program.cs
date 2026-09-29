@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using NextTrain.Api.Data;
 using NextTrain.Api.Services;
 using NextTrain.Core.Services;
+using Polly;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -9,8 +10,12 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddDbContext<NextTrainDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
 
-// HttpClient for MBTA
-builder.Services.AddHttpClient<IMbtaClient, MbtaClient>();
+// HttpClient for MBTA: fail fast, retry transient errors (5xx, 408, network) with backoff.
+// 429 is not retried; the prediction cache keeps us under the rate limit.
+builder.Services.AddMemoryCache();
+builder.Services.AddHttpClient<IMbtaClient, MbtaClient>(client => client.Timeout = TimeSpan.FromSeconds(10))
+    .AddTransientHttpErrorPolicy(policy =>
+        policy.WaitAndRetryAsync(2, attempt => TimeSpan.FromMilliseconds(300 * attempt)));
 
 // Station import service
 builder.Services.AddScoped<IStationImportService, StationImportService>();
