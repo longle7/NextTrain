@@ -1,0 +1,184 @@
+using System.ComponentModel.DataAnnotations;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using NextTrain.Api.Data;
+using NextTrain.Core.Domain;
+
+namespace NextTrain.Api.Controllers
+{
+    /// <summary>
+    /// A user's saved commutes. The user is identified by the X-User-Id header.
+    /// ponytail: header is trusted as-is, replace with the authenticated user's ID when login exists.
+    /// </summary>
+    [ApiController]
+    [Route("commutes")]
+    public class CommutesController : ControllerBase
+    {
+        private static readonly string[] ValidDays = { "Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun" };
+
+        private readonly NextTrainDbContext _db;
+
+        public CommutesController(NextTrainDbContext db)
+        {
+            _db = db;
+        }
+
+        // GET /commutes
+        [HttpGet]
+        public async Task<IEnumerable<CommuteResponse>> GetAll([FromHeader(Name = "X-User-Id"), Required, MaxLength(100)] string userId)
+        {
+            var commutes = await _db.UserCommutes
+                .Include(c => c.Station)
+                .Where(c => c.UserId == userId)
+                .OrderBy(c => c.WindowStartLocal)
+                .ToListAsync();
+
+            return commutes.Select(CommuteResponse.From);
+        }
+
+        // GET /commutes/5
+        [HttpGet("{id:int}")]
+        public async Task<ActionResult<CommuteResponse>> GetById(int id, [FromHeader(Name = "X-User-Id"), Required, MaxLength(100)] string userId)
+        {
+            var commute = await FindAsync(id, userId);
+            return commute is null ? NotFound() : CommuteResponse.From(commute);
+        }
+
+        // POST /commutes
+        [HttpPost]
+        public async Task<ActionResult<CommuteResponse>> Create(
+            CommuteRequest request,
+            [FromHeader(Name = "X-User-Id"), Required, MaxLength(100)] string userId)
+        {
+            var commute = new UserCommute { UserId = userId };
+            if (!await TryApplyAsync(commute, request))
+            {
+                return ValidationProblem();
+            }
+
+            _db.UserCommutes.Add(commute);
+            await _db.SaveChangesAsync();
+
+            return CreatedAtAction(nameof(GetById), new { id = commute.Id }, CommuteResponse.From(commute));
+        }
+
+        // PUT /commutes/5
+        [HttpPut("{id:int}")]
+        public async Task<ActionResult<CommuteResponse>> Update(
+            int id,
+            CommuteRequest request,
+            [FromHeader(Name = "X-User-Id"), Required, MaxLength(100)] string userId)
+        {
+            var commute = await FindAsync(id, userId);
+            if (commute is null)
+            {
+                return NotFound();
+            }
+
+            if (!await TryApplyAsync(commute, request))
+            {
+                return ValidationProblem();
+            }
+
+            commute.UpdatedAtUtc = DateTime.UtcNow;
+            await _db.SaveChangesAsync();
+
+            return CommuteResponse.From(commute);
+        }
+
+        // DELETE /commutes/5
+        [HttpDelete("{id:int}")]
+        public async Task<IActionResult> Delete(int id, [FromHeader(Name = "X-User-Id"), Required, MaxLength(100)] string userId)
+        {
+            var commute = await FindAsync(id, userId);
+            if (commute is null)
+            {
+                return NotFound();
+            }
+
+            _db.UserCommutes.Remove(commute);
+            await _db.SaveChangesAsync();
+
+            return NoContent();
+        }
+
+        // Another user's commute is reported as 404, so IDs don't leak.
+        private Task<UserCommute?> FindAsync(int id, string userId) =>
+            _db.UserCommutes
+                .Include(c => c.Station)
+                .FirstOrDefaultAsync(c => c.Id == id && c.UserId == userId);
+
+        // Validates the request against the database and copies it onto the commute.
+        // Adds errors to ModelState and returns false when invalid.
+        private async Task<bool> TryApplyAsync(UserCommute commute, CommuteRequest request)
+        {
+            var station = await _db.Stations.FirstOrDefaultAsync(s => s.MbtaStopId == request.MbtaStopId);
+            if (station is null)
+            {
+                ModelState.AddModelError(nameof(request.MbtaStopId), $"Unknown station '{request.MbtaStopId}'.");
+            }
+            else if (!station.RouteId.Split(',').Contains(request.RouteId))
+            {
+                ModelState.AddModelError(nameof(request.RouteId), $"Route '{request.RouteId}' does not serve {station.Name}.");
+            }
+
+            if (request.WindowStart >= request.WindowEnd)
+            {
+                ModelState.AddModelError(nameof(request.WindowEnd), "WindowEnd must be after WindowStart.");
+            }
+
+            var days = request.ActiveDays.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
+            if (days.Length == 0 || days.Any(d => !ValidDays.Contains(d)))
+            {
+                ModelState.AddModelError(nameof(request.ActiveDays), "ActiveDays must be a comma-separated list of Mon, Tue, Wed, Thu, Fri, Sat, Sun.");
+            }
+
+            if (!ModelState.IsValid)
+            {
+                return false;
+            }
+
+            commute.Station = station;
+            commute.StationId = station!.Id;
+            commute.RouteId = request.RouteId;
+            commute.DirectionId = request.DirectionId;
+            commute.WindowStartLocal = request.WindowStart.ToTimeSpan();
+            commute.WindowEndLocal = request.WindowEnd.ToTimeSpan();
+            commute.ActiveDays = string.Join(",", ValidDays.Where(days.Contains)); // normalized Mon..Sun order
+            commute.IsEnabled = request.IsEnabled;
+            return true;
+        }
+    }
+
+    public record CommuteRequest(
+        [Required] string MbtaStopId,
+        [Required] string RouteId,
+        [Range(0, 1)] int DirectionId,
+        TimeOnly WindowStart,
+        TimeOnly WindowEnd,
+        string ActiveDays = "Mon,Tue,Wed,Thu,Fri",
+        bool IsEnabled = true);
+
+    public record CommuteResponse(
+        int Id,
+        string MbtaStopId,
+        string StationName,
+        string RouteId,
+        int DirectionId,
+        TimeOnly WindowStart,
+        TimeOnly WindowEnd,
+        string ActiveDays,
+        bool IsEnabled)
+    {
+        public static CommuteResponse From(UserCommute c) => new(
+            c.Id,
+            c.Station!.MbtaStopId,
+            c.Station.Name,
+            c.RouteId,
+            c.DirectionId,
+            TimeOnly.FromTimeSpan(c.WindowStartLocal),
+            TimeOnly.FromTimeSpan(c.WindowEndLocal),
+            c.ActiveDays,
+            c.IsEnabled);
+    }
+}

@@ -17,3 +17,16 @@ GET {{host}}/stations/place-pktrm
 ###
 
 GET {{host}}/stations/place-pktrm/predictions?route=Red&direction=0
+
+###
+
+POST {{host}}/commutes
+X-User-Id: demo-user
+Content-Type: application/json
+
+{ "mbtaStopId": "place-pktrm", "routeId": "Red", "directionId": 0, "windowStart": "07:45", "windowEnd": "08:15", "activeDays": "Mon,Tue,Wed,Thu,Fri" }
+
+###
+
+GET {{host}}/commutes
+X-User-Id: demo-user
