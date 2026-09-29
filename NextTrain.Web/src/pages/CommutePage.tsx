@@ -5,7 +5,7 @@ import {
   type Commute, type CommuteInput, type Route, type Station,
 } from '../api'
 import { WEEK } from '../commutes'
-import { Card, LineBadge, SearchInput, Status } from '../components'
+import { Card, dangerButton, LineBadge, linkButton, primaryButton, SearchInput, Status } from '../components'
 import { usePolling } from '../usePolling'
 
 // /commutes/new (optionally ?station=place-pktrm) and /commutes/:id
@@ -80,7 +80,7 @@ function CommuteForm({ existing, initialStopId }: { existing: Commute | undefine
           <Card>
             <div className="flex items-center justify-between gap-2">
               <span className="font-semibold">{station.name}</span>
-              <button onClick={() => pickStation('')} className="min-h-11 px-2 font-semibold text-blue-600 dark:text-blue-400">
+              <button onClick={() => pickStation('')} className={linkButton}>
                 Change
               </button>
             </div>
@@ -152,12 +152,12 @@ function CommuteForm({ existing, initialStopId }: { existing: Commute | undefine
       <button
         onClick={save}
         disabled={!ready || saving}
-        className="min-h-12 w-full rounded-xl bg-neutral-900 text-lg font-semibold text-white disabled:opacity-40 dark:bg-white dark:text-neutral-900"
+        className={`${primaryButton} text-lg`}
       >
         {saving ? 'Saving…' : existing ? 'Save changes' : 'Save commute'}
       </button>
       {existing && (
-        <button onClick={remove} disabled={saving} className="min-h-12 w-full rounded-xl font-semibold text-red-600 dark:text-red-400">
+        <button onClick={remove} disabled={saving} className={dangerButton}>
           Delete commute
         </button>
       )}

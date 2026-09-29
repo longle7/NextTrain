@@ -1,27 +1,34 @@
-import type { ReactNode } from 'react'
+import { Component, type ReactNode } from 'react'
 import { Link } from 'react-router'
 import { ApiError, stationRouteIds, type Route, type Station } from './api'
 
-/** The MBTA "T" roundel. */
-export function TLogo() {
-  return (
-    <span className="grid size-8 place-items-center rounded-full border-2 border-white text-lg leading-none font-bold">
-      T
-    </span>
-  )
+/** Full-width main action ("Save commute"). Works on <button> and <Link>. */
+export const primaryButton =
+  'flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-neutral-900 px-4 font-semibold text-white transition active:opacity-80 disabled:opacity-40 dark:bg-white dark:text-neutral-900'
+/** Text action in the tint color ("Edit", "+ Add"). */
+export const linkButton = 'flex min-h-11 items-center px-2 font-semibold text-blue-600 active:opacity-60 dark:text-blue-400'
+/** Destructive action ("Delete commute"). */
+export const dangerButton =
+  'flex min-h-12 w-full items-center justify-center rounded-xl font-semibold text-red-600 active:opacity-60 disabled:opacity-40 dark:text-red-400'
+
+/** NextTrain's own mark (public/favicon.svg): not the MBTA's "T", which is their trademark. */
+export function AppLogo() {
+  return <img src="/favicon.svg" alt="" className="size-8" />
 }
 
-/** Colored line pill, e.g. "RL" in red. Gray until routes load. */
+/** Colored line pill, e.g. "RL" in red. Gray until routes load. Screen readers hear the full line name. */
 export function LineBadge({ routeId, routes }: { routeId: string; routes: Route[] | undefined }) {
   const route = routes?.find((r) => r.id.startsWith(routeId)) // 'Green' matches any branch
   const label = routeId.startsWith('Green-') ? `GL ${routeId.slice(6)}` : routeId === 'Mattapan' ? 'M' : `${routeId[0]}L`
+  const name = routeId === 'Green' ? 'Green Line' : (route?.name ?? routeId)
   return (
     <span
       className="inline-flex h-6 min-w-9 shrink-0 items-center justify-center rounded-full bg-mbta-silver px-2 text-xs font-bold whitespace-nowrap text-white"
       style={route && { backgroundColor: route.color, color: route.textColor }}
-      title={route?.name ?? routeId}
+      title={name}
     >
-      {label}
+      <span aria-hidden>{label}</span>
+      <span className="sr-only">{name}</span>
     </span>
   )
 }
@@ -50,9 +57,9 @@ export function Status({ error, loading }: { error?: Error; loading?: boolean })
   }
   if (loading) {
     return (
-      <div className="space-y-2" aria-busy="true" aria-label="Loading">
+      <div className="space-y-2" role="status" aria-label="Loading">
         {[0, 1, 2].map((i) => (
-          <div key={i} className="h-16 animate-pulse rounded-xl bg-neutral-200 dark:bg-neutral-800" />
+          <div key={i} className="h-16 rounded-xl bg-neutral-200 motion-safe:animate-pulse dark:bg-neutral-800" />
         ))}
       </div>
     )
@@ -112,4 +119,26 @@ export function SearchInput({ value, onChange, placeholder }: { value: string; o
       />
     </label>
   )
+}
+
+/** Catches a crash anywhere below it and offers a reload instead of a blank screen. */
+export class ErrorBoundary extends Component<{ children: ReactNode }, { crashed: boolean }> {
+  state = { crashed: false }
+
+  static getDerivedStateFromError() {
+    return { crashed: true }
+  }
+
+  render() {
+    if (!this.state.crashed) return this.props.children
+    return (
+      <div className="space-y-4 pt-8 text-center">
+        <h1 className="text-2xl font-bold">Something went wrong</h1>
+        <p className="text-neutral-500">NextTrain hit an unexpected problem. Reloading usually fixes it.</p>
+        <button onClick={() => location.assign('/')} className={primaryButton}>
+          Reload NextTrain
+        </button>
+      </div>
+    )
+  }
 }

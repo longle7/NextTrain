@@ -81,17 +81,28 @@ export async function api<T>(path: string, init?: RequestInit): Promise<T> {
 
 // Anonymous per-device ID that owns this device's saved commutes.
 // ponytail: whoever knows the ID can read its commutes; replace with real sign-in (e.g. Sign in with Apple) before launch.
+const USER_ID_KEY = 'nexttrain.userId'
 let sessionUserId: string | undefined
 function userId(): string {
   try {
-    let id = localStorage.getItem('nexttrain.userId')
+    let id = localStorage.getItem(USER_ID_KEY)
     if (!id) {
       id = randomId()
-      localStorage.setItem('nexttrain.userId', id)
+      localStorage.setItem(USER_ID_KEY, id)
     }
     return id
   } catch {
     return (sessionUserId ??= randomId()) // storage blocked: commutes last for this visit only
+  }
+}
+
+/** After "Delete my data": the next request starts a fresh anonymous ID. */
+export function forgetUserId() {
+  sessionUserId = undefined
+  try {
+    localStorage.removeItem(USER_ID_KEY)
+  } catch {
+    // storage blocked: nothing stored to forget
   }
 }
 

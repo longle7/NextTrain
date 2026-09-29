@@ -2,8 +2,8 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router'
 import { api, getRoutes, getStations, searchStations, type Commute, type Prediction, type Route, type Station } from '../api'
 import { commuteTiming, daysLabel, sortCommutes, timingLabel, windowLabel } from '../commutes'
-import { Card, LineBadge, SearchInput, StationLink, Status } from '../components'
-import { nearestStations, walkLabel } from '../geo'
+import { Card, LineBadge, linkButton, primaryButton, SearchInput, StationLink, Status } from '../components'
+import { locationErrorMessage, nearestStations, OUT_OF_AREA_MILES, walkLabel } from '../geo'
 import { countdown, groupDepartures } from '../time'
 import { useNow, usePolling } from '../usePolling'
 
@@ -59,14 +59,7 @@ function Nearby({ stations, routes }: { stations: Station[]; routes: Route[] | u
     setLocation({ state: 'locating' })
     navigator.geolocation.getCurrentPosition(
       (position) => setLocation({ state: 'found', coords: position.coords }),
-      (error) =>
-        setLocation({
-          state: 'error',
-          message:
-            error.code === error.PERMISSION_DENIED
-              ? 'Location access is off. Allow it in Settings to see stations near you.'
-              : "Couldn't find your location. Try again in a moment.",
-        }),
+      (error) => setLocation({ state: 'error', message: locationErrorMessage(error) }),
       { maximumAge: 60_000, timeout: 15_000 },
     )
   }
@@ -80,11 +73,18 @@ function Nearby({ stations, routes }: { stations: Station[]; routes: Route[] | u
   }, [])
 
   const nearest = location.state === 'found' ? nearestStations(stations, location.coords) : []
+  const outOfArea = nearest.length > 0 && nearest[0].miles > OUT_OF_AREA_MILES
 
   return (
     <section className="space-y-2">
       <h2 className="px-1 text-lg font-bold">Near you</h2>
-      {location.state === 'found' ? (
+      {outOfArea ? (
+        <Card>
+          <p className="text-neutral-500">
+            You're outside the MBTA subway area. Search for a station above to see its live departures.
+          </p>
+        </Card>
+      ) : location.state === 'found' ? (
         <StationList
           stations={nearest.map((n) => n.station)}
           routes={routes}
@@ -98,7 +98,7 @@ function Nearby({ stations, routes }: { stations: Station[]; routes: Route[] | u
           <button
             onClick={locate}
             disabled={location.state === 'locating'}
-            className="mt-3 flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-neutral-900 font-semibold text-white disabled:opacity-60 dark:bg-white dark:text-neutral-900"
+            className={`mt-3 ${primaryButton}`}
           >
             <svg viewBox="0 0 24 24" className="size-5 fill-none stroke-current stroke-2" aria-hidden>
               <path d="M12 2v3M12 19v3M2 12h3M19 12h3" />
@@ -121,7 +121,7 @@ function MyCommutes({ routes }: { routes: Route[] | undefined }) {
       <div className="flex items-center justify-between px-1">
         <h2 className="text-lg font-bold">Your commutes</h2>
         {!!commutes.data?.length && (
-          <Link to="/commutes/new" className="flex min-h-11 items-center px-2 font-semibold text-blue-600 dark:text-blue-400">
+          <Link to="/commutes/new" className={linkButton}>
             + Add
           </Link>
         )}
@@ -132,7 +132,7 @@ function MyCommutes({ routes }: { routes: Route[] | undefined }) {
           <p className="text-neutral-500">Save the trips you take every day. When it's time to go, your next train shows up right here.</p>
           <Link
             to="/commutes/new"
-            className="mt-3 flex min-h-11 items-center justify-center rounded-xl bg-neutral-900 font-semibold text-white dark:bg-white dark:text-neutral-900"
+            className={`mt-3 ${primaryButton}`}
           >
             Add a commute
           </Link>
@@ -173,7 +173,7 @@ function CommuteCard({ commute, route, routes, now }: { commute: Commute; route:
         <span>
           {daysLabel(commute.activeDays)} · {windowLabel(commute)}
         </span>
-        <Link to={`/commutes/${commute.id}`} className="-mr-2 flex min-h-11 items-center px-2 font-semibold text-blue-600 dark:text-blue-400">
+        <Link to={`/commutes/${commute.id}`} className={`-mr-2 ${linkButton}`}>
           Edit
         </Link>
       </div>
@@ -195,7 +195,7 @@ function CommuteDepartures({ commute }: { commute: Commute }) {
       {predictions.error ? (
         <span className="text-sm text-neutral-500">Live times unavailable</span>
       ) : !predictions.data ? (
-        <span className="h-7 w-24 animate-pulse rounded bg-neutral-200 dark:bg-neutral-800" />
+        <span className="h-7 w-24 rounded bg-neutral-200 motion-safe:animate-pulse dark:bg-neutral-800" aria-label="Loading" />
       ) : departures.length === 0 ? (
         <span className="text-sm text-neutral-500">No trains predicted right now</span>
       ) : (

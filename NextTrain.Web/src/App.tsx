@@ -1,12 +1,16 @@
-import { useEffect, type ReactNode } from 'react'
+import { lazy, Suspense, useEffect, type ReactNode } from 'react'
 import { BrowserRouter, Link, NavLink, Route, Routes, useLocation, useNavigate } from 'react-router'
-import { TLogo } from './components'
+import { AppLogo, ErrorBoundary, primaryButton, Status } from './components'
 import CommutePage from './pages/CommutePage'
 import HomePage from './pages/HomePage'
 import LinePage from './pages/LinePage'
 import LinesPage from './pages/LinesPage'
-import MapPage from './pages/MapPage'
+import PrivacyPage from './pages/PrivacyPage'
+import SettingsPage from './pages/SettingsPage'
 import StationPage from './pages/StationPage'
+
+// The map pulls in Leaflet, so it loads only when opened: a faster first launch.
+const MapPage = lazy(() => import('./pages/MapPage'))
 
 const TABS = ['/', '/lines', '/map']
 
@@ -16,6 +20,19 @@ export default function App() {
       <Header />
       {/* Bottom padding keeps the last item clear of the tab bar and the iPhone home indicator. */}
       <main className="mx-auto max-w-xl space-y-4 px-4 pt-4 pb-[calc(5.5rem+env(safe-area-inset-bottom))]">
+        <Pages />
+      </main>
+      <TabBar />
+    </BrowserRouter>
+  )
+}
+
+function Pages() {
+  const { pathname } = useLocation()
+  return (
+    // Keyed by page so moving to another page clears a crash.
+    <ErrorBoundary key={pathname}>
+      <Suspense fallback={<Status loading />}>
         <Routes>
           <Route path="/" element={<HomePage />} />
           <Route path="/lines" element={<LinesPage />} />
@@ -24,10 +41,12 @@ export default function App() {
           <Route path="/map" element={<MapPage />} />
           <Route path="/commutes/new" element={<CommutePage />} />
           <Route path="/commutes/:id" element={<CommutePage />} />
+          <Route path="/settings" element={<SettingsPage />} />
+          <Route path="/privacy" element={<PrivacyPage />} />
+          <Route path="*" element={<NotFound />} />
         </Routes>
-      </main>
-      <TabBar />
-    </BrowserRouter>
+      </Suspense>
+    </ErrorBoundary>
   )
 }
 
@@ -43,17 +62,25 @@ function Header() {
 
   return (
     <header className="sticky top-0 z-10 bg-neutral-900 pt-[env(safe-area-inset-top)] text-white">
-      <div className="mx-auto flex min-h-14 max-w-xl items-center gap-3 px-4">
+      <div className="mx-auto flex min-h-14 max-w-xl items-center justify-between gap-3 px-4">
         {TABS.includes(location.pathname) ? (
-          <Link to="/" className="flex items-center gap-3">
-            <TLogo />
-            <span className="text-xl font-bold tracking-tight">NextTrain</span>
-          </Link>
+          <>
+            <Link to="/" className="flex items-center gap-2.5">
+              <AppLogo />
+              <span className="text-xl font-bold tracking-tight">NextTrain</span>
+            </Link>
+            <Link to="/settings" aria-label="Settings" className="-mr-2 grid size-11 place-items-center rounded-full active:bg-white/10">
+              <svg viewBox="0 0 24 24" className="size-6 fill-none stroke-current stroke-2" aria-hidden>
+                <circle cx="12" cy="12" r="3" />
+                <path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z" />
+              </svg>
+            </Link>
+          </>
         ) : (
           <button
             // Opened from a link or bookmark there's no history to go back to, so go Home.
             onClick={() => (location.key === 'default' ? navigate('/') : navigate(-1))}
-            className="-ml-2 flex min-h-11 items-center gap-1 rounded-lg px-2 text-lg font-semibold"
+            className="-ml-2 flex min-h-11 items-center gap-1 rounded-lg px-2 text-lg font-semibold active:opacity-60"
           >
             <svg viewBox="0 0 24 24" className="size-6 fill-none stroke-current stroke-[2.5]" aria-hidden>
               <path d="m15 5-7 7 7 7" />
@@ -84,7 +111,7 @@ function Tab({ to, label, icon }: { to: string; label: string; icon: ReactNode }
       to={to}
       end={to === '/'}
       className={({ isActive }) =>
-        `flex min-h-14 flex-col items-center justify-center gap-0.5 text-xs font-semibold ${isActive ? 'text-neutral-900 dark:text-white' : 'text-neutral-400'}`
+        `flex min-h-14 flex-col items-center justify-center gap-0.5 text-xs font-semibold ${isActive ? 'text-neutral-900 dark:text-white' : 'text-neutral-500 dark:text-neutral-400'}`
       }
     >
       <svg viewBox="0 0 24 24" className="size-6 fill-none stroke-current stroke-2 [stroke-linejoin:round]" aria-hidden>
@@ -92,5 +119,17 @@ function Tab({ to, label, icon }: { to: string; label: string; icon: ReactNode }
       </svg>
       {label}
     </NavLink>
+  )
+}
+
+function NotFound() {
+  return (
+    <div className="space-y-4 pt-8 text-center">
+      <h1 className="text-2xl font-bold">Page not found</h1>
+      <p className="text-neutral-500">This page doesn't exist. It may have moved.</p>
+      <Link to="/" className={primaryButton}>
+        Go to Home
+      </Link>
+    </div>
   )
 }

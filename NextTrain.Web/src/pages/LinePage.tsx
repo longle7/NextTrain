@@ -72,7 +72,7 @@ export default function LinePage() {
             <li key={station.mbtaStopId}>
               <Card>
                 <div className="flex items-center gap-3">
-                  {sort === 'ridership' && <span className="w-6 text-right text-sm font-bold text-neutral-400 tabular-nums">{i + 1}</span>}
+                  {sort === 'ridership' && <span className="w-6 text-right text-sm font-bold text-neutral-500 tabular-nums">{i + 1}</span>}
                   <StationLink
                     station={station}
                     routes={routes.data}

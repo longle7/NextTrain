@@ -16,3 +16,26 @@ body {
   -webkit-tap-highlight-color: transparent;
   -webkit-text-size-adjust: 100%;
 }
+
+/* Dark mode map: invert only the OpenStreetMap tiles so line colors stay true. `html` outranks leaflet.css,
+   which loads later with the map. */
+@media (prefers-color-scheme: dark) {
+  html .leaflet-container {
+    background: #262626;
+  }
+  html .leaflet-tile-pane {
+    filter: invert(1) hue-rotate(180deg) brightness(0.95) contrast(0.9);
+  }
+  html .leaflet-control-attribution {
+    background: rgb(23 23 23 / 0.75);
+    color: #a3a3a3;
+  }
+  html .leaflet-control-attribution a {
+    color: #93c5fd;
+  }
+  html .leaflet-bar a {
+    background: #262626;
+    border-color: #404040;
+    color: #e5e5e5;
+  }
+}

@@ -1,4 +1,14 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
-  <circle cx="16" cy="16" r="14" fill="#171717" stroke="#fff" stroke-width="2.5"/>
-  <path d="M9 9h14v4h-5v11h-4V13H9z" fill="#fff"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <rect width="64" height="64" rx="14" fill="#171717"/>
+  <!-- Train front -->
+  <rect x="18" y="8" width="28" height="35" rx="8" fill="#fff"/>
+  <rect x="22.5" y="13" width="19" height="12" rx="3" fill="#171717"/>
+  <circle cx="25.5" cy="34.5" r="2.6" fill="#171717"/>
+  <circle cx="38.5" cy="34.5" r="2.6" fill="#171717"/>
+  <path d="M25 43.5 21 50M39 43.5 43 50" stroke="#fff" stroke-width="3.6" stroke-linecap="round"/>
+  <!-- Rails in the four subway line colors -->
+  <rect x="11" y="51" width="9.5" height="4.5" rx="2.25" fill="#E0392B"/>
+  <rect x="22" y="51" width="9.5" height="4.5" rx="2.25" fill="#F2A11F"/>
+  <rect x="33" y="51" width="9.5" height="4.5" rx="2.25" fill="#22A355"/>
+  <rect x="44" y="51" width="9.5" height="4.5" rx="2.25" fill="#3B82F6"/>
 </svg>

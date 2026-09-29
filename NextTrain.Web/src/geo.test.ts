@@ -30,6 +30,7 @@ describe('walkLabel', () => {
   it.each([
     [0.02, '<0.1 mi · 1 min walk'],
     [0.4, '0.4 mi · 10 min walk'],
+    [3.24, '3.2 mi away'],
   ])('%s mi is "%s"', (miles, expected) => {
     expect(walkLabel(miles)).toBe(expected)
   })

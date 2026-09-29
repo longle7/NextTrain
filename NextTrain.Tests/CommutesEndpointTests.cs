@@ -104,5 +104,31 @@ public class CommutesEndpointTests : IDisposable
         using var anonymous = _factory.CreateClient();
 
         Assert.Equal(HttpStatusCode.BadRequest, (await anonymous.GetAsync("/commutes")).StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, (await anonymous.DeleteAsync("/me")).StatusCode);
+    }
+
+    [Fact]
+    public async Task DeleteMe_RemovesAllOfThatUsersData_AndNobodyElses()
+    {
+        using var alice = ClientFor("alice");
+        using var bob = ClientFor("bob");
+        await alice.PostAsJsonAsync("/commutes", Request());
+        await bob.PostAsJsonAsync("/commutes", Request());
+        using (var db = TestDb.Open())
+        {
+            db.NotificationSubscriptions.AddRange(
+                new NotificationSubscription { UserId = "alice", EndpointOrToken = "alice-device" },
+                new NotificationSubscription { UserId = "bob", EndpointOrToken = "bob-device" });
+            db.UserLocationPreferences.Add(new UserLocationPreference { UserId = "alice" });
+            db.SaveChanges();
+        }
+
+        Assert.Equal(HttpStatusCode.NoContent, (await alice.DeleteAsync("/me")).StatusCode);
+
+        Assert.Empty((await alice.GetFromJsonAsync<List<CommuteResponse>>("/commutes"))!);
+        Assert.Single((await bob.GetFromJsonAsync<List<CommuteResponse>>("/commutes"))!);
+        using var check = TestDb.Open();
+        Assert.Equal("bob", Assert.Single(check.NotificationSubscriptions).UserId);
+        Assert.Empty(check.UserLocationPreferences);
     }
 }
