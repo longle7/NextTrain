@@ -1,0 +1,56 @@
+using Microsoft.AspNetCore.Mvc;
+using NextTrain.Core.Services;
+
+namespace NextTrain.Api.Controllers
+{
+    /// <summary>
+    /// Subway service alerts in effect now. The app decides which lines, stations, and commutes each one affects.
+    /// </summary>
+    [ApiController]
+    [Route("alerts")]
+    public class AlertsController : ControllerBase
+    {
+        // GET /alerts
+        [HttpGet]
+        public async Task<ActionResult<IEnumerable<AlertResponse>>> GetAll([FromServices] IMbtaClient mbta)
+        {
+            try
+            {
+                var alerts = await mbta.GetSubwayAlertsAsync();
+                return Ok(alerts.OrderByDescending(a => a.Attributes.Severity).Select(AlertResponse.From));
+            }
+            catch (Exception e) when (e is HttpRequestException or TaskCanceledException)
+            {
+                return Problem("MBTA alerts are temporarily unavailable.", statusCode: StatusCodes.Status503ServiceUnavailable);
+            }
+        }
+    }
+
+    // Severity is 0 (information) to 10 (worst). Summary is short ("Symphony closed"); Header is a sentence or two.
+    public record AlertResponse(
+        string Id,
+        string Effect,
+        int Severity,
+        string Summary,
+        string Header,
+        string? Description,
+        string? Timeframe,
+        string? Url,
+        IReadOnlyList<AlertEntity> Entities)
+    {
+        public static AlertResponse From(MbtaAlertDto a) => new(
+            a.Id,
+            a.Attributes.Effect,
+            a.Attributes.Severity,
+            string.IsNullOrWhiteSpace(a.Attributes.ServiceEffect) ? a.Attributes.Header : a.Attributes.ServiceEffect,
+            a.Attributes.Header,
+            a.Attributes.Description,
+            a.Attributes.Timeframe,
+            a.Attributes.Url,
+            // MBTA repeats route/stop pairs once per activity; one of each is enough.
+            a.Attributes.InformedEntity.Select(e => new AlertEntity(e.Route, e.Stop, e.DirectionId)).Distinct().ToList());
+    }
+
+    // Null means "all": no RouteId is every route, no StopId is the whole route, no DirectionId is both directions.
+    public record AlertEntity(string? RouteId, string? StopId, int? DirectionId);
+}

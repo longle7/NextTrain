@@ -25,5 +25,8 @@ namespace NextTrain.Core.Services
 
         // Gets the track shape of each subway route's typical trips.
         Task<IReadOnlyList<MbtaShape>> GetSubwayShapesAsync();
+
+        // Gets subway service alerts in effect right now (delays, suspensions, station closures, ...).
+        Task<IReadOnlyList<MbtaAlertDto>> GetSubwayAlertsAsync();
     }
 }

@@ -220,6 +220,37 @@ public class StationsEndpointTests : IDisposable
     }
 
     [Fact]
+    public async Task GetAlerts_MostSevereFirst_WithShortSummary_AndDistinctEntities()
+    {
+        MbtaAlertDto Alert(string id, int severity, string? serviceEffect, params MbtaInformedEntityDto[] entities) => new()
+        {
+            Id = id,
+            Attributes = new()
+            {
+                Effect = "DELAY", Severity = severity, Header = $"Header {id}", ServiceEffect = serviceEffect,
+                InformedEntity = entities.ToList()
+            }
+        };
+        var redLine = new MbtaInformedEntityDto { Route = "Red" };
+        _mbta.Alerts.Add(Alert("minor", 1, "Station issue at Savin Hill", redLine));
+        _mbta.Alerts.Add(Alert("major", 7, null, redLine, new MbtaInformedEntityDto { Route = "Red" })); // repeated per activity
+
+        var alerts = (await _client.GetFromJsonAsync<List<AlertResponse>>("/alerts"))!;
+
+        Assert.Equal(new[] { "major", "minor" }, alerts.Select(a => a.Id));
+        Assert.Equal("Header major", alerts[0].Summary); // no service_effect: falls back to the header
+        Assert.Equal(new AlertEntity("Red", null, null), Assert.Single(alerts[0].Entities));
+    }
+
+    [Fact]
+    public async Task GetAlerts_MbtaDown_Returns503()
+    {
+        _mbta.AlertsError = new HttpRequestException("MBTA down");
+
+        Assert.Equal(HttpStatusCode.ServiceUnavailable, (await _client.GetAsync("/alerts")).StatusCode);
+    }
+
+    [Fact]
     public async Task GetRouteShapes_ReturnsPolylines()
     {
         _mbta.Shapes.Add(new MbtaShape("Red", "_p~iF~ps|U"));

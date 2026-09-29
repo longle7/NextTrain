@@ -39,4 +39,13 @@ public class FakeMbtaClient : IMbtaClient
 
     public Task<IReadOnlyList<MbtaShape>> GetSubwayShapesAsync() =>
         Task.FromResult<IReadOnlyList<MbtaShape>>(Shapes);
+
+    // Set AlertsError to simulate MBTA being down.
+    public List<MbtaAlertDto> Alerts { get; } = new();
+    public Exception? AlertsError { get; set; }
+
+    public Task<IReadOnlyList<MbtaAlertDto>> GetSubwayAlertsAsync() =>
+        AlertsError is not null
+            ? Task.FromException<IReadOnlyList<MbtaAlertDto>>(AlertsError)
+            : Task.FromResult<IReadOnlyList<MbtaAlertDto>>(Alerts);
 }

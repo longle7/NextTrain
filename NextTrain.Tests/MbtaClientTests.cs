@@ -95,6 +95,30 @@ public class MbtaClientTests
     }
 
     [Fact]
+    public async Task GetSubwayAlertsAsync_ParsesSnakeCase_ForSubwayAlertsInEffectNow()
+    {
+        const string json = """
+            {"data":[{"id":"1033333","attributes":{"effect":"SUSPENSION","severity":7,
+              "header":"Green Line: No trains between North Station & Kenmore.","description":"Use shuttle buses.",
+              "service_effect":"Suspension of service on Green Line","timeframe":"through Sunday","url":null,
+              "informed_entity":[{"route":"Green-B","stop":"place-pktrm","direction_id":null,"activities":["BOARD"]}]}}]}
+            """;
+        var handler = new StubHandler(json);
+        var client = new MbtaClient(new HttpClient(handler), new ConfigurationBuilder().Build(),
+            new MemoryCache(new MemoryCacheOptions()));
+
+        var alert = Assert.Single(await client.GetSubwayAlertsAsync());
+
+        Assert.Equal("SUSPENSION", alert.Attributes.Effect);
+        Assert.Equal(7, alert.Attributes.Severity);
+        Assert.Equal("Suspension of service on Green Line", alert.Attributes.ServiceEffect);
+        Assert.Equal("through Sunday", alert.Attributes.Timeframe);
+        var entity = Assert.Single(alert.Attributes.InformedEntity);
+        Assert.Equal(("Green-B", "place-pktrm", (int?)null), (entity.Route, entity.Stop, entity.DirectionId));
+        Assert.Contains("filter[route_type]=0,1&filter[datetime]=NOW", Uri.UnescapeDataString(handler.Urls[0]));
+    }
+
+    [Fact]
     public async Task GetSubwayShapesAsync_JoinsTripsToShapes_ForAllSubwayRoutes()
     {
         // Served for both the /routes and /route_patterns calls: each parse reads only the fields it needs.

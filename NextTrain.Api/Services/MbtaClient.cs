@@ -22,6 +22,9 @@ namespace NextTrain.Api.Services
         // Route names and colors almost never change.
         public static readonly TimeSpan RouteCacheDuration = TimeSpan.FromHours(1);
 
+        // Alerts change within minutes, not seconds.
+        public static readonly TimeSpan AlertCacheDuration = TimeSpan.FromMinutes(1);
+
         // MBTA JSON uses snake_case (e.g., "arrival_time", "platform_code").
         private static readonly JsonSerializerOptions JsonOptions = new()
         {
@@ -101,6 +104,14 @@ namespace NextTrain.Api.Services
                 .Select(t => new MbtaShape(t.RelatedId("route") ?? "", polylines.GetValueOrDefault(t.RelatedId("shape") ?? "") ?? ""))
                 .Where(s => s.Polyline != "")
                 .ToList();
+        }
+
+        public async Task<IReadOnlyList<MbtaAlertDto>> GetSubwayAlertsAsync()
+        {
+            // MBTA's default activity filter (board, exit, ride) leaves out elevator and escalator outages.
+            var payload = await GetCachedAsync<MbtaAlertsResponseDto>(
+                "https://api-v3.mbta.com/alerts?filter[route_type]=0,1&filter[datetime]=NOW", AlertCacheDuration);
+            return payload?.Data ?? new List<MbtaAlertDto>();
         }
 
         // Failures are not cached: GetOrCreateAsync stores nothing when the factory throws.
