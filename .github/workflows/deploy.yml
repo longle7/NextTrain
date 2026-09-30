@@ -11,14 +11,38 @@ on:
     branches: [main]
   workflow_dispatch:
 
+# One deploy at a time, queued (never canceled): two at once made Static Web Apps cancel the first upload.
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+
 env:
   RESOURCE_GROUP: nexttrain-rg
   CONTAINER_APP: nexttrain-api
   IMAGE: ghcr.io/${{ github.repository_owner }}/nexttrain-api
 
 jobs:
-  api:
+  # Deploy only the newest commit on main. When merges land close together, their CI runs can finish in either order;
+  # without this, an older commit's deploy could finish last and put older code live. A skipped deploy loses nothing:
+  # the newer commit's own deploy ships everything.
+  latest:
     if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    outputs:
+      current: ${{ steps.check.outputs.current }}
+    steps:
+      - id: check
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
+        run: |
+          main=$(gh api "repos/${{ github.repository }}/commits/main" --jq .sha)
+          echo "current=$([ "$main" = "$SHA" ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+          [ "$main" = "$SHA" ] || echo "::notice::Skipping: $SHA is no longer the newest commit on main ($main); its deploy ships this."
+
+  api:
+    needs: latest
+    if: needs.latest.outputs.current == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -50,7 +74,8 @@ jobs:
       - run: az containerapp update -g $RESOURCE_GROUP -n $CONTAINER_APP --image $IMAGE:${{ github.event.workflow_run.head_sha || github.sha }}
 
   web:
-    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    needs: latest
+    if: needs.latest.outputs.current == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
