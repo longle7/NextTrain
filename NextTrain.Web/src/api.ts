@@ -77,7 +77,10 @@ export interface Commute {
 
 export type CommuteInput = Pick<Commute, 'mbtaStopId' | 'routeId' | 'directionId' | 'windowStart' | 'windowEnd' | 'activeDays'>
 
-/** An HTTP error with the API's own message (e.g. a validation error) when it sent one. */
+/**
+ * A failed request: an HTTP error with the API's own message (e.g. a validation error) when it sent one, or
+ * status 0 when there was no answer at all (timed out, or no connection), with a message to show as is.
+ */
 export class ApiError extends Error {
   status: number
   constructor(status: number, message: string) {
@@ -90,8 +93,22 @@ export class ApiError extends Error {
 // so its build points at the hosted API instead: VITE_API_URL=https://api.example.com npm run build
 const API_URL = import.meta.env.VITE_API_URL ?? '/api'
 
+/** Give up on a request after this long, so a stalled connection (a tunnel, weak signal) shows an error, not a spinner forever. */
+export const REQUEST_TIMEOUT_MS = 15_000
+export const TIMEOUT_MESSAGE = 'NextTrain is taking too long to respond. Check your connection and try again.'
+export const NETWORK_MESSAGE = "Couldn't reach NextTrain. Check your connection and try again."
+
+// fetch with a timeout; a request that gets no answer becomes an ApiError with status 0 and a message to show.
+async function request(url: string, init?: RequestInit): Promise<Response> {
+  try {
+    return await fetch(url, { ...init, signal: init?.signal ?? AbortSignal.timeout(REQUEST_TIMEOUT_MS) })
+  } catch (error) {
+    throw new ApiError(0, (error as Error).name === 'TimeoutError' ? TIMEOUT_MESSAGE : NETWORK_MESSAGE)
+  }
+}
+
 export async function api<T>(path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(`${API_URL}${path}`, {
+  const response = await request(`${API_URL}${path}`, {
     ...init,
     headers: { 'Content-Type': 'application/json', 'X-User-Id': userId(), ...init?.headers },
   })
@@ -107,7 +124,7 @@ export async function api<T>(path: string, init?: RequestInit): Promise<T> {
 // A 30-minute Apple Maps token, signed by our API (MapKitController) so the signing key never reaches the app.
 // Plain text, not JSON. No X-User-Id: the token isn't tied to a user, and a plain GET needs no CORS preflight.
 export async function getMapKitToken(): Promise<string> {
-  const response = await fetch(`${API_URL}/mapkit/token`)
+  const response = await request(`${API_URL}/mapkit/token`)
   if (!response.ok) throw new ApiError(response.status, "The map isn't available right now.")
   return response.text()
 }

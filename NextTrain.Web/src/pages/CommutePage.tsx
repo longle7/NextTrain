@@ -1,12 +1,12 @@
 import { useState, type ReactNode } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router'
 import {
-  api, getRoutes, getStations, searchStations, stationRouteIds,
+  api, ApiError, getRoutes, getStations, searchStations, stationRouteIds,
   type Commute, type CommuteInput, type Route, type Station,
 } from '../api'
 import { WEEK } from '../commutes'
 import { recentStationIds } from '../recent'
-import { Card, dangerButton, LineBadge, linkButton, primaryButton, SearchInput, Status } from '../components'
+import { Card, dangerButton, LineBadge, linkButton, NotFound, primaryButton, SearchInput, Status } from '../components'
 import { usePolling, useTitle } from '../usePolling'
 
 // /commutes/new (optionally ?station=place-pktrm) and /commutes/:id
@@ -14,8 +14,11 @@ export default function CommutePage() {
   const { id } = useParams()
   const [params] = useSearchParams()
   const existing = usePolling(() => (id ? api<Commute>(`/commutes/${id}`) : Promise.resolve(undefined)), id ?? 'new')
-  useTitle(id ? 'Edit commute' : 'New commute')
+  // Someone else's commute also answers 404 (see CommutesController), so this covers both.
+  const notFound = existing.error instanceof ApiError && existing.error.status === 404
+  useTitle(notFound ? 'Commute not found' : id ? 'Edit commute' : 'New commute')
 
+  if (notFound) return <NotFound title="Commute not found" message="This commute doesn't exist on this device. It may have been deleted." />
   if (id && !existing.data) return <Status error={existing.error} loading={!existing.error} />
   return <CommuteForm key={id ?? 'new'} existing={existing.data} initialStopId={params.get('station') ?? ''} />
 }

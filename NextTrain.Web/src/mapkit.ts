@@ -76,16 +76,35 @@ export function updateTrainElement(svg: Element, color: string, heading: number 
   ;(svg as SVGElement).style.transform = `rotate(${heading ?? 0}deg)`
 }
 
+/** Shows and hides the station's next-trains card (MapPage's StationPreview). */
+export interface Preview {
+  show: (dot: HTMLElement) => void
+  hide: (now?: boolean) => void
+}
+
 /**
  * A station's dot, as its own button. We handle the tap here rather than through MapKit's selection: where dots
  * overlap, MapKit sometimes picks the one underneath, but the browser always delivers the tap to the dot on top.
+ * Hovering with a mouse, or focusing with the keyboard, shows its next trains; Escape hides them.
  */
-export function stationElement(name: string, open: () => void) {
-  const dot = Object.assign(document.createElement('div'), { className: 'station-dot', title: name, tabIndex: 0 })
+export function stationElement(name: string, open: () => void, preview: Preview) {
+  const dot = Object.assign(document.createElement('div'), { className: 'station-dot', tabIndex: 0 })
   dot.setAttribute('role', 'button')
   dot.setAttribute('aria-label', `${name} station`)
+  dot.setAttribute('aria-describedby', 'station-preview')
   dot.addEventListener('click', open)
-  dot.addEventListener('keydown', (event) => (event.key === 'Enter' || event.key === ' ') && (event.preventDefault(), open()))
+  dot.addEventListener('keydown', (event) => {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault()
+      open()
+    }
+    if (event.key === 'Escape') preview.hide(true)
+  })
+  // Mouse only: on a touchscreen a tap opens the station, and a hover card would just flash first.
+  dot.addEventListener('pointerenter', (event) => event.pointerType === 'mouse' && preview.show(dot))
+  dot.addEventListener('pointerleave', (event) => event.pointerType === 'mouse' && preview.hide())
+  dot.addEventListener('focus', () => preview.show(dot))
+  dot.addEventListener('blur', () => preview.hide())
   return dot
 }
 

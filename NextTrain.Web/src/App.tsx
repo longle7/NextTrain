@@ -1,7 +1,7 @@
 import { lazy, Suspense, useEffect, useRef, type ReactNode } from 'react'
 import { BrowserRouter, Link, NavLink, Route, Routes, useLocation, useNavigate } from 'react-router'
-import { AppLogo, ErrorBoundary, primaryButton, Status } from './components'
-import { useOnline, useTitle } from './usePolling'
+import { AppLogo, ErrorBoundary, NotFound, Status } from './components'
+import { useOnline } from './usePolling'
 import CommutePage from './pages/CommutePage'
 import HomePage from './pages/HomePage'
 import LinePage from './pages/LinePage'
@@ -135,18 +135,5 @@ function Tab({ to, label, icon }: { to: string; label: string; icon: ReactNode }
       </svg>
       {label}
     </NavLink>
-  )
-}
-
-function NotFound() {
-  useTitle('Page not found')
-  return (
-    <div className="space-y-4 pt-8 text-center">
-      <h1 className="text-2xl font-bold">Page not found</h1>
-      <p className="text-neutral-500">This page doesn't exist. It may have moved.</p>
-      <Link to="/" className={primaryButton}>
-        Go to Home
-      </Link>
-    </div>
   )
 }
