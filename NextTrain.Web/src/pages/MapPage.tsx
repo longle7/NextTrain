@@ -116,7 +116,8 @@ export default function MapPage() {
       const route = routes.data?.find((r) => r.id === v.routeId)
       let marker = trains.current.get(v.id)
       if (!marker) {
-        marker = L.marker([v.latitude, v.longitude]).bindPopup('').addTo(map)
+        // Start with the train icon: Leaflet's default pin would request marker images this site doesn't serve.
+        marker = L.marker([v.latitude, v.longitude], { icon: trainIcon(route?.color ?? 'gray', v.bearing) }).bindPopup('').addTo(map)
         trains.current.set(v.id, marker)
       }
       // Leaflet makes markers keyboard buttons; `title` (applied when setIcon rebuilds the icon) names them for VoiceOver.
