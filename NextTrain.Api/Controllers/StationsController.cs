@@ -1,5 +1,6 @@
 ﻿using System.ComponentModel.DataAnnotations;
 using Microsoft.AspNetCore.Mvc;
+using NextTrain.Api.Services;
 using NextTrain.Core.Domain;
 using NextTrain.Core.Services;
 
@@ -9,7 +10,7 @@ namespace NextTrain.Api.Controllers
     /// Stations and their live departures.
     ///
     /// Where the data comes from: station details (name, location, lines) live in our SQL Server database,
-    /// imported from MBTA by StationImportService, and are read through IStationLookupService.
+    /// imported from MBTA by StationImportService, and are read through StationLookupService.
     /// Live data (departures, line order) comes straight from MBTA through IMbtaClient, which caches it briefly.
     /// If MBTA is down, MbtaUnavailableFilter turns the error into a 503.
     /// </summary>
@@ -17,9 +18,9 @@ namespace NextTrain.Api.Controllers
     [Route("stations")]
     public class StationsController : ControllerBase
     {
-        private readonly IStationLookupService _lookup;
+        private readonly StationLookupService _lookup;
 
-        public StationsController(IStationLookupService lookup)
+        public StationsController(StationLookupService lookup)
         {
             _lookup = lookup;
         }
@@ -55,17 +56,6 @@ namespace NextTrain.Api.Controllers
             }
         }
 
-        // GET /stations/nearest?lat=42.3564&lon=-71.0624&route=Red
-        [HttpGet("nearest")]
-        public async Task<ActionResult<Station>> GetNearest(
-            [FromQuery, Required, Range(-90, 90)] double? lat,
-            [FromQuery, Required, Range(-180, 180)] double? lon,
-            [FromQuery] string? route)
-        {
-            var station = await _lookup.GetNearestStationAsync(lat!.Value, lon!.Value, route);
-            return station is null ? NotFound() : station;
-        }
-
         // GET /stations/place-pktrm
         [HttpGet("{mbtaStopId}")]
         public async Task<ActionResult<Station>> GetById(string mbtaStopId)
@@ -95,16 +85,12 @@ namespace NextTrain.Api.Controllers
             var predictions = await mbta.GetPredictionsAsync(station.MbtaStopId, station.RouteId);
 
             return Ok(predictions
-                .Select(p => new PredictionResponse(
-                    p.Relationships.Route.Data.Id,
-                    p.Attributes.DirectionId,
-                    p.Attributes.ArrivalTime,
-                    p.Attributes.DepartureTime,
-                    p.Attributes.Status))
+                // No departure: the train ends here (nothing to board) or skips this stop.
+                .Where(p => p.Attributes.DepartureTime is not null)
+                .Select(p => new PredictionResponse(p.Relationships.Route.Data.Id, p.Attributes.DirectionId, p.Attributes.DepartureTime!.Value))
                 .Where(p => route is null || p.RouteId == route)
                 .Where(p => direction is null || p.DirectionId == direction)
-                .Where(p => p.ArrivalTime is not null || p.DepartureTime is not null) // skipped/cancelled stops
-                .OrderBy(p => p.DepartureTime ?? p.ArrivalTime));
+                .OrderBy(p => p.DepartureTime));
         }
     }
 
@@ -115,10 +101,5 @@ namespace NextTrain.Api.Controllers
         Ridership  // busiest first; stations without data last
     }
 
-    public record PredictionResponse(
-        string RouteId,
-        int DirectionId,
-        DateTimeOffset? ArrivalTime,
-        DateTimeOffset? DepartureTime,
-        string? Status);
+    public record PredictionResponse(string RouteId, int DirectionId, DateTimeOffset DepartureTime);
 }

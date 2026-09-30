@@ -28,7 +28,6 @@ Commutes belong to an anonymous ID stored on the device (sent as `X-User-Id`) un
 | GET | `/vehicles` | Live train positions, bearing, direction, and current/next stop |
 | GET | `/alerts` | Service alerts in effect now (delays, suspensions, station closures), most severe first |
 | GET | `/stations?route=Red&sort=line` | List stations, optionally by route; `sort` is `name` (default), `line` (order along the route), or `ridership` |
-| GET | `/stations/nearest?lat=&lon=&route=` | Nearest station to a location |
 | GET | `/stations/{mbtaStopId}` | One station, e.g. `place-pktrm` |
 | GET | `/stations/{mbtaStopId}/predictions?route=&direction=` | Upcoming trains, soonest first |
 | GET | `/mapkit/token` | A short-lived Apple Maps (MapKit JS) token for the calling site; 404 until `MapKit:TeamId`, `MapKit:KeyId`, and `MapKit:PrivateKey` are set |
@@ -98,12 +97,11 @@ New to the code? Start with **[docs/backend.md](docs/backend.md)**: how requests
 
 ## Design notes
 
-- Stations import from MBTA when the API starts and every 24 hours after (`Stations:RefreshHours`; 0 turns it off), so a fresh deployment is never empty and new or renamed stations appear on their own. A failed import retries in 5 minutes. They're imported per subway route because MBTA only reports a stop's route when filtering by a single route. Transfer stations store all routes, e.g. `Green-B,Green-C,Green-D,Green-E,Red`.
+How the API works (station import, caching, errors, adding an endpoint) is in [docs/backend.md](docs/backend.md). Beyond that:
+
 - Ridership is average weekday boardings per station from MassDOT's Fall 2024 counts (embedded snapshot, applied on import). Mattapan stops are not in the dataset.
-- Predictions and train positions are cached in memory for 10 seconds, alerts for 1 minute, route info and shapes for 1 hour. MBTA calls time out after 10 seconds and retry transient failures twice. If MBTA is unavailable the API returns 503.
-- Errors are always problem JSON (RFC 9457): validation errors list what's wrong, unknown paths and IDs get a 404 body, and unexpected failures return a 500 without internals outside Development. Responses are compressed (Brotli or gzip), which cuts `/stations` from 33 KB to 8 KB and each 10-second `/vehicles` refresh from 15 KB to 4 KB.
 - `/alerts` returns every subway alert with the routes, stations, and directions it covers; the app decides what each line, station, and commute shows. A line's status counts alerts of severity 3 and up (MBTA uses 1-2 for things like a closed staircase, which still show on that station's page).
-- The live map (`/map`) is Apple Maps (MapKit JS), loaded only when the map opens. `mapkit.ts` pins Apple's script to one version with a Subresource Integrity hash, and MapKit gets its 30-minute tokens from `GET /mapkit/token`, so the signing key stays on the server. Line shapes are MBTA's canonical (regular service) patterns.
+- The live map (`/map`) is Apple Maps (MapKit JS), loaded only when the map opens. `mapkit.ts` pins Apple's script to one version with a Subresource Integrity hash, and MapKit gets its 30-minute tokens from `GET /mapkit/token`, so the signing key stays on the server. Trains are drawn on their own line, pointing the way they're going (`snap.ts`).
 
 ## Hosting (Azure)
 
@@ -112,29 +110,21 @@ Merging to `main` deploys automatically once CI passes (`.github/workflows/deplo
 | Piece | Azure service | Cost |
 |---|---|---|
 | Web app | Static Web Apps (Free) | $0 |
-| API | Container Apps (Consumption, 0.25 vCPU, scales to zero, at most 1 replica) running the root `Dockerfile`, image on ghcr.io | ~$0–3/month |
+| API | Container Apps (Consumption, 0.25 vCPU, 1 replica from 4:30 AM to 2 AM Eastern, at most 1) running the root `Dockerfile`, image on ghcr.io | ~$4–5/month |
 | Database | Azure SQL Database, Basic (5 DTU, 2 GB) | ~$5/month |
 
 A $10/month budget on the resource group emails the subscription owner at 50%, 80%, and 100% of actual spend and at 100% forecast. Azure has no hard cap on pay-as-you-go spending, so the limits above (one replica, fixed-price database) are what keep the bill small.
 
 Production settings live in Azure, never in the repo: the connection string, MBTA key, and MapKit private key are Container App secrets, and `Cors__AllowedOrigins__2` adds the web app's address to the allowed origins. GitHub signs in to Azure with OIDC (no stored password) using the `AZURE_CLIENT_ID`, `AZURE_TENANT_ID`, and `AZURE_SUBSCRIPTION_ID` repository variables; `API_URL` is the address the web app calls, and the `SWA_DEPLOY_TOKEN` secret uploads the web app. The optional `GA_MEASUREMENT_ID` repository variable (e.g. `G-ABC123`) turns on consent-gated Google Analytics for the website build; the iPhone app never has analytics.
 
-The API scales to zero when idle, so the first request after a quiet spell takes a few seconds while it starts. Set the Container App's minimum replicas to 1 (about $4 more a month) to avoid that.
+Scaling (set in Azure, not by the deploy): a `cron` rule keeps one API instance running from 4:30 AM to 2:00 AM Eastern (`America/New_York`, so daylight saving is handled), when people ride the T. Overnight it may scale to zero; the `http` rule wakes it for a visitor, which can take from seconds to minutes when Azure is short on capacity. Waking from zero during the day is what caused slow first loads before the schedule.
 
 ## Road to the App Store
 
-The web app is built to be wrapped as a native iPhone app with [Capacitor](https://capacitorjs.com). **[docs/app-store](docs/app-store/README.md)** has the listing kit: screenshots, name, description, keywords, App Privacy answers, review notes, Info.plist strings, and the submission checklist.
+The iPhone app wraps the web app with [Capacitor](https://capacitorjs.com); its Xcode project is `NextTrain.Web/ios` (bundle ID `com.longledev.nexttrain`). **[docs/app-store](docs/app-store/README.md)** has everything for the listing (screenshots, text, App Privacy answers, review notes) and the submission checklist, including building on a Mac:
 
-Ready:
+```
+cd NextTrain.Web && VITE_API_URL=https://api.nexttrain.longledev.com npm run ios && npx cap open ios
+```
 
-- **App icon**: NextTrain's own mark (not the MBTA's "T", a trademark App Review would flag under guideline 5.2.1). The 1024×1024 App Store icon, with no alpha channel as Apple requires, is `NextTrain.Web/assets/app-store-icon.png`.
-- **Privacy policy** at `/privacy` (in the app under Settings); once hosted, that URL is the one App Store Connect asks for. Location never leaves the device and there's no tracking, so the App Privacy answers are short: *User Content* (saved commutes) and *Identifiers → User ID* (the random device ID), both used only for app functionality and not for tracking.
-- **In-app data deletion**: Settings → Delete my data calls `DELETE /me`.
-- **App Review from outside Boston**: "Near you" and the map say you're outside the MBTA area instead of listing stations 2,700 miles away.
-
-Still to do:
-
-1. **Custom domain.** The API is hosted on Azure (see [Hosting](#hosting-azure)); point the app's domain at it and build the iPhone app with `VITE_API_URL=https://<api-host>`.
-2. **Optional: Sign in with Apple**, for commutes that follow you across devices. App Review doesn't require it (the app has no third-party login), and Delete my data already covers Apple's data-deletion rule.
-3. **Push notifications** for commutes ("your train leaves in 5 min") via APNs. The `NotificationSubscription` table is ready for it, and it gives the app native value beyond a website (App Review guideline 4.2).
-4. **Build and ship on a Mac.** The iPhone app's Xcode project is in `NextTrain.Web/ios` (Capacitor, bundle ID `com.longledev.nexttrain`). Run `VITE_API_URL=https://<api-host> npm run ios`, then `npx cap open ios`, set your signing team, and archive. You'll need an Apple Developer account.
+Ideas for later: Sign in with Apple (commutes across devices), and push notifications for commutes ("your train leaves in 5 min"), which would also give the app native value beyond the website (App Review guideline 4.2).

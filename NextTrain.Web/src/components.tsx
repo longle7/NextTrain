@@ -210,16 +210,12 @@ export class ErrorBoundary extends Component<{ children: ReactNode }, { crashed:
     return { crashed: true }
   }
 
+  // Going Home clears it: App keys this boundary by page.
   render() {
-    if (!this.state.crashed) return this.props.children
-    return (
-      <div className="space-y-4 pt-8 text-center">
-        <h1 className="text-2xl font-bold">Something went wrong</h1>
-        <p className="text-neutral-500">NextTrain hit an unexpected problem. Reloading usually fixes it.</p>
-        <button onClick={() => location.assign('/')} className={primaryButton}>
-          Reload NextTrain
-        </button>
-      </div>
+    return this.state.crashed ? (
+      <NotFound title="Something went wrong" message="NextTrain hit an unexpected problem. Going back to Home usually fixes it." />
+    ) : (
+      this.props.children
     )
   }
 }

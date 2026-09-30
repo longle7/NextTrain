@@ -22,9 +22,7 @@ export interface Station {
 export interface Prediction {
   routeId: string
   directionId: number
-  arrivalTime: string | null
-  departureTime: string | null
-  status: string | null
+  departureTime: string // the API only sends trains you can board
 }
 
 export interface Vehicle {
@@ -72,7 +70,6 @@ export interface Commute {
   windowStart: string // "07:45:00", Boston local time
   windowEnd: string
   activeDays: string // "Mon,Tue,Wed,Thu,Fri"
-  isEnabled: boolean
 }
 
 export type CommuteInput = Pick<Commute, 'mbtaStopId' | 'routeId' | 'directionId' | 'windowStart' | 'windowEnd' | 'activeDays'>

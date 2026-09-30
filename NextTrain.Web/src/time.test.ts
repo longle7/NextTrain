@@ -20,17 +20,15 @@ describe('countdown', () => {
 })
 
 describe('groupDepartures', () => {
-  const p = (routeId: string, directionId: number, departureSeconds: number | null): Prediction => ({
+  const p = (routeId: string, directionId: number, departureSeconds: number): Prediction => ({
     routeId,
     directionId,
-    arrivalTime: null,
-    departureTime: departureSeconds === null ? null : at(departureSeconds),
-    status: null,
+    departureTime: at(departureSeconds),
   })
 
-  it('groups by route and direction, soonest first, dropping arrival-only and departed trains', () => {
+  it('groups by route and direction, soonest first, dropping departed trains', () => {
     const groups = groupDepartures(
-      [p('Red', 1, 600), p('Red', 1, 120), p('Orange', 0, 300), p('Red', 1, null), p('Red', 0, -120)],
+      [p('Red', 1, 600), p('Red', 1, 120), p('Orange', 0, 300), p('Red', 0, -120)],
       now,
     )
 
