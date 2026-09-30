@@ -1,5 +1,5 @@
-import { expect, it } from 'vitest'
-import { searchStations, type Station } from './api'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { getMapKitToken, searchStations, type Station } from './api'
 
 const station = (name: string): Station => ({
   mbtaStopId: name, name, latitude: 0, longitude: 0, routeId: 'Red', averageWeekdayBoardings: null, isAccessible: null,
@@ -34,4 +34,20 @@ it.each([
 it('does not match on optional words alone or on unrelated words', () => {
   expect(search('station')).toEqual([])
   expect(search('harvard zzz')).toEqual([])
+})
+
+describe('getMapKitToken', () => {
+  afterEach(() => vi.unstubAllGlobals())
+
+  it('returns the token text from /mapkit/token, without the user ID', async () => {
+    const fetch = vi.fn().mockResolvedValue(new Response('eyJ.token.sig', { status: 200 }))
+    vi.stubGlobal('fetch', fetch)
+    expect(await getMapKitToken()).toBe('eyJ.token.sig')
+    expect(fetch).toHaveBeenCalledWith('/api/mapkit/token') // no headers at all: no X-User-Id, no CORS preflight
+  })
+
+  it('throws an ApiError when the server refuses', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('{}', { status: 403 })))
+    await expect(getMapKitToken()).rejects.toMatchObject({ status: 403 })
+  })
 })

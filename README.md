@@ -102,7 +102,7 @@ New to the code? Start with **[docs/backend.md](docs/backend.md)**: how requests
 - Predictions and train positions are cached in memory for 10 seconds, alerts for 1 minute, route info and shapes for 1 hour. MBTA calls time out after 10 seconds and retry transient failures twice. If MBTA is unavailable the API returns 503.
 - Errors are always problem JSON (RFC 9457): validation errors list what's wrong, unknown paths and IDs get a 404 body, and unexpected failures return a 500 without internals outside Development. Responses are compressed (Brotli or gzip), which cuts `/stations` from 33 KB to 8 KB and each 10-second `/vehicles` refresh from 15 KB to 4 KB.
 - `/alerts` returns every subway alert with the routes, stations, and directions it covers; the app decides what each line, station, and commute shows. A line's status counts alerts of severity 3 and up (MBTA uses 1-2 for things like a closed staircase, which still show on that station's page).
-- The live map (`/map`) uses Leaflet with OpenStreetMap tiles, loaded only when the map opens. Line shapes are MBTA's canonical (regular service) patterns. OpenStreetMap's tile servers are for light use; switch to a commercial tile provider before launch.
+- The live map (`/map`) is Apple Maps (MapKit JS), loaded only when the map opens. `mapkit.ts` pins Apple's script to one version with a Subresource Integrity hash, and MapKit gets its 30-minute tokens from `GET /mapkit/token`, so the signing key stays on the server. Line shapes are MBTA's canonical (regular service) patterns.
 
 ## Hosting (Azure)
 

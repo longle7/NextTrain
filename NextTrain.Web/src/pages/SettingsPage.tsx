@@ -65,8 +65,8 @@ export default function SettingsPage() {
       </Section>
 
       <p className="px-1 text-xs text-neutral-500">
-        Live train data from the MBTA. NextTrain is an independent app and isn't affiliated with or endorsed by the MBTA. Map
-        data © OpenStreetMap contributors.
+        Live train data from the MBTA. NextTrain is an independent app and isn't affiliated with or endorsed by the MBTA. Maps
+        by Apple.
       </p>
     </>
   )
