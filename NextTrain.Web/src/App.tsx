@@ -1,14 +1,18 @@
 import { lazy, Suspense, useEffect, useRef, type ReactNode } from 'react'
 import { BrowserRouter, Link, NavLink, Route, Routes, useLocation, useNavigate } from 'react-router'
+import { trackPageView } from './analytics'
 import { AppLogo, ErrorBoundary, NotFound, Status } from './components'
+import ConsentBanner from './ConsentBanner'
 import { useOnline } from './usePolling'
 import CommutePage from './pages/CommutePage'
+import CookiesPage from './pages/CookiesPage'
 import HomePage from './pages/HomePage'
 import LinePage from './pages/LinePage'
 import LinesPage from './pages/LinesPage'
 import PrivacyPage from './pages/PrivacyPage'
 import SettingsPage from './pages/SettingsPage'
 import StationPage from './pages/StationPage'
+import TermsPage from './pages/TermsPage'
 
 // The map loads Apple's MapKit JS (about 240 KB), so it loads only when opened: a faster first launch.
 const MapPage = lazy(() => import('./pages/MapPage'))
@@ -23,6 +27,7 @@ export default function App() {
       {/* Focusable (but not tabbable) so navigation can move focus here; see Header. */}
       <main tabIndex={-1} className="mx-auto max-w-xl space-y-4 px-4 pt-4 pb-[calc(5.5rem+env(safe-area-inset-bottom))] outline-none">
         <Pages />
+        <ConsentBanner />
       </main>
       <TabBar />
     </BrowserRouter>
@@ -45,6 +50,8 @@ function Pages() {
           <Route path="/commutes/:id" element={<CommutePage />} />
           <Route path="/settings" element={<SettingsPage />} />
           <Route path="/privacy" element={<PrivacyPage />} />
+          <Route path="/terms" element={<TermsPage />} />
+          <Route path="/cookies" element={<CookiesPage />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </Suspense>
@@ -64,10 +71,11 @@ function Header() {
   useEffect(() => {
     window.scrollTo(0, 0)
     if (firstPage.current) {
-      firstPage.current = false
+      firstPage.current = false // the first page view is counted when analytics starts
       return
     }
     document.querySelector('main')?.focus({ preventScroll: true })
+    trackPageView(location.pathname) // does nothing unless the visitor allowed analytics
   }, [location.pathname])
 
   return (

@@ -14,7 +14,8 @@ Mobile-first, with a bottom tab bar like an iPhone app:
 - **Lines**: each line's status ("Normal service", "Delays", "Suspension", ...), and its stations in line order, A-Z, or by ridership, with its alerts on top.
 - **Map**: every line, station, and live train with its direction of travel.
 - **Station**: service alerts that affect it, live departures by line and direction, and a button to save it as a commute.
-- **Settings** (gear icon): privacy policy, report a problem, version, and **Delete my data**.
+- **Settings** (gear icon): **Delete my data**, the analytics choice (website only), the Privacy Policy, Terms of Use, and Cookie Policy, report a problem, and version.
+- **Legal and consent**: `/privacy`, `/terms`, `/cookies`. Google Analytics runs only on the website, only when `GA_MEASUREMENT_ID` is set, and only after the visitor chooses Allow in the cookie notice; Global Privacy Control and Do Not Track mean no. See [docs/legal.md](docs/legal.md).
 
 Commutes belong to an anonymous ID stored on the device (sent as `X-User-Id`) until sign-in exists. On an iPhone, Safari's **Share → Add to Home Screen** installs it full screen with its own icon.
 
@@ -116,7 +117,7 @@ Merging to `main` deploys automatically once CI passes (`.github/workflows/deplo
 
 A $10/month budget on the resource group emails the subscription owner at 50%, 80%, and 100% of actual spend and at 100% forecast. Azure has no hard cap on pay-as-you-go spending, so the limits above (one replica, fixed-price database) are what keep the bill small.
 
-Production settings live in Azure, never in the repo: the connection string, MBTA key, and MapKit private key are Container App secrets, and `Cors__AllowedOrigins__2` adds the web app's address to the allowed origins. GitHub signs in to Azure with OIDC (no stored password) using the `AZURE_CLIENT_ID`, `AZURE_TENANT_ID`, and `AZURE_SUBSCRIPTION_ID` repository variables; `API_URL` is the address the web app calls, and the `SWA_DEPLOY_TOKEN` secret uploads the web app.
+Production settings live in Azure, never in the repo: the connection string, MBTA key, and MapKit private key are Container App secrets, and `Cors__AllowedOrigins__2` adds the web app's address to the allowed origins. GitHub signs in to Azure with OIDC (no stored password) using the `AZURE_CLIENT_ID`, `AZURE_TENANT_ID`, and `AZURE_SUBSCRIPTION_ID` repository variables; `API_URL` is the address the web app calls, and the `SWA_DEPLOY_TOKEN` secret uploads the web app. The optional `GA_MEASUREMENT_ID` repository variable (e.g. `G-ABC123`) turns on consent-gated Google Analytics for the website build; the iPhone app never has analytics.
 
 The API scales to zero when idle, so the first request after a quiet spell takes a few seconds while it starts. Set the Container App's minimum replicas to 1 (about $4 more a month) to avoid that.
 

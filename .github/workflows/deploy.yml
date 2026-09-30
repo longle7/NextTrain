@@ -3,6 +3,7 @@ name: Deploy
 # After CI passes on main: the API goes to Azure Container Apps (image on GitHub's registry, ghcr.io) and the web app
 # to Azure Static Web Apps. Azure login is OIDC (no stored password): AZURE_CLIENT_ID, AZURE_TENANT_ID and
 # AZURE_SUBSCRIPTION_ID are repository variables, SWA_DEPLOY_TOKEN is a repository secret, API_URL is the API's address.
+# GA_MEASUREMENT_ID (optional, e.g. G-ABC123) turns on consent-gated Google Analytics for the website only.
 on:
   workflow_run:
     workflows: [CI]
@@ -66,6 +67,7 @@ jobs:
         working-directory: NextTrain.Web
         env:
           VITE_API_URL: ${{ vars.API_URL }}
+          VITE_GA_ID: ${{ vars.GA_MEASUREMENT_ID }}
         run: |
           npm ci
           npm run build
