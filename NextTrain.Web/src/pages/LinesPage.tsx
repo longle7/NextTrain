@@ -11,7 +11,7 @@ export default function LinesPage() {
   return (
     <>
       <h1 className="text-2xl font-bold">Subway lines</h1>
-      <Status error={routes.error} loading={!routes.data} />
+      <Status error={routes.error} loading={!routes.data} rows={8} /> {/* one per subway line */}
       <ul className="space-y-2">
         {routes.data?.map((route) => (
           <li key={route.id}>

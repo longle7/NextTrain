@@ -241,3 +241,10 @@ export function NotFound({
     </div>
   )
 }
+
+/** A gray bar where text will appear once it loads (e.g. a station's name); screen readers hear "Loading". */
+export function LoadingText({ className }: { className: string }) {
+  return (
+    <span role="status" aria-label="Loading" className={`inline-block rounded-md bg-neutral-200 align-middle motion-safe:animate-pulse dark:bg-neutral-800 ${className}`} />
+  )
+}

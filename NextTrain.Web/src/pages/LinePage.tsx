@@ -1,7 +1,7 @@
 import { useParams, useSearchParams } from 'react-router'
 import { alertsFor } from '../alerts'
 import { ALERTS_REFRESH_MS, api, getAlerts, getRoutes, type Station, type Vehicle } from '../api'
-import { AlertBanner, Card, NotFound, Status, StationLink } from '../components'
+import { AlertBanner, Card, LoadingText, NotFound, Status, StationLink } from '../components'
 import { directionsDown, trainsByStation, type LineTrain } from '../lineTrains'
 import { usePolling, useTitle } from '../usePolling'
 
@@ -48,7 +48,7 @@ export default function LinePage() {
     <>
       <h1 className="flex items-center gap-2 text-2xl font-bold">
         <span className="h-7 w-1.5 rounded-full" style={{ backgroundColor: color }} />
-        {route?.name ?? routeId}
+        {route?.name ?? <LoadingText className="h-7 w-36" />}
       </h1>
 
       {alerts.data &&

@@ -70,8 +70,9 @@ declare namespace mapkit {
     constructor(parent: HTMLElement, options?: MapOptions)
     colorScheme: string
     setRegionAnimated(region: CoordinateRegion, animate?: boolean): this
-    addEventListener(type: 'region-change-start', listener: () => void): void
-    removeEventListener(type: 'region-change-start', listener: () => void): void
+    region: CoordinateRegion & { span: { latitudeDelta: number } }
+    addEventListener(type: 'region-change-start' | 'region-change-end', listener: () => void): void
+    removeEventListener(type: 'region-change-start' | 'region-change-end', listener: () => void): void
     addOverlays(overlays: Overlay[]): Overlay[]
     removeOverlays(overlays: Overlay[]): Overlay[]
     addAnnotation(annotation: Annotation): Annotation

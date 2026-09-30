@@ -117,6 +117,10 @@ export function stationElement(name: string, open: () => void, preview: Preview)
   dot.setAttribute('role', 'button')
   dot.setAttribute('aria-label', `${name} station`)
   dot.setAttribute('aria-describedby', 'station-preview')
+  // Its name, shown beside the dot once the map is zoomed in (CSS: .show-names); the dot's aria-label already says it.
+  const label = Object.assign(document.createElement('span'), { className: 'station-name', textContent: name })
+  label.setAttribute('aria-hidden', 'true')
+  dot.append(label)
   stationActions.set(dot, { open, preview })
   const nearest = (event: PointerEvent | MouseEvent) => {
     const target = nearestDot(event.clientX, event.clientY, dot)
