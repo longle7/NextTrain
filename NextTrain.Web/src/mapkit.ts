@@ -55,20 +55,25 @@ const svgElement = (tag: string, attributes: Record<string, string>) => {
   return element
 }
 
-/** A dot in the line's color with a white arrow pointing the way the train is heading (no arrow if unknown). */
-export function trainElement(color: string, bearing: number | null) {
+/**
+ * A dot in the line's color with a white arrowhead pointing the way the train is heading (no arrow if unknown).
+ * The arrowhead is notched, like a navigation arrow: a plain triangle looks the same turned by 120°, so its
+ * direction can't be read.
+ */
+export function trainElement(color: string, heading: number | null) {
   const svg = svgElement('svg', { viewBox: '0 0 24 24', width: '24', height: '24' })
   svg.append(svgElement('circle', { cx: '12', cy: '12', r: '10', stroke: 'white', 'stroke-width': '2' }))
-  svg.append(svgElement('path', { d: 'M12 3 L17 12 H7 Z', fill: 'white' }))
-  updateTrainElement(svg, color, bearing)
+  svg.append(svgElement('path', { d: 'M12 4.5 L17 17 L12 14 L7 17 Z', fill: 'white', 'stroke-linejoin': 'round' }))
+  updateTrainElement(svg, color, heading)
   return svg
 }
 
-export function updateTrainElement(svg: Element, color: string, bearing: number | null) {
+// heading: degrees clockwise from north.
+export function updateTrainElement(svg: Element, color: string, heading: number | null) {
   const [circle, arrow] = svg.children as unknown as [SVGElement, SVGElement]
   circle.style.fill = color // a style property, so an invalid value is just ignored
-  arrow.style.display = bearing === null ? 'none' : ''
-  ;(svg as SVGElement).style.transform = `rotate(${bearing ?? 0}deg)`
+  arrow.style.display = heading === null ? 'none' : ''
+  ;(svg as SVGElement).style.transform = `rotate(${heading ?? 0}deg)`
 }
 
 /**
