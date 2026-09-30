@@ -1,3 +1,6 @@
+using System.Threading.RateLimiting;
+using Microsoft.AspNetCore.HttpOverrides;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using NextTrain.Api.Controllers;
 using NextTrain.Api.Data;
@@ -15,7 +18,7 @@ using Polly;
 //   3. app.Run() starts listening for HTTP requests.
 //
 // How one request flows, e.g. GET /stations/place-pktrm/predictions:
-//   compression -> error handling -> CORS -> routing -> StationsController.GetPredictions
+//   forwarded IP -> compression -> error handling -> CORS -> rate limit -> routing -> StationsController.GetPredictions
 //     -> StationLookupService reads the station from SQL Server
 //     -> IMbtaClient returns the cached departures, or fetches them from MBTA and caches them for 10 seconds
 //   -> the controller's return value is serialized to JSON. If MBTA fails, MbtaUnavailableFilter answers 503.
@@ -66,6 +69,41 @@ builder.Services.AddProblemDetails();
 // all over mobile data. Safe over HTTPS: no response carries a secret for a BREACH-style attack to extract.
 builder.Services.AddResponseCompression(options => options.EnableForHttps = true);
 
+// The client's real IP. The host's ingress (Azure Container Apps) is the only way in and appends it as the last
+// X-Forwarded-For entry; reading only that one entry (ForwardLimit 1) means a client can't pick the IP it's counted as.
+builder.Services.Configure<ForwardedHeadersOptions>(options =>
+{
+    options.ForwardedHeaders = ForwardedHeaders.XForwardedFor;
+    options.KnownIPNetworks.Clear(); // the ingress's address isn't fixed
+    options.KnownProxies.Clear();
+});
+
+// Rate limit per client IP (RateLimit:PerMinute): one misbehaving client or script can't run up the hosting bill or
+// use up the MBTA key's quota for everyone. The app makes about 20 requests a minute, so the default leaves room for
+// many people behind one address (an office, a phone carrier). /health is exempt so the host's probe never fails.
+// ponytail: fixed window per IPv6 address, not per /64; limit by prefix if someone rotates addresses to get around it.
+var perMinute = builder.Configuration.GetValue("RateLimit:PerMinute", 600);
+builder.Services.AddRateLimiter(options =>
+{
+    options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(context =>
+        context.Request.Path.StartsWithSegments("/health")
+            ? RateLimitPartition.GetNoLimiter("health")
+            : RateLimitPartition.GetFixedWindowLimiter(context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+                _ => new FixedWindowRateLimiterOptions { PermitLimit = perMinute, Window = TimeSpan.FromMinutes(1) }));
+    options.OnRejected = async (rejected, cancellationToken) =>
+    {
+        var response = rejected.HttpContext.Response;
+        response.StatusCode = StatusCodes.Status429TooManyRequests;
+        if (rejected.Lease.TryGetMetadata(MetadataName.RetryAfter, out var retryAfter))
+            response.Headers.RetryAfter = ((int)Math.Ceiling(retryAfter.TotalSeconds)).ToString();
+        await response.WriteAsJsonAsync(new ProblemDetails
+        {
+            Status = StatusCodes.Status429TooManyRequests,
+            Title = "Too many requests. Wait a minute and try again.",
+        }, (System.Text.Json.JsonSerializerOptions?)null, "application/problem+json", cancellationToken);
+    };
+});
+
 // Swagger: interactive API docs at /swagger (Development only, see below).
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
@@ -80,6 +118,7 @@ if (!app.Environment.IsDevelopment() && string.IsNullOrWhiteSpace(app.Configurat
     app.Logger.LogWarning("No MBTA API key (Mbta:ApiKey): MBTA allows only 20 requests a minute without one. Get a free key at https://api-v3.mbta.com.");
 }
 
+app.UseForwardedHeaders();
 app.UseResponseCompression();
 if (!app.Environment.IsDevelopment())
 {
@@ -108,7 +147,8 @@ if (app.Environment.IsDevelopment())
     });
 }
 
-app.UseCors();
+app.UseCors(); // before the limiter, so a 429 carries CORS headers and the app can show its message
+app.UseRateLimiter();
 app.MapHealthChecks("/health");
 app.MapControllers(); // every [ApiController] class in Controllers/ becomes a set of endpoints
 

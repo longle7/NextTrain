@@ -119,6 +119,8 @@ Production settings live in Azure, never in the repo: the connection string, MBT
 
 Scaling (set in Azure, not by the deploy): a `cron` rule keeps one API instance running from 4:30 AM to 2:00 AM Eastern (`America/New_York`, so daylight saving is handled), when people ride the T. Overnight it may scale to zero; the `http` rule wakes it for a visitor, which can take from seconds to minutes when Azure is short on capacity. Waking from zero during the day is what caused slow first loads before the schedule.
 
+Protection: the API limits each client IP to `RateLimit:PerMinute` requests (600 by default; the app uses about 20), answering 429 with `Retry-After` beyond that, so one runaway client can't run up the bill or use up the MBTA key. The website sends security headers from `NextTrain.Web/public/staticwebapp.config.json`: a Content-Security-Policy, no framing by other sites, and location allowed only for NextTrain itself. **If the API address (`API_URL`) or a third-party service changes, update the policy's `connect-src`/`script-src`**, or the site can't reach it.
+
 ## Road to the App Store
 
 The iPhone app wraps the web app with [Capacitor](https://capacitorjs.com); its Xcode project is `NextTrain.Web/ios` (bundle ID `com.longledev.nexttrain`). **[docs/app-store](docs/app-store/README.md)** has everything for the listing (screenshots, text, App Privacy answers, review notes) and the submission checklist, including building on a Mac:
