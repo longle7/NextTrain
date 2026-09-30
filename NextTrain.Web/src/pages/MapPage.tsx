@@ -234,6 +234,21 @@ export default function MapPage() {
     }
   }, [])
 
+  // Scroll to zoom, like other web maps. MapKit zooms only on Ctrl + wheel (a trackpad pinch sends that too) and leaves
+  // a plain wheel to the page whenever the page could scroll. So hand MapKit each plain wheel event as Ctrl + wheel.
+  useEffect(() => {
+    const element = container.current
+    if (!map || !element) return
+    const onWheel = (event: WheelEvent) => {
+      if (event.ctrlKey || !event.isTrusted) return // already a zoom, or our own re-sent event
+      event.preventDefault()
+      event.stopPropagation()
+      event.target?.dispatchEvent(new WheelEvent('wheel', { ...pick(event), ctrlKey: true, bubbles: true, cancelable: true }))
+    }
+    element.addEventListener('wheel', onWheel, { capture: true, passive: false })
+    return () => element.removeEventListener('wheel', onWheel, { capture: true })
+  }, [map])
+
   // Center on the user with a blue dot, unless they're nowhere near the T.
   const locate = () => {
     if (!map) return
@@ -409,3 +424,8 @@ function StationPreview({ station, x, y, width, routes, onPointerEnter, onPointe
     </div>
   )
 }
+
+// The parts of a wheel event MapKit reads, to re-send it.
+const pick = ({ deltaX, deltaY, deltaMode, clientX, clientY, screenX, screenY, shiftKey, altKey, metaKey }: WheelEvent) => ({
+  deltaX, deltaY, deltaMode, clientX, clientY, screenX, screenY, shiftKey, altKey, metaKey,
+})
