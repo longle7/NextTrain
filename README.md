@@ -30,6 +30,7 @@ Commutes belong to an anonymous ID stored on the device (sent as `X-User-Id`) un
 | GET | `/stations/nearest?lat=&lon=&route=` | Nearest station to a location |
 | GET | `/stations/{mbtaStopId}` | One station, e.g. `place-pktrm` |
 | GET | `/stations/{mbtaStopId}/predictions?route=&direction=` | Upcoming trains, soonest first |
+| GET | `/mapkit/token` | A short-lived Apple Maps (MapKit JS) token for the calling site; 404 until `MapKit:TeamId`, `MapKit:KeyId`, and `MapKit:PrivateKey` are set |
 | GET | `/health` | Health probe for hosting: 200 when the database is reachable, 503 when not |
 | POST | `/admin/import-stations` | Re-import subway stations from MBTA now (Development only; it also happens automatically) |
 | GET | `/commutes` | Your saved commutes |
@@ -115,7 +116,7 @@ Merging to `main` deploys automatically once CI passes (`.github/workflows/deplo
 
 A $10/month budget on the resource group emails the subscription owner at 50%, 80%, and 100% of actual spend and at 100% forecast. Azure has no hard cap on pay-as-you-go spending, so the limits above (one replica, fixed-price database) are what keep the bill small.
 
-Production settings live in Azure, never in the repo: the connection string and MBTA key are Container App secrets, and `Cors__AllowedOrigins__2` adds the web app's address to the allowed origins. GitHub signs in to Azure with OIDC (no stored password) using the `AZURE_CLIENT_ID`, `AZURE_TENANT_ID`, and `AZURE_SUBSCRIPTION_ID` repository variables; `API_URL` is the address the web app calls, and the `SWA_DEPLOY_TOKEN` secret uploads the web app.
+Production settings live in Azure, never in the repo: the connection string, MBTA key, and MapKit private key are Container App secrets, and `Cors__AllowedOrigins__2` adds the web app's address to the allowed origins. GitHub signs in to Azure with OIDC (no stored password) using the `AZURE_CLIENT_ID`, `AZURE_TENANT_ID`, and `AZURE_SUBSCRIPTION_ID` repository variables; `API_URL` is the address the web app calls, and the `SWA_DEPLOY_TOKEN` secret uploads the web app.
 
 The API scales to zero when idle, so the first request after a quiet spell takes a few seconds while it starts. Set the Container App's minimum replicas to 1 (about $4 more a month) to avoid that.
 
