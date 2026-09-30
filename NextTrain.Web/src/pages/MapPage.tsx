@@ -235,18 +235,39 @@ export default function MapPage() {
   }, [])
 
   // Scroll to zoom, like other web maps. MapKit zooms only on Ctrl + wheel (a trackpad pinch sends that too) and leaves
-  // a plain wheel to the page whenever the page could scroll. So hand MapKit each plain wheel event as Ctrl + wheel.
+  // a plain wheel to the page whenever the page could scroll. So hand MapKit each plain wheel as Ctrl + wheel, and
+  // glide: a mouse notch arrives as one big jump, so it's fed to MapKit a fraction per frame (eases out over ~150 ms).
+  // On iPhone, stop Safari from pinch-zooming the whole page over the map (MapKit still gets the pinch).
   useEffect(() => {
     const element = container.current
     if (!map || !element) return
+    let pending = 0 // wheel distance not yet sent, in pixels
+    let last: WheelEvent | undefined
+    let frame = 0
+    const step = () => {
+      const delta = Math.abs(pending) < 2 ? pending : pending * 0.35
+      pending -= delta
+      last!.target?.dispatchEvent(new WheelEvent('wheel', { ...pick(last!), deltaY: delta, deltaMode: 0, ctrlKey: true, bubbles: true, cancelable: true }))
+      frame = pending ? requestAnimationFrame(step) : 0
+    }
     const onWheel = (event: WheelEvent) => {
-      if (event.ctrlKey || !event.isTrusted) return // already a zoom, or our own re-sent event
+      if (event.ctrlKey || !event.isTrusted) return // already a zoom (pinch), or our own re-sent event
       event.preventDefault()
       event.stopPropagation()
-      event.target?.dispatchEvent(new WheelEvent('wheel', { ...pick(event), ctrlKey: true, bubbles: true, cancelable: true }))
+      pending += WHEEL_SPEED * event.deltaY * (event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? element.clientHeight : 1) // lines, pages -> px
+      last = event
+      frame ||= requestAnimationFrame(step)
     }
+    const noPageZoom = (event: Event) => event.preventDefault() // Safari's gesturestart/gesturechange
     element.addEventListener('wheel', onWheel, { capture: true, passive: false })
-    return () => element.removeEventListener('wheel', onWheel, { capture: true })
+    element.addEventListener('gesturestart', noPageZoom)
+    element.addEventListener('gesturechange', noPageZoom)
+    return () => {
+      cancelAnimationFrame(frame)
+      element.removeEventListener('wheel', onWheel, { capture: true })
+      element.removeEventListener('gesturestart', noPageZoom)
+      element.removeEventListener('gesturechange', noPageZoom)
+    }
   }, [map])
 
   // Center on the user with a blue dot, unless they're nowhere near the T.
@@ -307,12 +328,13 @@ export default function MapPage() {
           )
         })}
       </div>
-      {/* isolate keeps the map's own z-indexes below the sticky header */}
+      {/* isolate keeps the map's own z-indexes below the sticky header; touch-none gives every touch gesture (pan,
+          pinch) to the map, never the page */}
       <div ref={frame} className="relative isolate">
         <div
           ref={container}
           data-testid="map"
-          className="h-[calc(100dvh-19rem-env(safe-area-inset-top)-env(safe-area-inset-bottom))] min-h-80 overflow-hidden rounded-xl bg-neutral-200 shadow-sm dark:bg-neutral-800"
+          className="touch-none h-[calc(100dvh-19rem-env(safe-area-inset-top)-env(safe-area-inset-bottom))] min-h-80 overflow-hidden rounded-xl bg-neutral-200 shadow-sm dark:bg-neutral-800"
         />
         {!map && !mapError && (
           <p role="status" className="absolute inset-0 grid place-items-center text-sm font-semibold text-neutral-500 motion-safe:animate-pulse">
@@ -424,6 +446,10 @@ function StationPreview({ station, x, y, width, routes, onPointerEnter, onPointe
     </div>
   )
 }
+
+// How far one wheel notch zooms. MapKit speeds zoom up for fast wheel events, and the per-frame glide looks fast to it,
+// so this scales the distance down. Tuned so a mouse notch is about a quarter zoom step, as before the glide.
+const WHEEL_SPEED = 0.25
 
 // The parts of a wheel event MapKit reads, to re-send it.
 const pick = ({ deltaX, deltaY, deltaMode, clientX, clientY, screenX, screenY, shiftKey, altKey, metaKey }: WheelEvent) => ({
