@@ -37,6 +37,9 @@ const regionAround = (points: [number, number][]) => {
 // Downtown and the inner stops, where most trains are; the whole system would make downtown too crowded on a phone.
 const bostonRegion = () => new mapkit.CoordinateRegion(new mapkit.Coordinate(42.355, -71.08), new mapkit.CoordinateSpan(0.1, 0.12))
 
+// Zoomed in closer than this (degrees of latitude across the map, about 2 km), station names show beside the dots.
+const SHOW_NAMES_BELOW = 0.02
+
 // Glide to a new view, or jump there for people who've asked their device for less motion.
 const animate = () => !matchMedia('(prefers-reduced-motion: reduce)').matches
 
@@ -110,6 +113,16 @@ export default function MapPage() {
     return { forStation, forTrain, hide, enterCard, leaveCard }
   }, [])
   useEffect(() => () => clearTimeout(previewTimer.current), [])
+
+  // Station names appear beside the dots once zoomed in far enough that they have room (about a neighborhood across).
+  const [showNames, setShowNames] = useState(false)
+  useEffect(() => {
+    if (!map) return
+    const update = () => setShowNames(map.region.span.latitudeDelta < SHOW_NAMES_BELOW)
+    update()
+    map.addEventListener('region-change-end', update)
+    return () => map.removeEventListener('region-change-end', update)
+  }, [map])
 
   // Light or dark map, following the phone's setting, including when it changes while the map is open.
   useEffect(() => {
@@ -373,7 +386,7 @@ export default function MapPage() {
         <div
           ref={container}
           data-testid="map"
-          className="touch-none h-[calc(100dvh-19rem-env(safe-area-inset-top)-env(safe-area-inset-bottom))] min-h-80 overflow-hidden rounded-xl bg-neutral-200 shadow-sm dark:bg-neutral-800"
+          className={`${showNames ? 'show-names ' : ''}touch-none h-[calc(100dvh-19rem-env(safe-area-inset-top)-env(safe-area-inset-bottom))] min-h-80 overflow-hidden rounded-xl bg-neutral-200 shadow-sm dark:bg-neutral-800`}
         />
         {!map && !mapError && (
           <p role="status" className="absolute inset-0 grid place-items-center text-sm font-semibold text-neutral-500 motion-safe:animate-pulse">

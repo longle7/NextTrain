@@ -60,7 +60,18 @@ export default function HomePage() {
               </Card>
             </section>
           )}
-          {stations.data && <Nearby stations={stations.data} routes={routes.data} alerts={alerts.data} />}
+          {stations.data ? (
+            <Nearby stations={stations.data} routes={routes.data} alerts={alerts.data} />
+          ) : (
+            // Keeps Home's layout steady while stations load, instead of the section popping in. (A failure already
+            // shows at the top of the page.)
+            !stations.error && (
+              <section className="space-y-2">
+                <h2 className="px-1 text-lg font-bold">Near you</h2>
+                <Status loading rows={1} />
+              </section>
+            )
+          )}
         </>
       )}
     </>

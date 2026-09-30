@@ -2,7 +2,7 @@ import { useEffect } from 'react'
 import { Link, useParams } from 'react-router'
 import { alertsFor, majorAlert } from '../alerts'
 import { ALERTS_REFRESH_MS, api, ApiError, getAlerts, getRoutes, stationRouteIds, type Prediction, type Station } from '../api'
-import { AccessibleIcon, AlertBanner, Card, LineBadge, NotFound, secondaryButton, Status } from '../components'
+import { AccessibleIcon, AlertBanner, Card, LineBadge, LoadingText, NotFound, secondaryButton, Status } from '../components'
 import { rememberStation } from '../recent'
 import { agoLabel, clock, countdown, groupDepartures, noTrainsMessage, secondsAgo, STALE_AFTER_SECONDS } from '../time'
 import { useNow, usePolling, useTitle } from '../usePolling'
@@ -41,7 +41,7 @@ export default function StationPage() {
   return (
     <>
       <div>
-        <h1 className="text-2xl font-bold">{station.data?.name ?? 'Station'}</h1>
+        <h1 className="text-2xl font-bold">{station.data?.name ?? <LoadingText className="h-7 w-48" />}</h1>
         <div className="mt-1 flex flex-wrap gap-1">
           {station.data &&
             stationRouteIds(station.data).map((id) => <LineBadge key={id} routeId={id} routes={routes.data} />)}

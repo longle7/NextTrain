@@ -39,22 +39,25 @@ function Pages() {
   return (
     // Keyed by page so moving to another page clears a crash.
     <ErrorBoundary key={pathname}>
-      <Suspense fallback={<Status loading />}>
-        <Routes>
-          <Route path="/" element={<HomePage />} />
-          <Route path="/lines" element={<LinesPage />} />
-          <Route path="/lines/:routeId" element={<LinePage />} />
-          <Route path="/stations/:stopId" element={<StationPage />} />
-          <Route path="/map" element={<MapPage />} />
-          <Route path="/commutes/new" element={<CommutePage />} />
-          <Route path="/commutes/:id" element={<CommutePage />} />
-          <Route path="/settings" element={<SettingsPage />} />
-          <Route path="/privacy" element={<PrivacyPage />} />
-          <Route path="/terms" element={<TermsPage />} />
-          <Route path="/cookies" element={<CookiesPage />} />
-          <Route path="*" element={<NotFound />} />
-        </Routes>
-      </Suspense>
+      {/* New for each page (the boundary is keyed by it), so every page change plays the enter animation. */}
+      <div className="page-enter space-y-4">
+        <Suspense fallback={<Status loading />}>
+          <Routes>
+            <Route path="/" element={<HomePage />} />
+            <Route path="/lines" element={<LinesPage />} />
+            <Route path="/lines/:routeId" element={<LinePage />} />
+            <Route path="/stations/:stopId" element={<StationPage />} />
+            <Route path="/map" element={<MapPage />} />
+            <Route path="/commutes/new" element={<CommutePage />} />
+            <Route path="/commutes/:id" element={<CommutePage />} />
+            <Route path="/settings" element={<SettingsPage />} />
+            <Route path="/privacy" element={<PrivacyPage />} />
+            <Route path="/terms" element={<TermsPage />} />
+            <Route path="/cookies" element={<CookiesPage />} />
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+        </Suspense>
+      </div>
     </ErrorBoundary>
   )
 }
