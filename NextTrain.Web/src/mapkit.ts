@@ -39,7 +39,7 @@ export function loadMapKit(): Promise<void> {
 
 const STATUS = { INCOMING_AT: 'Arriving at', STOPPED_AT: 'Stopped at', IN_TRANSIT_TO: 'Next stop:' }
 
-/** A train's callout: "Red Line to Alewife", then where it is ("Next stop: Park Street") when MBTA says. */
+/** A train's card title, "Red Line to Alewife", then where it is ("Next stop: Park Street") when MBTA says. */
 export function trainCallout(v: Vehicle, route: Route | undefined) {
   return {
     title: `${route?.name ?? v.routeId} to ${route?.directionDestinations[v.directionId] ?? 'unknown'}`,
@@ -60,25 +60,30 @@ const svgElement = (tag: string, attributes: Record<string, string>) => {
  * The arrowhead is notched, like a navigation arrow: a plain triangle looks the same turned by 120°, so its
  * direction can't be read.
  */
-export function trainElement(color: string, heading: number | null) {
-  const svg = svgElement('svg', { viewBox: '0 0 24 24', width: '24', height: '24' })
+export function trainElement(color: string, heading: number | null, label: string, preview: Preview) {
+  const svg = svgElement('svg', { viewBox: '0 0 24 24', width: '24', height: '24', role: 'img', class: 'train' })
   svg.append(svgElement('circle', { cx: '12', cy: '12', r: '10', stroke: 'white', 'stroke-width': '2' }))
   svg.append(svgElement('path', { d: 'M12 4.5 L17 17 L12 14 L7 17 Z', fill: 'white', 'stroke-linejoin': 'round' }))
-  updateTrainElement(svg, color, heading)
+  updateTrainElement(svg, color, heading, label)
+  // Its card: on mouse hover, or on a tap (a touchscreen has no hover).
+  svg.addEventListener('pointerenter', (event) => event.pointerType === 'mouse' && preview.show(svg))
+  svg.addEventListener('pointerleave', (event) => event.pointerType === 'mouse' && preview.hide())
+  svg.addEventListener('click', () => preview.show(svg))
   return svg
 }
 
-// heading: degrees clockwise from north.
-export function updateTrainElement(svg: Element, color: string, heading: number | null) {
+// heading: degrees clockwise from north. label: what a screen reader says ("Red Line to Alewife. Next stop: …").
+export function updateTrainElement(svg: Element, color: string, heading: number | null, label: string) {
   const [circle, arrow] = svg.children as unknown as [SVGElement, SVGElement]
   circle.style.fill = color // a style property, so an invalid value is just ignored
   arrow.style.display = heading === null ? 'none' : ''
   ;(svg as SVGElement).style.transform = `rotate(${heading ?? 0}deg)`
+  svg.setAttribute('aria-label', label)
 }
 
-/** Shows and hides the station's next-trains card (MapPage's StationPreview). */
+/** Shows and hides a station's or train's card on the map (MapPage's StationPreview and TrainPreview). */
 export interface Preview {
-  show: (dot: HTMLElement) => void
+  show: (marker: Element) => void
   hide: (now?: boolean) => void
 }
 
@@ -133,7 +138,7 @@ export function stationElement(name: string, open: () => void, preview: Preview)
     const { target, actions } = nearest(event)
     if (target === hovered) return
     hovered = target
-    actions.preview.show(target as HTMLElement)
+    actions.preview.show(target)
   }
   dot.addEventListener('pointerenter', hover)
   dot.addEventListener('pointermove', hover)

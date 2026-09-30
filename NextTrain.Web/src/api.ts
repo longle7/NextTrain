@@ -35,6 +35,13 @@ export interface Vehicle {
   currentStatus: 'INCOMING_AT' | 'STOPPED_AT' | 'IN_TRANSIT_TO' | null
   stopName: string | null // the stop it's at or heading to
   stationId: string | null // that stop's station, e.g. "place-harsq"
+  cars: Car[] // front to back
+}
+
+// How full a car is, when MBTA reports it (today: Orange, and the newer Red Line cars); otherwise both null.
+export interface Car {
+  crowding: 'MANY_SEATS_AVAILABLE' | 'FEW_SEATS_AVAILABLE' | 'STANDING_ROOM_ONLY' | 'CRUSHED_STANDING_ROOM_ONLY' | 'FULL' | null
+  percentFull: number | null
 }
 
 export interface RouteShape {
