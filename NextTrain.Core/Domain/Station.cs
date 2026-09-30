@@ -14,15 +14,12 @@
         // Human-readable station name (e.g., "Alewife").
         public string Name { get; set; } = string.Empty;
 
-        // Latitude and longitude for geolocation / nearest-station queries.
+        // Where the station is, for the map and "Near you".
         public double Latitude { get; set; }
         public double Longitude { get; set; }
 
         // Optional: route/line info (e.g., "Red Line").
         public string RouteId { get; set; } = string.Empty;
-
-        // Optional: direction info or platform grouping.
-        public string? PlatformCode { get; set; }
 
         // Step-free access for wheelchairs, from MBTA. Null when MBTA has no information.
         public bool? IsAccessible { get; set; }

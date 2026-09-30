@@ -161,7 +161,6 @@ namespace NextTrain.Api.Controllers
             commute.WindowStartLocal = request.WindowStart.ToTimeSpan();
             commute.WindowEndLocal = request.WindowEnd.ToTimeSpan();
             commute.ActiveDays = string.Join(",", ValidDays.Where(days.Contains)); // normalized Mon..Sun order
-            commute.IsEnabled = request.IsEnabled;
             return true;
         }
     }
@@ -172,8 +171,7 @@ namespace NextTrain.Api.Controllers
         [Range(0, 1)] int DirectionId,
         TimeOnly WindowStart,
         TimeOnly WindowEnd,
-        string ActiveDays = "Mon,Tue,Wed,Thu,Fri",
-        bool IsEnabled = true);
+        string ActiveDays = "Mon,Tue,Wed,Thu,Fri");
 
     public record CommuteResponse(
         int Id,
@@ -183,8 +181,7 @@ namespace NextTrain.Api.Controllers
         int DirectionId,
         TimeOnly WindowStart,
         TimeOnly WindowEnd,
-        string ActiveDays,
-        bool IsEnabled)
+        string ActiveDays)
     {
         public static CommuteResponse From(UserCommute c) => new(
             c.Id,
@@ -194,7 +191,6 @@ namespace NextTrain.Api.Controllers
             c.DirectionId,
             TimeOnly.FromTimeSpan(c.WindowStartLocal),
             TimeOnly.FromTimeSpan(c.WindowEndLocal),
-            c.ActiveDays,
-            c.IsEnabled);
+            c.ActiveDays);
     }
 }

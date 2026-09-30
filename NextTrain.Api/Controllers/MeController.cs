@@ -25,8 +25,6 @@ namespace NextTrain.Api.Controllers
         public async Task<IActionResult> Delete([FromHeader(Name = "X-User-Id"), Required, MaxLength(100)] string userId)
         {
             await _db.UserCommutes.Where(c => c.UserId == userId).ExecuteDeleteAsync();
-            await _db.NotificationSubscriptions.Where(s => s.UserId == userId).ExecuteDeleteAsync();
-            await _db.UserLocationPreferences.Where(p => p.UserId == userId).ExecuteDeleteAsync();
             return NoContent();
         }
     }

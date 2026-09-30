@@ -28,7 +28,7 @@ public class MbtaClientTests
     public async Task GetPredictionsAsync_ParsesSnakeCase_AndCachesByStopAndRoutes()
     {
         const string json = """
-            {"data":[{"attributes":{"arrival_time":"2026-09-29T08:00:00-04:00","departure_time":null,
+            {"data":[{"attributes":{"arrival_time":"2026-09-29T07:59:30-04:00","departure_time":"2026-09-29T08:00:00-04:00",
               "direction_id":1,"status":"Approaching"},
               "relationships":{"route":{"data":{"id":"Red","type":"route"}}}}]}
             """;
@@ -41,8 +41,7 @@ public class MbtaClientTests
         await client.GetPredictionsAsync("place-alfcl", "Red");         // different key
 
         var p = Assert.Single(first);
-        Assert.Equal(DateTimeOffset.Parse("2026-09-29T12:00:00Z"), p.Attributes.ArrivalTime);
-        Assert.Null(p.Attributes.DepartureTime);
+        Assert.Equal(DateTimeOffset.Parse("2026-09-29T12:00:00Z"), p.Attributes.DepartureTime);
         Assert.Equal(1, p.Attributes.DirectionId);
         Assert.Equal("Red", p.Relationships.Route.Data.Id);
 

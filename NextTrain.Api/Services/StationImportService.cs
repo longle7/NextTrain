@@ -69,7 +69,6 @@ namespace NextTrain.Api.Services
                     existing.Name = station.Name;
                     existing.Latitude = station.Latitude;
                     existing.Longitude = station.Longitude;
-                    existing.PlatformCode = station.PlatformCode;
                     existing.IsAccessible = station.IsAccessible;
                     existing.RouteId = station.RouteId;
                     existing.AverageWeekdayBoardings = station.AverageWeekdayBoardings;
@@ -112,7 +111,6 @@ namespace NextTrain.Api.Services
                         Name = stop.Attributes.Name,
                         Latitude = stop.Attributes.Latitude!.Value,
                         Longitude = stop.Attributes.Longitude!.Value,
-                        PlatformCode = stop.Attributes.PlatformCode,
                         IsAccessible = stop.Attributes.WheelchairBoarding switch { 1 => true, 2 => false, _ => null },
                         RouteId = string.Join(",", g.Select(x => x.RouteId).Distinct().Order(StringComparer.Ordinal)),
                         CreatedAtUtc = DateTime.UtcNow

@@ -1,7 +1,7 @@
 ﻿namespace NextTrain.Core.Domain
 {
     /// <summary>
-    /// Represents a user's recurring commute configuration for notifications.
+    /// A commute a user saved: where they board, which way, and when. Home shows its next trains while it's on.
     /// </summary>
     public class UserCommute
     {
@@ -29,9 +29,6 @@
 
         // Days of week this commute is active (e.g., "Mon,Tue,Wed,Thu,Fri").
         public string ActiveDays { get; set; } = "Mon,Tue,Wed,Thu,Fri";
-
-        // Whether notifications are currently enabled.
-        public bool IsEnabled { get; set; } = true;
 
         // Timestamps for auditing.
         public DateTime CreatedAtUtc { get; set; } = DateTime.UtcNow;

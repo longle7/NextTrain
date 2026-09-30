@@ -12,10 +12,6 @@ GET {{host}}/stations?route=Red
 
 ###
 
-GET {{host}}/stations/nearest?lat=42.3564&lon=-71.0624&route=Red
-
-###
-
 GET {{host}}/stations/place-pktrm
 
 ###

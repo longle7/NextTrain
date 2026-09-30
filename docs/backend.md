@@ -15,7 +15,7 @@ The API sits between the app (web and iPhone) and the MBTA's public API. It does
  ───────────                 ─────────────                             ───────
  fetch /api/...  ──HTTP──▶  Controller ──▶ IMbtaClient ──(cache miss)──▶ MBTA V3 API
                                    │            └─ IMemoryCache (seconds to an hour)
-                                   └──▶ IStationLookupService / DbContext ──▶ SQL Server
+                                   └──▶ StationLookupService / DbContext ──▶ SQL Server
 ```
 
 ## Projects
@@ -30,7 +30,7 @@ The API sits between the app (web and iPhone) and the MBTA's public API. It does
 
 **1. Live data: `GET /stations/place-pktrm/predictions`**
 
-1. `StationsController.GetPredictions` looks up the station in SQL Server (via `IStationLookupService`) and returns 404 if it's unknown.
+1. `StationsController.GetPredictions` looks up the station in SQL Server (via `StationLookupService`) and returns 404 if it's unknown.
 2. It asks `IMbtaClient.GetPredictionsAsync`. `MbtaClient` checks `IMemoryCache` first, and only calls MBTA over HTTP when the cached copy is older than 10 seconds.
 3. The controller reshapes MBTA's JSON into a small `PredictionResponse` list, filters it, and sorts it.
 4. If MBTA fails, `HttpClient` throws. `MbtaUnavailableFilter` catches that for every endpoint and answers **503**, and the app shows "MBTA live data is temporarily unavailable".
