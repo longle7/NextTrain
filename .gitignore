@@ -480,3 +480,6 @@ $RECYCLE.BIN/
 
 # Vim temporary swap files
 *.swp
+
+# Apple private keys (.p8): never commit; they live in Azure secrets and dotnet user-secrets
+*.p8
