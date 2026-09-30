@@ -110,14 +110,14 @@ Merging to `main` deploys automatically once CI passes (`.github/workflows/deplo
 | Piece | Azure service | Cost |
 |---|---|---|
 | Web app | Static Web Apps (Free) | $0 |
-| API | Container Apps (Consumption, 0.25 vCPU, scales to zero, at most 1 replica) running the root `Dockerfile`, image on ghcr.io | ~$0–3/month |
+| API | Container Apps (Consumption, 0.25 vCPU, 1 replica from 4:30 AM to 2 AM Eastern, at most 1) running the root `Dockerfile`, image on ghcr.io | ~$4–5/month |
 | Database | Azure SQL Database, Basic (5 DTU, 2 GB) | ~$5/month |
 
 A $10/month budget on the resource group emails the subscription owner at 50%, 80%, and 100% of actual spend and at 100% forecast. Azure has no hard cap on pay-as-you-go spending, so the limits above (one replica, fixed-price database) are what keep the bill small.
 
 Production settings live in Azure, never in the repo: the connection string, MBTA key, and MapKit private key are Container App secrets, and `Cors__AllowedOrigins__2` adds the web app's address to the allowed origins. GitHub signs in to Azure with OIDC (no stored password) using the `AZURE_CLIENT_ID`, `AZURE_TENANT_ID`, and `AZURE_SUBSCRIPTION_ID` repository variables; `API_URL` is the address the web app calls, and the `SWA_DEPLOY_TOKEN` secret uploads the web app. The optional `GA_MEASUREMENT_ID` repository variable (e.g. `G-ABC123`) turns on consent-gated Google Analytics for the website build; the iPhone app never has analytics.
 
-The API scales to zero when idle, so the first request after a quiet spell takes a few seconds while it starts. Set the Container App's minimum replicas to 1 (about $4 more a month) to avoid that.
+Scaling (set in Azure, not by the deploy): a `cron` rule keeps one API instance running from 4:30 AM to 2:00 AM Eastern (`America/New_York`, so daylight saving is handled), when people ride the T. Overnight it may scale to zero; the `http` rule wakes it for a visitor, which can take from seconds to minutes when Azure is short on capacity. Waking from zero during the day is what caused slow first loads before the schedule.
 
 ## Road to the App Store
 
