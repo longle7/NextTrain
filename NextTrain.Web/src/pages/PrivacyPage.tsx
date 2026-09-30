@@ -9,7 +9,7 @@ export default function PrivacyPage() {
     <article className="space-y-4 pb-4">
       <div>
         <h1 className="text-2xl font-bold">Privacy policy</h1>
-        <p className="text-sm text-neutral-500">Effective September 29, 2026</p>
+        <p className="text-sm text-neutral-500">Effective September 30, 2026</p>
       </div>
 
       <p>NextTrain shows live MBTA subway times. It's built to collect as little about you as possible.</p>
@@ -40,10 +40,11 @@ export default function PrivacyPage() {
           MBTA directly.
         </p>
         <p>
-          Map images load from OpenStreetMap's servers, which receive your IP address and the part of the map you're viewing.
-          See the{' '}
-          <a href="https://osmfoundation.org/wiki/Privacy_Policy" target="_blank" rel="noreferrer" className="text-blue-600 underline dark:text-blue-400">
-            OpenStreetMap Foundation privacy policy
+          The map is Apple Maps. Map images load from Apple's servers, which receive your IP address and the part of the
+          map you're viewing (after you tap the locate button, that's the area around you). Your exact location isn't sent:
+          the blue dot is placed on your device. See{' '}
+          <a href="https://www.apple.com/legal/privacy/" target="_blank" rel="noreferrer" className="text-blue-600 underline dark:text-blue-400">
+            Apple's privacy policy
           </a>
           .
         </p>

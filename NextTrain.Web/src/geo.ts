@@ -31,6 +31,20 @@ export const locationErrorMessage = (error: GeolocationPositionError) =>
 /** Farther than this from every station, you're outside the T's area (App Review, for one, tests from California). */
 export const OUT_OF_AREA_MILES = 25
 
+/**
+ * The box around [lat, lon] points, widened by `margin` (a fraction of its size) on every side so nothing sits on
+ * the map's edge. Undefined for no points.
+ */
+export function boundsOf(points: [number, number][], margin = 0.08) {
+  if (!points.length) return undefined
+  const lats = points.map(([lat]) => lat)
+  const lons = points.map(([, lon]) => lon)
+  const [south, north, west, east] = [Math.min(...lats), Math.max(...lats), Math.min(...lons), Math.max(...lons)]
+  const padLat = (north - south) * margin
+  const padLon = (east - west) * margin
+  return { north: north + padLat, south: south - padLat, east: east + padLon, west: west - padLon }
+}
+
 /** "0.4 mi · 10 min walk", or just "3.2 mi away" past a reasonable walk. */
 export function walkLabel(miles: number): string {
   const distance = `${miles < 0.1 ? '<0.1' : miles.toFixed(1)} mi`

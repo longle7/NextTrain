@@ -17,44 +17,27 @@ body {
   -webkit-text-size-adjust: 100%;
 }
 
-/* Dark mode map: invert only the OpenStreetMap tiles so line colors stay true. `html` outranks leaflet.css,
-   which loads later with the map. */
-@media (prefers-color-scheme: dark) {
-  html .leaflet-container {
-    background: #262626;
-  }
-  html .leaflet-tile-pane {
-    filter: invert(1) hue-rotate(180deg) brightness(0.95) contrast(0.9);
-  }
-  html .leaflet-control-attribution {
-    background: rgb(23 23 23 / 0.75);
-    color: #a3a3a3;
-  }
-  html .leaflet-control-attribution a {
-    color: #93c5fd;
-  }
-  html .leaflet-bar a {
-    background: #262626;
-    border-color: #404040;
-    color: #e5e5e5;
-  }
-  /* Train popups and station tooltips: dark cards instead of white flashes on a dark map. */
-  html .leaflet-popup-content-wrapper,
-  html .leaflet-popup-tip,
-  html .leaflet-tooltip {
-    background: #262626;
-    border-color: #404040;
-    color: #f5f5f5;
-  }
-  html .leaflet-popup-content-wrapper {
-    box-shadow: 0 0 0 1px #525252, 0 3px 14px rgb(0 0 0 / 0.6); /* outline: a dark card on a dark map needs an edge */
-  }
-  html .leaflet-tooltip-top::before {
-    border-top-color: #262626;
-  }
-  html .leaflet-container a.leaflet-popup-close-button {
-    color: #a3a3a3;
-  }
+/* Map markers (built in mapkit.ts). Stations: white dots with a dark ring, like a subway map. Apple Maps draws its
+   own light or dark map, so the dots only need to read on both. */
+.station-dot {
+  width: 12px;
+  height: 12px;
+  border: 2px solid #222;
+  border-radius: 50%;
+  background: white;
+  cursor: pointer;
+}
+.station-dot:focus-visible {
+  outline: 3px solid #2563eb;
+  outline-offset: 2px;
+}
+.user-dot {
+  width: 20px;
+  height: 20px;
+  border: 3px solid white;
+  border-radius: 50%;
+  background: #2563eb;
+  box-shadow: 0 1px 4px rgb(0 0 0 / 0.4);
 }
 
 /* iPhone app only (main.tsx adds .native): long-pressing a link shouldn't open Safari's link preview, and quick

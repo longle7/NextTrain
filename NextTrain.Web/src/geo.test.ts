@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { Station } from './api'
-import { distanceMiles, nearestStations, walkLabel } from './geo'
+import { boundsOf, distanceMiles, nearestStations, walkLabel } from './geo'
 
 const station = (mbtaStopId: string, latitude: number, longitude: number): Station => ({
   mbtaStopId, name: mbtaStopId, latitude, longitude, routeId: 'Red', averageWeekdayBoardings: null, isAccessible: null,
@@ -33,5 +33,20 @@ describe('walkLabel', () => {
     [3.24, '3.2 mi away'],
   ])('%s mi is "%s"', (miles, expected) => {
     expect(walkLabel(miles)).toBe(expected)
+  })
+})
+
+describe('boundsOf', () => {
+  it('is the box around the points, widened by the margin on every side', () => {
+    const b = boundsOf([[42.4, -71.2], [42.2, -71.0], [42.3, -71.1]], 0.1)!
+    expect(b.north).toBeCloseTo(42.42)
+    expect(b.south).toBeCloseTo(42.18)
+    expect(b.east).toBeCloseTo(-70.98)
+    expect(b.west).toBeCloseTo(-71.22)
+  })
+
+  it('is undefined for no points, and a point for one point', () => {
+    expect(boundsOf([])).toBeUndefined()
+    expect(boundsOf([[42.36, -71.06]])).toEqual({ north: 42.36, south: 42.36, east: -71.06, west: -71.06 })
   })
 })

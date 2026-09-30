@@ -10,7 +10,7 @@ import PrivacyPage from './pages/PrivacyPage'
 import SettingsPage from './pages/SettingsPage'
 import StationPage from './pages/StationPage'
 
-// The map pulls in Leaflet, so it loads only when opened: a faster first launch.
+// The map loads Apple's MapKit JS (about 240 KB), so it loads only when opened: a faster first launch.
 const MapPage = lazy(() => import('./pages/MapPage'))
 
 const TABS = ['/', '/lines', '/map']

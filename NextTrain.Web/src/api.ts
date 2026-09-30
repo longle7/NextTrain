@@ -104,6 +104,14 @@ export async function api<T>(path: string, init?: RequestInit): Promise<T> {
   return (response.status === 204 ? undefined : response.json()) as Promise<T>
 }
 
+// A 30-minute Apple Maps token, signed by our API (MapKitController) so the signing key never reaches the app.
+// Plain text, not JSON. No X-User-Id: the token isn't tied to a user, and a plain GET needs no CORS preflight.
+export async function getMapKitToken(): Promise<string> {
+  const response = await fetch(`${API_URL}/mapkit/token`)
+  if (!response.ok) throw new ApiError(response.status, "The map isn't available right now.")
+  return response.text()
+}
+
 // Anonymous per-device ID that owns this device's saved commutes.
 // ponytail: whoever knows the ID can read its commutes; replace with real sign-in (e.g. Sign in with Apple) before launch.
 const USER_ID_KEY = 'nexttrain.userId'
