@@ -25,9 +25,9 @@ Make the app **iPhone-only** in Xcode (Supported Destinations: iPhone). Otherwis
 | Category | Navigation (secondary: Travel) |
 | Age rating | 4+ |
 | Price | *you decide* (free fits the scope) |
-| Support URL | https://github.com/longle7/NextTrain/issues |
+| Support URL | https://nexttrain.longledev.com/support |
 | Privacy Policy URL | https://nexttrain.longledev.com/privacy |
-| Copyright | *you decide*, e.g. "2026 Your Name" |
+| Copyright | 2026 longledev |
 
 **Keywords** (100 max, comma-separated, no spaces needed). Keep "MBTA" out: App Review flags other companies' trademarks used as keywords (guideline 2.3.7).
 
@@ -81,6 +81,8 @@ What the app does today (see `/privacy`). You submit the final answers in App St
 | Location | **No**: only used on the device, never sent | – | – | – |
 | Everything else (contact info, usage data, diagnostics, …) | No: no analytics, ads, or crash reporting | – | – | – |
 
+The app's privacy manifest (`ios/App/App/PrivacyInfo.xcprivacy`) declares the same two types, no tracking, and the one "required reason" API it uses (UserDefaults, reason `CA92.1`, via Capacitor's storage). Keep it and these answers in step; Apple checks the manifest at upload.
+
 Recently viewed stations stay on the device and aren't "collected". The website's optional Google Analytics (after consent) is off in the app, both by build (the iPhone build has no `VITE_GA_ID`) and in code (`analytics.ts` refuses to run inside Capacitor), so these answers don't change. If you add crash reporting or analytics to the app later, update these answers and the privacy policy.
 
 ## Review notes
@@ -100,7 +102,7 @@ Location permission is optional; it's only used on the device to find nearby sta
 | Key | Value |
 |---|---|
 | `NSLocationWhenInUseUsageDescription` | NextTrain uses your location to show the subway stations closest to you. Your location stays on your device. |
-| `ITSAppUsesNonExemptEncryption` | `NO` (the app only uses standard HTTPS) |
+| `ITSAppUsesNonExemptEncryption` | `NO` (the app only uses standard HTTPS), so the Export Compliance question is answered for you |
 
 ## Before you submit
 
@@ -115,5 +117,16 @@ Location permission is optional; it's only used on the device to find nearby sta
    ```
    For the Simulator against your local API, use `VITE_API_URL=http://localhost:5112` instead (the app allows local-network HTTP for this).
 4. **Ship to TestFlight first** and try it on the subway, including the offline banner in a tunnel.
+
+## Protecting yourself
+
+Built into the app (see `docs/legal.md`):
+
+- **Agreement on first launch.** Before first use, and again whenever the Terms change, the app shows what it is, that times are MBTA estimates, that it isn't affiliated with the MBTA, and an **Agree and continue** button for the Terms of Use and Privacy Policy.
+- **A real Support page** at `/support` (the Support URL above): a contact email, where to go for MBTA service problems, "call 911" for emergencies, and answers to common questions.
+- **Trademarks:** the name, icon, and screenshots don't use the MBTA's "T" logo, and "MBTA" stays out of the name and keywords. The description uses "MBTA" only to say where the data comes from, and says the app isn't affiliated. Keep it that way.
+- **Screenshots** show only the app and public MBTA data: no personal information, no other apps' logos.
+
+Also consider, outside the code: have a lawyer review the Terms and Privacy Policy, and, once there's revenue, an LLC so a claim can't reach personal assets.
 
 **Guideline 4.2 risk:** Apple rejects apps that are "just a website". NextTrain's native-feeling UI, location, offline handling, and live features help. Adding **push notifications for commutes** ("your train leaves in 5 minutes") is the strongest answer if Review pushes back. Sign in with Apple is **not** required, because the app offers no third-party login.

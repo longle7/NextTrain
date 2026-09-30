@@ -19,11 +19,20 @@ export default function TermsPage() {
         </p>
       </Section>
 
+      <Section title="Stay safe">
+        <p>
+          Don't use NextTrain in a way that puts you or others at risk: stay behind the platform edge, watch where you're
+          going, and don't run for a train because of a time shown in the app. In an emergency, call 911 or tell MBTA
+          staff.
+        </p>
+      </Section>
+
       <Section title="Not affiliated with the MBTA">
         <p>
           NextTrain is independent and isn't affiliated with, endorsed by, or sponsored by the Massachusetts Department
           of Transportation (MassDOT) or the Massachusetts Bay Transportation Authority (MBTA). We use their names only to
-          describe the service. Transit data is provided by MassDOT and the MBTA under MassDOT's{' '}
+          describe the service; "MBTA" and the T logo are trademarks of MassDOT, and NextTrain doesn't use the logo.
+          Transit data is provided by MassDOT and the MBTA under MassDOT's{' '}
           <ExternalLink href="https://cdn.mbta.com/sites/default/files/2023-08/mbta-massdot-develop-license-agreement.pdf">developer license agreement</ExternalLink>.
         </p>
       </Section>

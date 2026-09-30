@@ -3,6 +3,7 @@ import { BrowserRouter, Link, NavLink, Route, Routes, useLocation, useNavigate }
 import { trackPageView } from './analytics'
 import { AppLogo, ErrorBoundary, NotFound, Status } from './components'
 import ConsentBanner from './ConsentBanner'
+import Welcome from './Welcome'
 import { useOnline } from './usePolling'
 import CommutePage from './pages/CommutePage'
 import CookiesPage from './pages/CookiesPage'
@@ -12,6 +13,7 @@ import LinesPage from './pages/LinesPage'
 import PrivacyPage from './pages/PrivacyPage'
 import SettingsPage from './pages/SettingsPage'
 import StationPage from './pages/StationPage'
+import SupportPage from './pages/SupportPage'
 import TermsPage from './pages/TermsPage'
 
 // The map loads Apple's MapKit JS (about 240 KB), so it loads only when opened: a faster first launch.
@@ -30,6 +32,7 @@ export default function App() {
         <ConsentBanner />
       </main>
       <TabBar />
+      <Welcome />
     </BrowserRouter>
   )
 }
@@ -54,6 +57,7 @@ function Pages() {
             <Route path="/privacy" element={<PrivacyPage />} />
             <Route path="/terms" element={<TermsPage />} />
             <Route path="/cookies" element={<CookiesPage />} />
+            <Route path="/support" element={<SupportPage />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </Suspense>

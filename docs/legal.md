@@ -4,6 +4,14 @@
 
 The pages live in `NextTrain.Web/src/pages/` (`PrivacyPage.tsx`, `TermsPage.tsx`, `CookiesPage.tsx`). Shared facts (operator, contact email, effective date, governing law) are in `NextTrain.Web/src/legal.ts`.
 
+## Agreement, support, and trademarks
+
+- **Clickwrap.** `src/Welcome.tsx` asks for an explicit **Agree and continue** to the Terms of Use and Privacy Policy on first launch (web and app), with the key disclaimer shown up front (times are MBTA estimates; not affiliated with the MBTA). Courts enforce terms people actively agreed to much more readily than terms that are only linked (browsewrap). It stores the agreed `EFFECTIVE_DATE` on the device, so **bumping `EFFECTIVE_DATE` in `legal.ts` asks everyone again**. The legal pages and `/support` stay readable without agreeing.
+- **Support.** `/support` (`SupportPage.tsx`) is the App Store Support URL: contact, MBTA customer support for service problems, 911 for emergencies, FAQ.
+- **Safety.** The Terms tell people not to use the app near the platform edge or run for trains, and to call 911 in an emergency.
+- **Trademarks.** "MBTA" and the T logo belong to MassDOT. NextTrain uses the name only to describe the data (nominative use), never the logo, and says it isn't affiliated (Terms, Settings, welcome screen, App Store description).
+- **Apple privacy manifest.** `ios/App/App/PrivacyInfo.xcprivacy` matches the App Privacy answers in `docs/app-store/README.md`.
+
 ## Before you rely on it
 
 1. **Make `privacy@longledev.com` work** before this ships: the pages promise it. Cloudflare dashboard → longledev.com → **Email** → **Email Routing** → enable → add a custom address `privacy` forwarding to your inbox (free; your real address stays private).
