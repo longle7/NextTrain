@@ -5,6 +5,7 @@ import { Status } from '../components'
 import { boundsOf, locationErrorMessage, nearestStations, OUT_OF_AREA_MILES } from '../geo'
 import { loadMapKit, stationElement, trainCallout, trainElement, updateTrainElement, userElement } from '../mapkit'
 import { decodePolyline } from '../polyline'
+import { trackSnapper } from '../snap'
 import { usePolling, useTitle } from '../usePolling'
 
 const REFRESH_MS = 10_000
@@ -21,8 +22,9 @@ const regionAround = (points: [number, number][]) => {
 // Downtown and the inner stops, where most trains are; the whole system would make downtown too crowded on a phone.
 const bostonRegion = () => new mapkit.CoordinateRegion(new mapkit.Coordinate(42.355, -71.08), new mapkit.CoordinateSpan(0.1, 0.12))
 
-// Dots are centered on their spot; MapKit's default anchors an element's bottom edge there (like a pin).
-const centered = (size: number) => ({ size: { width: size, height: size }, anchorOffset: new DOMPoint(0, size / 2) })
+// Dots are centered on their spot. MapKit puts an element's bottom-center there (like a pin), and a positive
+// anchorOffset y moves it up, so shift down by half the height. The e2e tests check markers land on their coordinates.
+const centered = (size: number) => ({ size: { width: size, height: size }, anchorOffset: new DOMPoint(0, -size / 2) })
 
 export default function MapPage() {
   const navigate = useNavigate()
@@ -33,6 +35,11 @@ export default function MapPage() {
   const shapes = usePolling(() => api<RouteShape[]>('/routes/shapes'), 'shapes')
   const vehicles = usePolling(() => api<Vehicle[]>('/vehicles'), 'vehicles', REFRESH_MS)
   const tracks = useMemo(() => shapes.data?.map((s) => ({ routeId: s.routeId, points: decodePolyline(s.polyline) })), [shapes.data])
+  // Puts each train on its own line, arrow along the track toward its next stop (see snap.ts).
+  const place = useMemo(
+    () => tracks && stations.data && trackSnapper(tracks, stations.data),
+    [tracks, stations.data],
+  )
 
   const container = useRef<HTMLDivElement>(null)
   const trains = useRef(new Map<string, mapkit.Annotation>())
@@ -101,17 +108,20 @@ export default function MapPage() {
       const route = routes.data?.find((r) => r.id === v.routeId)
       const color = route?.color ?? 'gray'
       const { title, subtitle } = trainCallout(v, route)
+      // Until the tracks load, the raw GPS position and compass bearing.
+      const destination = route?.directionDestinations[v.directionId] ?? null
+      const { latitude, longitude, heading } = place?.({ ...v, destination }) ?? { ...v, heading: v.bearing }
       let annotation = trains.current.get(v.id)
       if (!annotation) {
-        annotation = new mapkit.Annotation(coordinate([v.latitude, v.longitude]), () => trainElement(color, v.bearing), {
+        annotation = new mapkit.Annotation(coordinate([latitude, longitude]), () => trainElement(color, heading), {
           ...centered(24),
           displayPriority: mapkit.Annotation.DisplayPriority.Required,
         })
         map.addAnnotation(annotation)
         trains.current.set(v.id, annotation)
       } else {
-        annotation.coordinate = coordinate([v.latitude, v.longitude])
-        updateTrainElement(annotation.element, color, v.bearing)
+        annotation.coordinate = coordinate([latitude, longitude])
+        updateTrainElement(annotation.element, color, heading)
       }
       annotation.title = title // callout text; plain text, never HTML
       annotation.subtitle = subtitle
@@ -123,7 +133,7 @@ export default function MapPage() {
         trains.current.delete(id)
       }
     }
-  }, [map, vehicles.data, routes.data, line])
+  }, [map, vehicles.data, routes.data, line, place])
 
   // Keep trains above stations: MapKit draws annotations in the order they were added, and the station effect
   // above re-adds stations whenever they or the line change.
