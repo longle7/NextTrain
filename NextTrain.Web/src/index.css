@@ -20,12 +20,21 @@ body {
 /* Map markers (built in mapkit.ts). Stations: white dots with a dark ring, like a subway map. Apple Maps draws its
    own light or dark map, so the dots only need to read on both. */
 .station-dot {
+  /* A 24 px tap area (WCAG 2.2 target size) around a 12 px dot. */
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  cursor: pointer;
+}
+.station-dot::before {
+  content: '';
   width: 12px;
   height: 12px;
   border: 2px solid #222;
   border-radius: 50%;
   background: white;
-  cursor: pointer;
 }
 .station-dot:focus-visible {
   outline: 3px solid #2563eb;

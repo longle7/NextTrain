@@ -53,7 +53,10 @@ export default function SettingsPage() {
           </Row>
           <Row>
             <a href={SUPPORT_URL} target="_blank" rel="noreferrer" className="flex min-h-12 flex-1 items-center justify-between">
-              Report a problem <Chevron />
+              <span>
+                Report a problem<span className="sr-only"> (opens GitHub)</span>
+              </span>
+              <Chevron />
             </a>
           </Row>
           <Row>

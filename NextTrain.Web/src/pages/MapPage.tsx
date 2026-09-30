@@ -23,6 +23,9 @@ const regionAround = (points: [number, number][]) => {
 // Downtown and the inner stops, where most trains are; the whole system would make downtown too crowded on a phone.
 const bostonRegion = () => new mapkit.CoordinateRegion(new mapkit.Coordinate(42.355, -71.08), new mapkit.CoordinateSpan(0.1, 0.12))
 
+// Glide to a new view, or jump there for people who've asked their device for less motion.
+const animate = () => !matchMedia('(prefers-reduced-motion: reduce)').matches
+
 // Dots are centered on their spot. MapKit puts an element's bottom-center there (like a pin), and a positive
 // anchorOffset y moves it up, so shift down by half the height. The e2e tests check markers land on their coordinates.
 const centered = (size: number) => ({ size: { width: size, height: size }, anchorOffset: new DOMPoint(0, -size / 2) })
@@ -120,7 +123,7 @@ export default function MapPage() {
   useEffect(() => {
     if (!map || !tracks) return
     const region = line && regionAround(tracks.filter((t) => onLine(line, t.routeId)).flatMap((t) => t.points))
-    map.setRegionAnimated(region || bostonRegion())
+    map.setRegionAnimated(region || bostonRegion(), animate())
   }, [map, tracks, line])
 
   // Stations: tap to open departures
@@ -129,7 +132,7 @@ export default function MapPage() {
     const annotations = stations.data.filter((s) => stationRouteIds(s).some((id) => onLine(line, id))).map((s) => {
       const open = () => navigate(`/stations/${s.mbtaStopId}`)
       return new mapkit.Annotation(new mapkit.Coordinate(s.latitude, s.longitude), () => stationElement(s.name, open, previews.forStation(s)), {
-        ...centered(12),
+        ...centered(24), // the dot's tap area; it looks 12 px
         title: s.name, // plain text: MapKit never parses it as HTML
         enabled: false, // the dot handles its own taps (see stationElement)
         displayPriority: mapkit.Annotation.DisplayPriority.Required, // never hidden to avoid overlaps
@@ -256,7 +259,7 @@ export default function MapPage() {
           map.addAnnotation(me.current)
         }
         me.current.coordinate = here
-        map.setRegionAnimated(new mapkit.CoordinateRegion(here, new mapkit.CoordinateSpan(0.012, 0.012)))
+        map.setRegionAnimated(new mapkit.CoordinateRegion(here, new mapkit.CoordinateSpan(0.012, 0.012)), animate())
       },
       (error) => {
         setLocating(false)
