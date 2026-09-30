@@ -86,7 +86,7 @@ function CommuteForm({ existing, initialStopId }: { existing: Commute | undefine
             <div className="flex items-center justify-between gap-2">
               <span className="font-semibold">{station.name}</span>
               <button onClick={() => pickStation('')} className={linkButton}>
-                Change
+                Change<span className="sr-only"> station</span>
               </button>
             </div>
           </Card>
@@ -103,7 +103,10 @@ function CommuteForm({ existing, initialStopId }: { existing: Commute | undefine
                   setRouteId(id)
                   setDirectionId(undefined)
                 }}>
-                <LineBadge routeId={id} routes={routes.data} />
+                {/* The name is written out next to it, so screen readers skip the badge rather than say it twice. */}
+                <span aria-hidden>
+                  <LineBadge routeId={id} routes={routes.data} />
+                </span>
                 <span className="text-left">{routes.data?.find((r) => r.id === id)?.name ?? id}</span>
               </Choice>
             ))}
@@ -140,6 +143,7 @@ function CommuteForm({ existing, initialStopId }: { existing: Commute | undefine
               return (
                 <button
                   key={day}
+                  aria-label={DAY_NAMES[day]} // "Monday", not "Mon" (still contains the visible text)
                   aria-pressed={on}
                   onClick={() => setDays(on ? days.filter((d) => d !== day) : WEEK.filter((d) => d === day || days.includes(d)))}
                   className={`min-h-11 rounded-lg text-sm font-semibold ${on ? 'bg-neutral-900 text-white dark:bg-white dark:text-neutral-900' : 'bg-neutral-100 text-neutral-500 dark:bg-neutral-800'}`}
@@ -219,6 +223,10 @@ function Choice({ selected, onClick, children }: { selected: boolean; onClick: (
   )
 }
 
+const DAY_NAMES: Record<string, string> = {
+  Mon: 'Monday', Tue: 'Tuesday', Wed: 'Wednesday', Thu: 'Thursday', Fri: 'Friday', Sat: 'Saturday', Sun: 'Sunday',
+}
+
 // iOS shows its native time wheel for type="time".
 function TimeInput({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {
   return (
@@ -227,7 +235,7 @@ function TimeInput({ label, value, onChange }: { label: string; value: string; o
       aria-label={label}
       value={value}
       onChange={(e) => onChange(e.target.value)}
-      className="min-h-11 flex-1 rounded-lg bg-neutral-100 px-3 text-base font-semibold dark:bg-neutral-800"
+      className="min-h-11 min-w-0 flex-1 rounded-lg bg-neutral-100 px-3 text-base font-semibold dark:bg-neutral-800"
     />
   )
 }

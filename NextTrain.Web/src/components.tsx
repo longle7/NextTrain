@@ -132,7 +132,7 @@ export function SearchInput({ value, onChange, placeholder, onSubmit }: {
         e.preventDefault()
         onSubmit?.()
       }}
-      className="flex items-center gap-2 rounded-xl bg-white px-3 shadow-sm focus-within:ring-2 focus-within:ring-neutral-400 dark:bg-neutral-900"
+      className="flex items-center gap-2 rounded-xl bg-white px-3 shadow-sm focus-within:ring-2 focus-within:ring-blue-600 dark:bg-neutral-900 dark:focus-within:ring-blue-400"
     >
       <svg viewBox="0 0 24 24" className="size-5 shrink-0 fill-none stroke-neutral-400 stroke-2" aria-hidden>
         <circle cx="11" cy="11" r="7" />
@@ -174,7 +174,7 @@ export function AlertBanner({ alert }: { alert: Alert }) {
         {alert.description && <p className="opacity-80">{alert.description}</p>}
         {alert.url && (
           <a href={alert.url} target="_blank" rel="noreferrer" className="inline-block font-semibold underline">
-            More details
+            More details<span className="sr-only"> about this alert (opens the MBTA website)</span>
           </a>
         )}
       </div>

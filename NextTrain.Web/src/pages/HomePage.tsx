@@ -200,7 +200,8 @@ function MyCommutes({ routes, alerts }: { routes: Route[] | undefined; alerts: A
         <h2 className="text-lg font-bold">Your commutes</h2>
         {!!commutes.data?.length && (
           <Link to="/commutes/new" className={linkButton}>
-            + Add
+            {/* Heard as "Add a commute"; the name still contains the visible "Add" (WCAG 2.5.3). */}
+            <span aria-hidden>+&nbsp;</span>Add<span className="sr-only"> a commute</span>
           </Link>
         )}
       </div>
@@ -275,6 +276,10 @@ function CommuteCard({ commute, route, routes, now, alert }: {
         </span>
         <Link to={`/commutes/${commute.id}`} className={`-mr-2 ${linkButton}`}>
           Edit
+          {/* Out of context (e.g. a screen reader's list of links) "Edit" alone doesn't say which commute. */}
+          <span className="sr-only">
+            {' '}commute: {commute.stationName} to {route?.directionDestinations[commute.directionId] ?? ''}
+          </span>
         </Link>
       </div>
       {live && <CommuteDepartures commute={commute} />}

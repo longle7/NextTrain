@@ -82,17 +82,44 @@ export interface Preview {
   hide: (now?: boolean) => void
 }
 
+// Every station dot's actions, to hand a tap or hover to the nearest dot (see stationElement).
+const stationActions = new WeakMap<Element, { open: () => void; preview: Preview }>()
+let hovered: Element | undefined
+
+// The station dot whose visible center is closest to a pointer, among those whose tap area it's in.
+function nearestDot(x: number, y: number, fallback: HTMLElement): HTMLElement {
+  let best = fallback
+  let bestDistance = Infinity
+  for (const dot of document.querySelectorAll<HTMLElement>('.station-dot')) {
+    const r = dot.getBoundingClientRect()
+    const distance = Math.hypot(r.x + r.width / 2 - x, r.y + r.height / 2 - y)
+    if (distance <= r.width / 2 && distance < bestDistance) [best, bestDistance] = [dot, distance]
+  }
+  return best
+}
+
 /**
  * A station's dot, as its own button. We handle the tap here rather than through MapKit's selection: where dots
- * overlap, MapKit sometimes picks the one underneath, but the browser always delivers the tap to the dot on top.
- * Hovering with a mouse, or focusing with the keyboard, shows its next trains; Escape hides them.
+ * overlap, MapKit sometimes picks the one underneath.
+ *
+ * The dot looks 12 px but its tap area is 24 px (WCAG 2.2 target size). Downtown, dots sit closer than that, so
+ * tap areas overlap; a tap or hover goes to the station whose visible dot is nearest the pointer, never to a
+ * neighbor's invisible edge. Hovering with a mouse, or focusing with the keyboard, shows its next trains; Escape
+ * hides them.
  */
 export function stationElement(name: string, open: () => void, preview: Preview) {
   const dot = Object.assign(document.createElement('div'), { className: 'station-dot', tabIndex: 0 })
   dot.setAttribute('role', 'button')
   dot.setAttribute('aria-label', `${name} station`)
   dot.setAttribute('aria-describedby', 'station-preview')
-  dot.addEventListener('click', open)
+  stationActions.set(dot, { open, preview })
+  const nearest = (event: PointerEvent | MouseEvent) => {
+    const target = nearestDot(event.clientX, event.clientY, dot)
+    return { target, actions: stationActions.get(target) ?? { open, preview } }
+  }
+
+  // detail 0 is a click from the keyboard or a script, with no pointer position: this dot, as is.
+  dot.addEventListener('click', (event) => (event.detail === 0 ? open() : nearest(event).actions.open()))
   dot.addEventListener('keydown', (event) => {
     if (event.key === 'Enter' || event.key === ' ') {
       event.preventDefault()
@@ -101,8 +128,20 @@ export function stationElement(name: string, open: () => void, preview: Preview)
     if (event.key === 'Escape') preview.hide(true)
   })
   // Mouse only: on a touchscreen a tap opens the station, and a hover card would just flash first.
-  dot.addEventListener('pointerenter', (event) => event.pointerType === 'mouse' && preview.show(dot))
-  dot.addEventListener('pointerleave', (event) => event.pointerType === 'mouse' && preview.hide())
+  const hover = (event: PointerEvent) => {
+    if (event.pointerType !== 'mouse') return
+    const { target, actions } = nearest(event)
+    if (target === hovered) return
+    hovered = target
+    actions.preview.show(target as HTMLElement)
+  }
+  dot.addEventListener('pointerenter', hover)
+  dot.addEventListener('pointermove', hover)
+  dot.addEventListener('pointerleave', (event) => {
+    if (event.pointerType !== 'mouse') return
+    hovered = undefined
+    preview.hide()
+  })
   dot.addEventListener('focus', () => preview.show(dot))
   dot.addEventListener('blur', () => preview.hide())
   return dot
