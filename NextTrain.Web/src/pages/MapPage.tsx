@@ -35,7 +35,7 @@ export default function MapPage() {
   const shapes = usePolling(() => api<RouteShape[]>('/routes/shapes'), 'shapes')
   const vehicles = usePolling(() => api<Vehicle[]>('/vehicles'), 'vehicles', REFRESH_MS)
   const tracks = useMemo(() => shapes.data?.map((s) => ({ routeId: s.routeId, points: decodePolyline(s.polyline) })), [shapes.data])
-  // Puts each train on its own line, arrow along the track toward its next stop (see snap.ts).
+  // Puts each train on its own line, arrow along the track the way it's going (see snap.ts).
   const place = useMemo(
     () => tracks && stations.data && trackSnapper(tracks, stations.data),
     [tracks, stations.data],
