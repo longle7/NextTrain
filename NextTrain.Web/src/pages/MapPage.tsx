@@ -56,8 +56,12 @@ export default function MapPage() {
 
   useEffect(() => {
     const m = L.map(container.current!).setView(BOSTON, 12)
+    // OpenStreetMap's tile policy requires a Referer. The host sends Referrer-Policy: same-origin, which drops it
+    // for tiles, so send just our origin (the path stays private).
+    // ponytail: fine for the website's light use; the App Store app needs a keyed tile provider (the policy rules out apps).
     L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
       maxZoom: 19,
+      referrerPolicy: 'strict-origin-when-cross-origin',
       attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
     }).addTo(m)
     // Stations draw above the lines (overlay pane, 400) and below trains (marker pane, 600); your dot above all.
