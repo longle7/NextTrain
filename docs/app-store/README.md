@@ -81,7 +81,7 @@ What the app does today (see `/privacy`). You submit the final answers in App St
 | Location | **No**: only used on the device, never sent | – | – | – |
 | Everything else (contact info, usage data, diagnostics, …) | No: no analytics, ads, or crash reporting | – | – | – |
 
-Recently viewed stations stay on the device and aren't "collected". If you add crash reporting or analytics later, update these answers and the privacy policy.
+Recently viewed stations stay on the device and aren't "collected". The website's optional Google Analytics (after consent) is off in the app, both by build (the iPhone build has no `VITE_GA_ID`) and in code (`analytics.ts` refuses to run inside Capacitor), so these answers don't change. If you add crash reporting or analytics to the app later, update these answers and the privacy policy.
 
 ## Review notes
 
