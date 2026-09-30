@@ -12,15 +12,12 @@ export function countdown(departureIso: string, now: Date): string | undefined {
   return `${Math.round(seconds / 60)} min`
 }
 
-/**
- * Upcoming boardable departures grouped by route and direction, soonest first.
- * Arrival-only predictions (trains ending at this station) are dropped.
- */
+/** Upcoming departures grouped by route and direction, soonest first. Trains that already left are dropped. */
 export function groupDepartures(predictions: Prediction[], now: Date, perGroup = 3) {
   const groups = new Map<string, { routeId: string; directionId: number; departures: string[] }>()
 
   for (const p of predictions) {
-    if (!p.departureTime || countdown(p.departureTime, now) === undefined) continue
+    if (countdown(p.departureTime, now) === undefined) continue
     const key = `${p.routeId}|${p.directionId}`
     const group = groups.get(key) ?? { routeId: p.routeId, directionId: p.directionId, departures: [] }
     group.departures.push(p.departureTime)

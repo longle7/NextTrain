@@ -132,7 +132,7 @@ export function SearchInput({ value, onChange, placeholder, onSubmit }: {
         e.preventDefault()
         onSubmit?.()
       }}
-      className="flex items-center gap-2 rounded-xl bg-white px-3 shadow-sm focus-within:ring-2 focus-within:ring-neutral-400 dark:bg-neutral-900"
+      className="flex items-center gap-2 rounded-xl bg-white px-3 shadow-sm focus-within:ring-2 focus-within:ring-blue-600 dark:bg-neutral-900 dark:focus-within:ring-blue-400"
     >
       <svg viewBox="0 0 24 24" className="size-5 shrink-0 fill-none stroke-neutral-400 stroke-2" aria-hidden>
         <circle cx="11" cy="11" r="7" />
@@ -174,7 +174,7 @@ export function AlertBanner({ alert }: { alert: Alert }) {
         {alert.description && <p className="opacity-80">{alert.description}</p>}
         {alert.url && (
           <a href={alert.url} target="_blank" rel="noreferrer" className="inline-block font-semibold underline">
-            More details
+            More details<span className="sr-only"> about this alert (opens the MBTA website)</span>
           </a>
         )}
       </div>
@@ -210,16 +210,12 @@ export class ErrorBoundary extends Component<{ children: ReactNode }, { crashed:
     return { crashed: true }
   }
 
+  // Going Home clears it: App keys this boundary by page.
   render() {
-    if (!this.state.crashed) return this.props.children
-    return (
-      <div className="space-y-4 pt-8 text-center">
-        <h1 className="text-2xl font-bold">Something went wrong</h1>
-        <p className="text-neutral-500">NextTrain hit an unexpected problem. Reloading usually fixes it.</p>
-        <button onClick={() => location.assign('/')} className={primaryButton}>
-          Reload NextTrain
-        </button>
-      </div>
+    return this.state.crashed ? (
+      <NotFound title="Something went wrong" message="NextTrain hit an unexpected problem. Going back to Home usually fixes it." />
+    ) : (
+      this.props.children
     )
   }
 }

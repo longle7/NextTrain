@@ -16,7 +16,7 @@ using Polly;
 //
 // How one request flows, e.g. GET /stations/place-pktrm/predictions:
 //   compression -> error handling -> CORS -> routing -> StationsController.GetPredictions
-//     -> IStationLookupService reads the station from SQL Server
+//     -> StationLookupService reads the station from SQL Server
 //     -> IMbtaClient returns the cached departures, or fetches them from MBTA and caches them for 10 seconds
 //   -> the controller's return value is serialized to JSON. If MBTA fails, MbtaUnavailableFilter answers 503.
 // See docs/backend.md for the bigger picture.
@@ -40,7 +40,7 @@ builder.Services.AddHttpClient<IMbtaClient, MbtaClient>(client => client.Timeout
 
 // Stations: importing them from MBTA into the database, and reading them back.
 builder.Services.AddScoped<IStationImportService, StationImportService>();
-builder.Services.AddScoped<IStationLookupService, StationLookupService>();
+builder.Services.AddScoped<StationLookupService>();
 
 // A background job that imports stations at startup and daily (Stations:RefreshHours), so production is never empty.
 builder.Services.AddHostedService<StationRefreshService>();

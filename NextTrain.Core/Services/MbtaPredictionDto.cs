@@ -20,15 +20,10 @@ namespace NextTrain.Core.Services
 
     public class MbtaPredictionAttributesDto
     {
-        // Null at the first stop (no arrival) or last stop (no departure).
-        public DateTimeOffset? ArrivalTime { get; set; }
-
+        // Null at the last stop (nothing departs) and at skipped stops.
         public DateTimeOffset? DepartureTime { get; set; }
 
         public int DirectionId { get; set; }
-
-        // e.g., "Stopped at station", "Approaching". Often null.
-        public string? Status { get; set; }
     }
 
     public class MbtaPredictionRelationshipsDto

@@ -32,9 +32,6 @@ namespace NextTrain.Core.Services
 
         public double? Longitude { get; set; }
 
-        // Optional: platform code, type, etc.
-        public string? PlatformCode { get; set; }
-
         // 1 = accessible, 2 = not accessible, 0 or missing = no information.
         public int? WheelchairBoarding { get; set; }
     }

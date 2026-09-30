@@ -22,9 +22,7 @@ export interface Station {
 export interface Prediction {
   routeId: string
   directionId: number
-  arrivalTime: string | null
-  departureTime: string | null
-  status: string | null
+  departureTime: string // the API only sends trains you can board
 }
 
 export interface Vehicle {
@@ -37,6 +35,13 @@ export interface Vehicle {
   currentStatus: 'INCOMING_AT' | 'STOPPED_AT' | 'IN_TRANSIT_TO' | null
   stopName: string | null // the stop it's at or heading to
   stationId: string | null // that stop's station, e.g. "place-harsq"
+  cars: Car[] // front to back
+}
+
+// How full a car is, when MBTA reports it (today: Orange, and the newer Red Line cars); otherwise both null.
+export interface Car {
+  crowding: 'MANY_SEATS_AVAILABLE' | 'FEW_SEATS_AVAILABLE' | 'STANDING_ROOM_ONLY' | 'CRUSHED_STANDING_ROOM_ONLY' | 'FULL' | null
+  percentFull: number | null
 }
 
 export interface RouteShape {
@@ -72,7 +77,6 @@ export interface Commute {
   windowStart: string // "07:45:00", Boston local time
   windowEnd: string
   activeDays: string // "Mon,Tue,Wed,Thu,Fri"
-  isEnabled: boolean
 }
 
 export type CommuteInput = Pick<Commute, 'mbtaStopId' | 'routeId' | 'directionId' | 'windowStart' | 'windowEnd' | 'activeDays'>

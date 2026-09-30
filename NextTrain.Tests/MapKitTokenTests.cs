@@ -75,7 +75,8 @@ public class MapKitTokenTests : IDisposable
     {
         using var factory = new WebApplicationFactory<Program>().WithWebHostBuilder(b => b
             .UseSetting("ConnectionStrings:DefaultConnection", TestDb.ConnectionString)
-            .UseSetting("Stations:RefreshHours", "0"));
+            .UseSetting("Stations:RefreshHours", "0")
+            .UseSetting("MapKit:PrivateKey", "")); // blank even where a developer's user-secrets set one
         using var client = factory.CreateClient();
         client.DefaultRequestHeaders.Add("Origin", "capacitor://localhost");
 

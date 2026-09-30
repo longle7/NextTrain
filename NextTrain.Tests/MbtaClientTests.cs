@@ -28,7 +28,7 @@ public class MbtaClientTests
     public async Task GetPredictionsAsync_ParsesSnakeCase_AndCachesByStopAndRoutes()
     {
         const string json = """
-            {"data":[{"attributes":{"arrival_time":"2026-09-29T08:00:00-04:00","departure_time":null,
+            {"data":[{"attributes":{"arrival_time":"2026-09-29T07:59:30-04:00","departure_time":"2026-09-29T08:00:00-04:00",
               "direction_id":1,"status":"Approaching"},
               "relationships":{"route":{"data":{"id":"Red","type":"route"}}}}]}
             """;
@@ -41,8 +41,7 @@ public class MbtaClientTests
         await client.GetPredictionsAsync("place-alfcl", "Red");         // different key
 
         var p = Assert.Single(first);
-        Assert.Equal(DateTimeOffset.Parse("2026-09-29T12:00:00Z"), p.Attributes.ArrivalTime);
-        Assert.Null(p.Attributes.DepartureTime);
+        Assert.Equal(DateTimeOffset.Parse("2026-09-29T12:00:00Z"), p.Attributes.DepartureTime);
         Assert.Equal(1, p.Attributes.DirectionId);
         Assert.Equal("Red", p.Relationships.Route.Data.Id);
 
@@ -75,7 +74,9 @@ public class MbtaClientTests
     {
         const string json = """
             {"data":[
-              {"id":"R-1","attributes":{"latitude":42.3,"longitude":-71.06,"bearing":85,"direction_id":1,"current_status":"IN_TRANSIT_TO"},
+              {"id":"R-1","attributes":{"latitude":42.3,"longitude":-71.06,"bearing":85,"direction_id":1,"current_status":"IN_TRANSIT_TO",
+                "carriages":[{"label":"1500","occupancy_status":"FEW_SEATS_AVAILABLE","occupancy_percentage":34},
+                             {"label":"1501","occupancy_status":"NO_DATA_AVAILABLE","occupancy_percentage":null}]},
                "relationships":{"route":{"data":{"id":"Red"}},"stop":{"data":{"id":"70088"}}}},
               {"id":"R-2","attributes":{"latitude":42.4,"longitude":-71.1,"bearing":null,"direction_id":0,"current_status":"STOPPED_AT"},
                "relationships":{"route":{"data":{"id":"Red"}},"stop":{"data":null}}},
@@ -90,7 +91,10 @@ public class MbtaClientTests
         var vehicles = await client.GetSubwayVehiclesAsync();
 
         Assert.Equal(new[] { "R-1", "R-2" }, vehicles.Select(v => v.Id));
-        Assert.Equal(new MbtaVehicle("R-1", "Red", 1, 42.3, -71.06, 85, "IN_TRANSIT_TO", "Savin Hill", "place-shmnl"), vehicles[0]);
+        Assert.Equal(new MbtaVehicle("R-1", "Red", 1, 42.3, -71.06, 85, "IN_TRANSIT_TO", "Savin Hill", "place-shmnl", vehicles[0].Cars), vehicles[0]);
+        // Each car's crowding, front to back; a car without data is null, not a guess.
+        Assert.Equal(new[] { new MbtaCar("FEW_SEATS_AVAILABLE", 34), new MbtaCar(null, null) }, vehicles[0].Cars);
+        Assert.Empty(vehicles[1].Cars); // no carriages reported
         Assert.Null(vehicles[1].StopName);
         Assert.Null(vehicles[1].StationId);
         Assert.Null(vehicles[1].Bearing);

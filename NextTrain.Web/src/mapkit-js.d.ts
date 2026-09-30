@@ -6,7 +6,7 @@ declare namespace mapkit {
 
   const FeatureVisibility: { readonly Adaptive: string; readonly Hidden: string; readonly Visible: string }
 
-  function init(options: { authorizationCallback: (done: (token: string) => void) => void; language?: string }): void
+  function init(options: { authorizationCallback: (done: (token: string) => void) => void }): void
   function addEventListener(type: 'configuration-change' | 'error', listener: (event: { status: Status }) => void): void
 
   class Coordinate {
@@ -24,40 +24,32 @@ declare namespace mapkit {
     constructor(northLatitude: number, eastLongitude: number, southLatitude: number, westLongitude: number)
     toCoordinateRegion(): CoordinateRegion
   }
-  class Padding {
-    constructor(top: number, right: number, bottom: number, left: number)
-  }
 
   class Style {
     constructor(options: { strokeColor?: string; strokeOpacity?: number; lineWidth?: number; lineJoin?: string; lineCap?: string })
   }
   class Overlay {}
   class PolylineOverlay extends Overlay {
-    constructor(points: Coordinate[], options?: { style?: Style; enabled?: boolean })
+    constructor(points: Coordinate[], options?: { style?: Style })
   }
 
   interface AnnotationOptions {
     title?: string
-    subtitle?: string
     accessibilityLabel?: string
     calloutEnabled?: boolean
     displayPriority?: number
-    collisionMode?: string
     anchorOffset?: DOMPoint
     size?: { width: number; height: number }
     enabled?: boolean
   }
   class Annotation {
     static readonly DisplayPriority: { Low: number; High: number; Required: number }
-    static readonly CollisionMode: { Rectangle: string; Circle: string; None: string }
     constructor(coordinate: Coordinate, factory: (coordinate: Coordinate, options: AnnotationOptions) => Element, options?: AnnotationOptions)
     coordinate: Coordinate
     title: string
     subtitle: string
     accessibilityLabel: string
-    selected: boolean
     element: Element
-    addEventListener(type: 'select' | 'deselect', listener: () => void): void
   }
 
   interface MapOptions {
@@ -66,11 +58,9 @@ declare namespace mapkit {
     showsCompass?: string
     showsScale?: string
     showsMapTypeControl?: boolean
-    showsZoomControl?: boolean
     showsUserLocationControl?: boolean
     isRotationEnabled?: boolean
     pointOfInterestFilter?: PointOfInterestFilter
-    padding?: Padding
   }
   class PointOfInterestFilter {
     static readonly excludingAllCategories: PointOfInterestFilter
@@ -79,9 +69,6 @@ declare namespace mapkit {
     static readonly ColorSchemes: { Light: string; Dark: string }
     constructor(parent: HTMLElement, options?: MapOptions)
     colorScheme: string
-    region: CoordinateRegion
-    annotations: Annotation[]
-    overlays: Overlay[]
     setRegionAnimated(region: CoordinateRegion, animate?: boolean): this
     addEventListener(type: 'region-change-start', listener: () => void): void
     removeEventListener(type: 'region-change-start', listener: () => void): void

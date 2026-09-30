@@ -67,7 +67,7 @@ export default function StationPage() {
             <svg viewBox="0 0 24 24" className="size-5 fill-current" aria-hidden>
               <path d="M21 3 3 10.5l7.5 2.9L13.5 21z" />
             </svg>
-            Directions
+            Directions<span className="sr-only"> to {station.data.name} (opens Apple Maps)</span>
           </a>
         )}
         <Link to={`/commutes/new?station=${encodeURIComponent(stopId)}`} className={secondaryButton}>

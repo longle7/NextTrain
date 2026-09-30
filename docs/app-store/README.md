@@ -81,7 +81,7 @@ What the app does today (see `/privacy`). You submit the final answers in App St
 | Location | **No**: only used on the device, never sent | – | – | – |
 | Everything else (contact info, usage data, diagnostics, …) | No: no analytics, ads, or crash reporting | – | – | – |
 
-Recently viewed stations stay on the device and aren't "collected". If you add crash reporting or analytics later, update these answers and the privacy policy.
+Recently viewed stations stay on the device and aren't "collected". The website's optional Google Analytics (after consent) is off in the app, both by build (the iPhone build has no `VITE_GA_ID`) and in code (`analytics.ts` refuses to run inside Capacitor), so these answers don't change. If you add crash reporting or analytics to the app later, update these answers and the privacy policy.
 
 ## Review notes
 
@@ -116,4 +116,4 @@ Location permission is optional; it's only used on the device to find nearby sta
    For the Simulator against your local API, use `VITE_API_URL=http://localhost:5112` instead (the app allows local-network HTTP for this).
 4. **Ship to TestFlight first** and try it on the subway, including the offline banner in a tunnel.
 
-**Guideline 4.2 risk:** Apple rejects apps that are "just a website". NextTrain's native-feeling UI, location, offline handling, and live features help. Adding **push notifications for commutes** ("your train leaves in 5 minutes"; the `NotificationSubscription` table is ready) is the strongest answer if Review pushes back. Sign in with Apple is **not** required, because the app offers no third-party login.
+**Guideline 4.2 risk:** Apple rejects apps that are "just a website". NextTrain's native-feeling UI, location, offline handling, and live features help. Adding **push notifications for commutes** ("your train leaves in 5 minutes") is the strongest answer if Review pushes back. Sign in with Apple is **not** required, because the app offers no third-party login.

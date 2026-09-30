@@ -25,8 +25,6 @@ public static class TestDb
         db.Database.Migrate();
         db.UserCommutes.ExecuteDelete(); // FK to Stations, delete first
         db.Stations.ExecuteDelete();
-        db.NotificationSubscriptions.ExecuteDelete();
-        db.UserLocationPreferences.ExecuteDelete();
         return db;
     }
 }

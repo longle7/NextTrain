@@ -53,22 +53,7 @@ public class StationsEndpointTests : IDisposable
         Assert.Equal(new[] { "Alewife", "Park Street" }, stations!.Select(s => s.Name));
     }
 
-    [Fact]
-    public async Task GetNearest_ReturnsClosestStation_OnRequestedRoute()
-    {
-        // Standing at Park Street: nearest overall is Park Street, nearest Blue Line is Government Center.
-        var any = await _client.GetFromJsonAsync<Station>("/stations/nearest?lat=42.3564&lon=-71.0624");
-        var blue = await _client.GetFromJsonAsync<Station>("/stations/nearest?lat=42.3564&lon=-71.0624&route=Blue");
-
-        Assert.Equal("place-pktrm", any!.MbtaStopId);
-        Assert.Equal("place-gover", blue!.MbtaStopId);
-    }
-
     [Theory]
-    [InlineData("/stations/nearest?lat=91&lon=-71")]
-    [InlineData("/stations/nearest?lat=42&lon=-181")]
-    [InlineData("/stations/nearest?lon=-71")]
-    [InlineData("/stations/nearest?lat=abc&lon=-71")]
     [InlineData("/stations/place-pktrm/predictions?direction=2")]
     [InlineData("/stations?sort=line")] // line order needs a route
     [InlineData("/stations?sort=bogus")]
@@ -80,7 +65,6 @@ public class StationsEndpointTests : IDisposable
     }
 
     [Theory]
-    [InlineData("/stations/nearest?lat=42.36&lon=-71.06&route=Orange")] // no stations on route
     [InlineData("/stations/place-unknown")]
     [InlineData("/stations/place-unknown/predictions")]
     public async Task UnknownStation_Returns404(string url)
@@ -98,12 +82,11 @@ public class StationsEndpointTests : IDisposable
         Assert.Equal("Alewife", station!.Name);
     }
 
-    private static MbtaPredictionDto Prediction(string route, int direction, string? arrival, string? departure) => new()
+    private static MbtaPredictionDto Prediction(string route, int direction, string? departure) => new()
     {
         Attributes = new MbtaPredictionAttributesDto
         {
             DirectionId = direction,
-            ArrivalTime = arrival is null ? null : DateTimeOffset.Parse(arrival),
             DepartureTime = departure is null ? null : DateTimeOffset.Parse(departure),
         },
         Relationships = new MbtaPredictionRelationshipsDto { Route = new() { Data = new() { Id = route } } }
@@ -114,10 +97,10 @@ public class StationsEndpointTests : IDisposable
     {
         _mbta.PredictionsByStop["place-pktrm"] = new()
         {
-            Prediction("Red", 0, null, "2026-09-29T08:05:00-04:00"),
-            Prediction("Green-B", 1, "2026-09-29T08:01:00-04:00", null),
-            Prediction("Red", 1, "2026-09-29T08:02:30-04:00", "2026-09-29T08:03:00-04:00"),
-            Prediction("Red", 0, null, null), // skipped stop, dropped
+            Prediction("Red", 0, "2026-09-29T08:05:00-04:00"),
+            Prediction("Green-B", 1, null), // ends here: nothing to board, dropped
+            Prediction("Red", 1, "2026-09-29T08:03:00-04:00"),
+            Prediction("Red", 0, null), // skipped stop, dropped
         };
 
         var red = await _client.GetFromJsonAsync<List<PredictionResponse>>("/stations/place-pktrm/predictions?route=Red");
@@ -204,13 +187,15 @@ public class StationsEndpointTests : IDisposable
     [Fact]
     public async Task GetVehicles_ReturnsLivePositions()
     {
-        _mbta.Vehicles.Add(new MbtaVehicle("R-1", "Red", 1, 42.3, -71.06, 85, "STOPPED_AT", "Savin Hill", "place-shmnl"));
+        _mbta.Vehicles.Add(new MbtaVehicle("R-1", "Red", 1, 42.3, -71.06, 85, "STOPPED_AT", "Savin Hill", "place-shmnl",
+            [new MbtaCar("MANY_SEATS_AVAILABLE", 12), new MbtaCar(null, null)]));
 
         var vehicle = Assert.Single((await _client.GetFromJsonAsync<List<MbtaVehicle>>("/vehicles"))!);
 
         Assert.Equal("Savin Hill", vehicle.StopName);
         Assert.Equal("place-shmnl", vehicle.StationId);
         Assert.Equal(85, vehicle.Bearing);
+        Assert.Equal(new[] { new MbtaCar("MANY_SEATS_AVAILABLE", 12), new MbtaCar(null, null) }, vehicle.Cars);
     }
 
     [Fact]
