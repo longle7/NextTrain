@@ -6,8 +6,6 @@ import { Card, dangerButton } from '../components'
 import { forgetRecentStations } from '../recent'
 import { useTitle } from '../usePolling'
 
-const SUPPORT_URL = 'https://github.com/longle7/NextTrain/issues'
-
 export default function SettingsPage() {
   const [deletion, setDeletion] = useState<'idle' | 'deleting' | 'done' | 'failed'>('idle')
   useTitle('Settings')
@@ -68,12 +66,9 @@ export default function SettingsPage() {
       <Section title="About">
         <ul className="divide-y divide-neutral-100 rounded-xl bg-white shadow-sm dark:divide-neutral-800 dark:bg-neutral-900">
           <Row>
-            <a href={SUPPORT_URL} target="_blank" rel="noreferrer" className="flex min-h-12 flex-1 items-center justify-between">
-              <span>
-                Report a problem<span className="sr-only"> (opens GitHub)</span>
-              </span>
-              <Chevron />
-            </a>
+            <Link to="/support" className="flex min-h-12 flex-1 items-center justify-between">
+              Help &amp; support <Chevron />
+            </Link>
           </Row>
           <Row>
             <span className="flex min-h-12 flex-1 items-center justify-between">
@@ -86,7 +81,8 @@ export default function SettingsPage() {
       <p className="px-1 text-xs text-neutral-500">
         {/* The MassDOT developer license requires clearly acknowledging MassDOT as the provider of the data. */}
         Transit data provided by the Massachusetts Department of Transportation (MassDOT) and the MBTA. NextTrain is an
-        independent app and isn't affiliated with or endorsed by MassDOT or the MBTA. Maps by Apple.
+        independent app and isn't affiliated with or endorsed by MassDOT or the MBTA. MBTA is a trademark of MassDOT, used
+        here only to describe the service. Maps by Apple.
       </p>
     </>
   )
