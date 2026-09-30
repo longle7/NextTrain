@@ -1,8 +1,8 @@
 import { useEffect } from 'react'
 import { Link, useParams } from 'react-router'
 import { alertsFor, majorAlert } from '../alerts'
-import { ALERTS_REFRESH_MS, api, getAlerts, getRoutes, stationRouteIds, type Prediction, type Station } from '../api'
-import { AccessibleIcon, AlertBanner, Card, LineBadge, secondaryButton, Status } from '../components'
+import { ALERTS_REFRESH_MS, api, ApiError, getAlerts, getRoutes, stationRouteIds, type Prediction, type Station } from '../api'
+import { AccessibleIcon, AlertBanner, Card, LineBadge, NotFound, secondaryButton, Status } from '../components'
 import { rememberStation } from '../recent'
 import { agoLabel, clock, countdown, groupDepartures, noTrainsMessage, secondsAgo, STALE_AFTER_SECONDS } from '../time'
 import { useNow, usePolling, useTitle } from '../usePolling'
@@ -21,7 +21,8 @@ export default function StationPage() {
   )
 
   const alerts = usePolling(getAlerts, 'alerts', ALERTS_REFRESH_MS)
-  useTitle(station.data?.name)
+  const notFound = station.error instanceof ApiError && station.error.status === 404
+  useTitle(notFound ? 'Station not found' : station.data?.name)
   useEffect(() => {
     if (station.data) rememberStation(station.data.mbtaStopId)
   }, [station.data])
@@ -32,6 +33,10 @@ export default function StationPage() {
     station.data && alerts.data
       ? alertsFor(alerts.data, { routeIds: stationRouteIds(station.data), stopId: station.data.mbtaStopId })
       : []
+
+  if (notFound) {
+    return <NotFound title="Station not found" message="There's no subway station at this address." back={{ to: '/lines', label: 'Browse lines' }} />
+  }
 
   return (
     <>

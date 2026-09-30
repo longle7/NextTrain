@@ -83,6 +83,8 @@ declare namespace mapkit {
     annotations: Annotation[]
     overlays: Overlay[]
     setRegionAnimated(region: CoordinateRegion, animate?: boolean): this
+    addEventListener(type: 'region-change-start', listener: () => void): void
+    removeEventListener(type: 'region-change-start', listener: () => void): void
     addOverlays(overlays: Overlay[]): Overlay[]
     removeOverlays(overlays: Overlay[]): Overlay[]
     addAnnotation(annotation: Annotation): Annotation

@@ -1,6 +1,6 @@
 import { Component, type ReactNode } from 'react'
 import { Link } from 'react-router'
-import { useOnline } from './usePolling'
+import { useOnline, useTitle } from './usePolling'
 import { MAJOR_SEVERITY } from './alerts'
 import { ApiError, stationRouteIds, type Alert, type Route, type Station } from './api'
 
@@ -79,7 +79,9 @@ export function Status({ error, loading, rows = 3 }: { error?: Error; loading?: 
 
 function friendlyError(error: Error): string {
   const status = error instanceof ApiError ? error.status : undefined
+  if (status === 0) return error.message // timed out or no connection: api.ts wrote it for people
   if (status === 503) return 'MBTA live data is temporarily unavailable. Please try again in a moment.'
+  if (status === 429) return 'Too many requests right now. Please wait a moment and try again.'
   if (status === 404) return "We couldn't find that. It may have moved or been removed."
   return "Couldn't load this right now. Please try again."
 }
@@ -220,4 +222,26 @@ export class ErrorBoundary extends Component<{ children: ReactNode }, { crashed:
       </div>
     )
   }
+}
+
+/** A missing page, line, or station: says so plainly and offers a way on (Home, or `back` like "All lines"). */
+export function NotFound({
+  title = 'Page not found',
+  message = "This page doesn't exist. It may have moved.",
+  back,
+}: {
+  title?: string
+  message?: string
+  back?: { to: string; label: string }
+}) {
+  useTitle(title)
+  return (
+    <div className="space-y-4 pt-8 text-center">
+      <h1 className="text-2xl font-bold">{title}</h1>
+      <p className="text-neutral-500">{message}</p>
+      <Link to={back?.to ?? '/'} className={primaryButton}>
+        {back?.label ?? 'Go to Home'}
+      </Link>
+    </div>
+  )
 }

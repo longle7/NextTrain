@@ -1,12 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router'
-import { api, getRoutes, getStations, stationRouteIds, type RouteShape, type Vehicle } from '../api'
-import { Status } from '../components'
+import { api, getRoutes, getStations, stationRouteIds, type Prediction, type Route, type RouteShape, type Station, type Vehicle } from '../api'
+import { LineBadge, Status } from '../components'
 import { boundsOf, locationErrorMessage, nearestStations, OUT_OF_AREA_MILES } from '../geo'
-import { loadMapKit, stationElement, trainCallout, trainElement, updateTrainElement, userElement } from '../mapkit'
+import { loadMapKit, stationElement, trainCallout, trainElement, updateTrainElement, userElement, type Preview } from '../mapkit'
 import { decodePolyline } from '../polyline'
 import { trackSnapper } from '../snap'
-import { usePolling, useTitle } from '../usePolling'
+import { countdown, groupDepartures, noTrainsMessage } from '../time'
+import { useNow, usePolling, useTitle } from '../usePolling'
 
 const REFRESH_MS = 10_000
 
@@ -50,6 +51,45 @@ export default function MapPage() {
   const [locateMessage, setLocateMessage] = useState<string>()
   useTitle('Live map')
 
+  // The station whose next trains are showing (hover or keyboard focus), and where to draw the card.
+  const frame = useRef<HTMLDivElement>(null)
+  const [preview, setPreview] = useState<{ station: Station; x: number; y: number; width: number }>()
+  const previewTimer = useRef<ReturnType<typeof setTimeout>>(undefined)
+  const overCard = useRef(false) // checked when a delayed hide fires: the dot's leave and the card's enter race
+  const previews = useMemo(() => {
+    // A short delay each way: sweeping the mouse across the map doesn't flash cards, and there's time to move the
+    // pointer onto the card (WCAG 1.4.13: hover content must be hoverable and dismissible).
+    const later = (fn: () => void, ms: number) => {
+      clearTimeout(previewTimer.current)
+      previewTimer.current = setTimeout(fn, ms)
+    }
+    const hide = (now?: boolean) => {
+      if (!now) return later(() => !overCard.current && setPreview(undefined), 200)
+      clearTimeout(previewTimer.current)
+      overCard.current = false
+      setPreview(undefined)
+    }
+    const forStation = (station: Station): Preview => ({
+      show: (dot) =>
+        later(() => {
+          const box = frame.current?.getBoundingClientRect()
+          const r = dot.getBoundingClientRect()
+          if (box) setPreview({ station, x: r.left + r.width / 2 - box.left, y: r.top + r.height / 2 - box.top, width: box.width })
+        }, 120),
+      hide,
+    })
+    const enterCard = () => {
+      overCard.current = true
+      clearTimeout(previewTimer.current)
+    }
+    const leaveCard = () => {
+      overCard.current = false
+      hide()
+    }
+    return { forStation, hide, enterCard, leaveCard }
+  }, [])
+  useEffect(() => () => clearTimeout(previewTimer.current), [])
+
   // Light or dark map, following the phone's setting, including when it changes while the map is open.
   useEffect(() => {
     if (!map) return
@@ -88,7 +128,7 @@ export default function MapPage() {
     if (!map || !stations.data) return
     const annotations = stations.data.filter((s) => stationRouteIds(s).some((id) => onLine(line, id))).map((s) => {
       const open = () => navigate(`/stations/${s.mbtaStopId}`)
-      return new mapkit.Annotation(new mapkit.Coordinate(s.latitude, s.longitude), () => stationElement(s.name, open), {
+      return new mapkit.Annotation(new mapkit.Coordinate(s.latitude, s.longitude), () => stationElement(s.name, open, previews.forStation(s)), {
         ...centered(12),
         title: s.name, // plain text: MapKit never parses it as HTML
         enabled: false, // the dot handles its own taps (see stationElement)
@@ -96,8 +136,24 @@ export default function MapPage() {
       })
     })
     map.addAnnotations(annotations)
-    return () => void map.removeAnnotations(annotations)
-  }, [map, stations.data, navigate, line])
+    return () => {
+      map.removeAnnotations(annotations)
+      previews.hide(true) // its dot is gone
+    }
+  }, [map, stations.data, navigate, line, previews])
+
+  // Panning or zooming moves the dots out from under the card, so close it; Escape closes it too.
+  useEffect(() => {
+    if (!map || !preview) return
+    const close = () => previews.hide(true)
+    const onKey = (event: KeyboardEvent) => event.key === 'Escape' && close()
+    map.addEventListener('region-change-start', close)
+    document.addEventListener('keydown', onKey)
+    return () => {
+      map.removeEventListener('region-change-start', close)
+      document.removeEventListener('keydown', onKey)
+    }
+  }, [map, preview, previews])
 
   // Trains: move existing markers instead of recreating them, so an open callout survives a refresh.
   useEffect(() => {
@@ -234,12 +290,26 @@ export default function MapPage() {
         })}
       </div>
       {/* isolate keeps the map's own z-indexes below the sticky header */}
-      <div className="relative isolate">
+      <div ref={frame} className="relative isolate">
         <div
           ref={container}
           data-testid="map"
           className="h-[calc(100dvh-19rem-env(safe-area-inset-top)-env(safe-area-inset-bottom))] min-h-80 overflow-hidden rounded-xl bg-neutral-200 shadow-sm dark:bg-neutral-800"
         />
+        {!map && !mapError && (
+          <p role="status" className="absolute inset-0 grid place-items-center text-sm font-semibold text-neutral-500 motion-safe:animate-pulse">
+            Loading map…
+          </p>
+        )}
+        {preview && (
+          <StationPreview
+            key={preview.station.mbtaStopId}
+            {...preview}
+            routes={routes.data}
+            onPointerEnter={previews.enterCard}
+            onPointerLeave={previews.leaveCard}
+          />
+        )}
         <button
           onClick={locate}
           disabled={locating || !map}
@@ -251,6 +321,11 @@ export default function MapPage() {
           </svg>
         </button>
       </div>
+      {vehicles.data && !vehicles.data.some((v) => onLine(line, v.routeId)) && (
+        <p role="status" className="text-center text-sm font-semibold text-neutral-500">
+          {noTrainsRunning(line, routes.data)}
+        </p>
+      )}
       {locateMessage && (
         <p role="status" className="text-center text-sm text-neutral-500">
           {locateMessage}
@@ -260,5 +335,74 @@ export default function MapPage() {
         Trains update every 10 seconds; arrows show the direction of travel. Tap a train for where it's headed, or a station for departures.
       </p>
     </>
+  )
+}
+
+// "No Red Line trains are running right now." (or the overnight closure), for an empty map.
+function noTrainsRunning(line: string | null, routes: Route[] | undefined) {
+  const hour = new Date().getHours()
+  if (hour >= 1 && hour < 5) return 'The subway is closed overnight. Trains start again around 5 AM.'
+  const name = line === 'Green' ? 'Green Line' : line ? (routes?.find((r) => r.id === line)?.name ?? line) : undefined
+  return `No ${name ? `${name} ` : ''}trains are running right now.`
+}
+
+const CARD_WIDTH = 288 // px; w-72
+
+/**
+ * A station's next trains, over the map beside its dot: on mouse hover or keyboard focus. Each direction's next two
+ * departures, refreshed every 10 seconds while it's open. Select the station for all of them.
+ */
+function StationPreview({ station, x, y, width, routes, onPointerEnter, onPointerLeave }: {
+  station: Station
+  x: number
+  y: number
+  width: number
+  routes: Route[] | undefined
+  onPointerEnter: () => void
+  onPointerLeave: () => void
+}) {
+  const now = useNow()
+  const predictions = usePolling(
+    () => api<Prediction[]>(`/stations/${encodeURIComponent(station.mbtaStopId)}/predictions`),
+    `preview|${station.mbtaStopId}`,
+    REFRESH_MS,
+  )
+  const groups = predictions.data ? groupDepartures(predictions.data, now, 2) : []
+  // Keep the card inside the map: centered on the dot, nudged in from the sides, above it unless that runs off the top.
+  const left = Math.min(Math.max(x, CARD_WIDTH / 2 + 8), Math.max(width - CARD_WIDTH / 2 - 8, CARD_WIDTH / 2 + 8))
+  const below = y < 180
+
+  return (
+    <div
+      id="station-preview"
+      role="tooltip"
+      onPointerEnter={onPointerEnter}
+      onPointerLeave={onPointerLeave}
+      className="absolute z-20 w-72 space-y-2 rounded-xl bg-white p-3 text-sm shadow-lg ring-1 ring-black/5 dark:bg-neutral-900 dark:ring-white/10"
+      style={{ left, top: below ? y + 14 : y - 14, transform: `translate(-50%, ${below ? '0' : '-100%'})` }}
+    >
+      <p className="font-semibold">{station.name}</p>
+      {predictions.error ? (
+        <p className="text-neutral-500">Train times aren't available right now.</p>
+      ) : !predictions.data ? (
+        <p className="text-neutral-500">Loading train times…</p>
+      ) : groups.length === 0 ? (
+        <p className="text-neutral-500">{noTrainsMessage(false, now)}</p>
+      ) : (
+        <ul className="space-y-2">
+          {groups.map((g) => (
+            <li key={`${g.routeId}|${g.directionId}`} className="flex items-start gap-2">
+              <LineBadge routeId={g.routeId} routes={routes} />
+              {/* Times under the destination, so a long one ("Ashmont/Braintree") never runs into them. */}
+              <div className="min-w-0 flex-1">
+                <p>to {routes?.find((r) => r.id === g.routeId)?.directionDestinations[g.directionId] ?? '…'}</p>
+                <p className="font-semibold tabular-nums">{g.departures.map((d) => countdown(d, now)).join(', ')}</p>
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+      <p className="text-xs text-neutral-500">Select the station for all departures.</p>
+    </div>
   )
 }

@@ -1,7 +1,7 @@
 import { useParams, useSearchParams } from 'react-router'
 import { alertsFor } from '../alerts'
 import { ALERTS_REFRESH_MS, api, getAlerts, getRoutes, type Station, type Vehicle } from '../api'
-import { AlertBanner, Card, Status, StationLink } from '../components'
+import { AlertBanner, Card, NotFound, Status, StationLink } from '../components'
 import { directionsDown, trainsByStation, type LineTrain } from '../lineTrains'
 import { usePolling, useTitle } from '../usePolling'
 
@@ -32,12 +32,17 @@ export default function LinePage() {
     lineOrder ? 10_000 : undefined,
   )
   const route = routes.data?.find((r) => r.id === routeId)
+  const notFound = !!routes.data && !route // e.g. /lines/Purple: no such subway line
   const color = route?.color ?? 'var(--color-mbta-silver)'
-  useTitle(route?.name ?? routeId)
+  useTitle(notFound ? 'Line not found' : (route?.name ?? routeId))
   const trains = lineOrder && route && stations.data && vehicles.data ? trainsByStation(vehicles.data, route, stations.data) : undefined
   const trainsAt = (station: Station, down: boolean) => trains?.get(station.mbtaStopId)?.filter((t) => t.down === down) ?? []
   // For the caption: which direction (by ID) runs down the list, i.e. on the left.
   const sides = lineOrder && route && stations.data?.length ? directionsDown(stations.data, route.directionDestinations) : undefined
+
+  if (notFound) {
+    return <NotFound title="Line not found" message="There's no subway line at this address." back={{ to: '/lines', label: 'All lines' }} />
+  }
 
   return (
     <>
