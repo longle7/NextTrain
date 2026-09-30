@@ -79,7 +79,7 @@ namespace NextTrain.Api.Services
         {
             var payload = await GetCachedAsync<MbtaIncludeResponseDto>(
                 "https://api-v3.mbta.com/vehicles?filter[route_type]=0,1&include=stop&fields[stop]=name" +
-                "&fields[vehicle]=latitude,longitude,bearing,direction_id,current_status", PredictionCacheDuration);
+                "&fields[vehicle]=latitude,longitude,bearing,direction_id,current_status,carriages", PredictionCacheDuration);
             if (payload is null) return new List<MbtaVehicle>();
 
             // Vehicles report a platform stop; its parent_station is the station the app knows.
@@ -93,10 +93,15 @@ namespace NextTrain.Api.Services
                         v.Id, v.RelatedId("route") ?? "", v.Attributes.DirectionId,
                         v.Attributes.Latitude!.Value, v.Attributes.Longitude!.Value,
                         v.Attributes.Bearing, v.Attributes.CurrentStatus,
-                        stop?.Attributes.Name, stop?.RelatedId("parent_station") ?? stop?.Id);
+                        stop?.Attributes.Name, stop?.RelatedId("parent_station") ?? stop?.Id,
+                        (v.Attributes.Carriages ?? []).Select(Car).ToList());
                 })
                 .ToList();
         }
+
+        // "NO_DATA_AVAILABLE" (most cars today) becomes null, so the app shows nothing rather than a guess.
+        private static MbtaCar Car(MbtaCarriageDto c) =>
+            c.OccupancyStatus is null or "NO_DATA_AVAILABLE" ? new MbtaCar(null, null) : new MbtaCar(c.OccupancyStatus, c.OccupancyPercentage);
 
         public async Task<IReadOnlyList<MbtaShape>> GetSubwayShapesAsync()
         {

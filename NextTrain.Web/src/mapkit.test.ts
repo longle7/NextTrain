@@ -8,7 +8,7 @@ const red: Route = {
 }
 const train = (v: Partial<Vehicle>): Vehicle => ({
   id: 'R-1', routeId: 'Red', directionId: 1, latitude: 42.36, longitude: -71.06, bearing: 90,
-  currentStatus: null, stopName: null, stationId: null, ...v,
+  currentStatus: null, stopName: null, stationId: null, cars: [], ...v,
 })
 
 it('titles a train by line and destination, with where it is as the subtitle', () => {

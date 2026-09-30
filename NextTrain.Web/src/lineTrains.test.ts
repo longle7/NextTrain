@@ -20,7 +20,7 @@ const redLine: Route = {
 }
 
 const vehicle = (id: string, directionId: number, currentStatus: Vehicle['currentStatus'], stationId: string | null, stopName: string | null, routeId = 'Red'): Vehicle => ({
-  id, routeId, directionId, currentStatus, stationId, stopName, latitude: 0, longitude: 0, bearing: null,
+  id, routeId, directionId, currentStatus, stationId, stopName, latitude: 0, longitude: 0, bearing: null, cars: [],
 })
 
 describe('directionsDown', () => {
