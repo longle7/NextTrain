@@ -4,15 +4,21 @@ Everything App Store Connect asks for, drafted from what the app does today. Edi
 
 ## Screenshots
 
-In `screenshots/`: 1290 × 2796 PNGs, an accepted size for the required **6.9" iPhone** slot (Apple scales them down for smaller iPhones). Captured from the real app with live MBTA data on September 29, 2026.
+Captured from the iPhone app build (native mode) with live MBTA data on October 1, 2026, at both sizes App Store Connect asks for:
+
+- `screenshots/`: 1290 × 2796, the **6.9" iPhone** slot
+- `screenshots/6.5-inch/`: 1284 × 2778, the **6.5" iPhone** slot
 
 | File | Shows |
 |---|---|
-| `1-home.png` | Home: a commute happening now with its next train and an alert, and live departures at the nearest station |
-| `2-station.png` | A station's live departures by line and direction |
-| `3-lines.png` | Every line's service status |
-| `4-line-live-trains.png` | The Red Line diagram with live trains and direction arrows |
-| `5-map.png` | The live map of lines, stations, and trains |
+| `1-home.png` | Home: a commute happening now with its next train, and live departures at the nearest station |
+| `2-map.png` | The live map on Apple Maps: every line, station, and train, with direction arrows |
+| `3-map-train.png` | Zoomed in with station names, and a train's card: destination, next stop, and how crowded each car is |
+| `4-station.png` | A station's live departures by line and direction |
+| `5-line-live-trains.png` | The Red Line diagram with live trains and direction arrows |
+| `6-lines.png` | Every line's service status |
+
+To retake them, run the app locally (API on 5112, Vite on 5173) and capture at 430 × 932 and 428 × 926 CSS pixels at 3× with a commute saved. Map shots need the MapKit key in user-secrets.
 
 Make the app **iPhone-only** in Xcode (Supported Destinations: iPhone). Otherwise Apple also requires iPad screenshots and reviews the iPad layout.
 
@@ -59,7 +65,10 @@ SERVICE ALERTS
 Delays, shuttle buses, suspensions, and station closures appear on the lines, stations, and commutes they affect.
 
 LIVE LINE DIAGRAMS AND MAP
-Watch every train move along its line, or across the whole system on the map, with arrows showing which way each one is heading.
+Watch every train move along its line, or across the whole system on the map, with arrows showing which way each one is heading. Zoom in to see station names, or filter to a single line or Green Line branch.
+
+HOW FULL IS IT?
+Tap a train on the map to see where it's headed and, where the MBTA reports it, how crowded each car is.
 
 SEARCH THAT GETS YOU
 "harvard sq", "park st", "gov ctr": type it the way you say it.
@@ -92,9 +101,11 @@ Paste into **App Review Information → Notes**:
 ```
 NextTrain shows live times for Boston's MBTA subway. No account or login is needed.
 
-Reviewing from outside Boston? "Near you" will say you're outside the service area. Search for "Park Street" or open the Lines tab to see live departures, service alerts, and trains moving on each line.
+On first launch, a one-time Welcome screen explains that times are estimates from MBTA data and asks the user to agree to the Terms of Use and Privacy Policy (both linked on that screen). Tap "Agree and continue" to start.
 
-Location permission is optional; it's only used on the device to find nearby stations. To try commutes: Home → Add a commute. Settings → Delete my data removes all saved data.
+Reviewing from outside Boston? "Near you" will say you're outside the service area. Search for "Park Street" or open the Lines tab to see live departures, service alerts, and trains moving on each line. The Map tab shows every train live on Apple Maps; tap a train for its destination and, where the MBTA reports it, how crowded each car is.
+
+Location permission is optional; it's only used on the device to find nearby stations. To try commutes: Home → Add a commute. Settings → Delete my data removes all saved data. Help & support is in Settings.
 ```
 
 ## Info.plist strings
