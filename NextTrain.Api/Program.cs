@@ -68,14 +68,21 @@ builder.Services.AddProblemDetails();
 // all over mobile data. Safe over HTTPS: no response carries a secret for a BREACH-style attack to extract.
 builder.Services.AddResponseCompression(options => options.EnableForHttps = true);
 
-// The client's real IP. The host's ingress (Azure Container Apps) is the only way in and appends it as the last
-// X-Forwarded-For entry; reading only that one entry (ForwardLimit 1) means a client can't pick the IP it's counted as.
+// The client's real IP. Each proxy in front of the API appends the address it saw to X-Forwarded-For, so with
+// Proxy:Hops proxies the client is that many entries from the end, and anything a client wrote before it is ignored.
+//   1 (default): only Azure's ingress, which appends the client.
+//   2: Cloudflare, then Azure's ingress ("client, cloudflare"). Only safe once the ingress accepts Cloudflare's IPs
+//      alone; otherwise a client could skip Cloudflare and pick the IP it's counted as.
 builder.Services.Configure<ForwardedHeadersOptions>(options =>
 {
     options.ForwardedHeaders = ForwardedHeaders.XForwardedFor;
-    options.KnownIPNetworks.Clear(); // the ingress's address isn't fixed
+    options.ForwardLimit = builder.Configuration.GetValue("Proxy:Hops", 1);
+    options.KnownIPNetworks.Clear(); // the proxies' addresses aren't fixed
     options.KnownProxies.Clear();
 });
+
+// Don't advertise the web server ("server: Kestrel") to scanners.
+builder.WebHost.ConfigureKestrel(options => options.AddServerHeader = false);
 
 // Rate limit per client IP (RateLimit:PerMinute): one misbehaving client or script can't run up the hosting bill or
 // use up the MBTA key's quota for everyone. The app makes about 20 requests a minute, so the default leaves room for
