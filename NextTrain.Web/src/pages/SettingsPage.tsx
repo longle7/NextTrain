@@ -1,9 +1,12 @@
-import { useState, type ReactNode } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { Link } from 'react-router'
 import { analyticsBlocked, forgetAnalyticsChoice, setAnalyticsChoice, useAnalyticsChoice } from '../analytics'
-import { api, forgetUserId } from '../api'
-import { Card, dangerButton } from '../components'
+import { api, commutePredictionsPath, forgetUserId, getRoutes, type Commute, type Prediction } from '../api'
+import { sortCommutes } from '../commutes'
+import { Card, dangerButton, primaryButton } from '../components'
+import { endLiveActivities, liveActivitiesAvailable, liveActivityDetails, showLiveActivity } from '../liveActivity'
 import { forgetRecentStations } from '../recent'
+import { groupDepartures } from '../time'
 import { useTitle } from '../usePolling'
 
 export default function SettingsPage() {
@@ -18,6 +21,7 @@ export default function SettingsPage() {
       forgetUserId()
       forgetRecentStations()
       forgetAnalyticsChoice()
+      void endLiveActivities()
       setDeletion('done')
     } catch {
       setDeletion('failed')
@@ -44,6 +48,8 @@ export default function SettingsPage() {
           </p>
         </Card>
       </Section>
+
+      <LiveActivities />
 
       <AnalyticsChoice />
 
@@ -89,6 +95,52 @@ export default function SettingsPage() {
 }
 
 // The website's analytics switch. Not shown where analytics can't run (the iPhone app, or no analytics set up).
+// iPhone app only. iOS has the on/off switch itself (Settings → NextTrain → Live Activities), so there's none here.
+function LiveActivities() {
+  const [available, setAvailable] = useState(false)
+  const [preview, setPreview] = useState<'idle' | 'starting' | 'shown' | 'no-commute' | 'failed'>('idle')
+  useEffect(() => {
+    void liveActivitiesAvailable().then(setAvailable)
+  }, [])
+  if (!available) return null
+
+  // Shows your soonest commute's live trains now, whatever the time, so you can see what it looks like.
+  const showPreview = async () => {
+    setPreview('starting')
+    try {
+      const [commutes, routes] = await Promise.all([api<Commute[]>('/commutes'), getRoutes()])
+      const commute = sortCommutes(commutes, new Date())[0]
+      if (!commute) return setPreview('no-commute')
+      const predictions = await api<Prediction[]>(commutePredictionsPath(commute))
+      const departures = groupDepartures(predictions, new Date())[0]?.departures ?? []
+      const route = routes.find((r) => r.id === commute.routeId)
+      const endsAt = new Date(Date.now() + 5 * 60_000)
+      setPreview((await showLiveActivity(liveActivityDetails(commute, route, departures, endsAt, undefined))) ? 'shown' : 'failed')
+    } catch {
+      setPreview('failed')
+    }
+  }
+
+  return (
+    <Section title="Live Activities">
+      <Card>
+        <p className="text-sm text-neutral-500">
+          From 15 minutes before a saved commute until it ends, its next trains count down on your Lock Screen and in the
+          Dynamic Island. Turn this off in iPhone Settings → NextTrain → Live Activities.
+        </p>
+        <button onClick={showPreview} disabled={preview === 'starting'} className={`mt-2 ${primaryButton}`}>
+          Preview Live Activity
+        </button>
+        <p role="status" className="text-center text-sm text-neutral-500">
+          {preview === 'shown' && 'Lock your iPhone to see it.'}
+          {preview === 'no-commute' && 'Add a commute first, then preview it here.'}
+          {preview === 'failed' && "Couldn't show it. Check that Live Activities are on for NextTrain in iPhone Settings."}
+        </p>
+      </Card>
+    </Section>
+  )
+}
+
 function AnalyticsChoice() {
   const choice = useAnalyticsChoice()
   const blocked = analyticsBlocked()

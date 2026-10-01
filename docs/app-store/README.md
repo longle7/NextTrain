@@ -106,6 +106,8 @@ On first launch, a one-time Welcome screen explains that times are estimates fro
 Reviewing from outside Boston? "Near you" will say you're outside the service area. Search for "Park Street" or open the Lines tab to see live departures, service alerts, and trains moving on each line. The Map tab shows every train live on Apple Maps; tap a train for its destination and, where the MBTA reports it, how crowded each car is.
 
 Location permission is optional; it's only used on the device to find nearby stations. To try commutes: Home → Add a commute. Settings → Delete my data removes all saved data. Help & support is in Settings.
+
+Live Activities (from version 1.1): a saved commute's next trains show on the Lock Screen and in the Dynamic Island from 15 minutes before it starts. To see one at any time of day: add a commute, then Settings → Preview Live Activity, and lock the phone.
 ```
 
 ## Info.plist strings
