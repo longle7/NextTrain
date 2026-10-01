@@ -108,7 +108,7 @@ Location permission is optional; it's only used on the device to find nearby sta
 
 1. ~~Host the API and web app~~: done, on Azure at https://api.nexttrain.longledev.com and https://nexttrain.longledev.com (see the main README's Hosting section).
 2. ~~Switch the map to Apple Maps~~: done (MapKit JS, tokens from `GET /mapkit/token`).
-3. **Build the iPhone app** on a Mac. The Xcode project is already in `NextTrain.Web/ios`: iPhone-only, portrait, app icon, branded launch screen, and the Info.plist strings above. The bundle ID is `com.longledev.nexttrain`; it can't change after the first upload.
+3. **Build the iPhone app.** Without a Mac: Actions → **TestFlight** → Run workflow (needs the three `ASC_*` secrets; see the top of `.github/workflows/testflight.yml`). With a Mac: The Xcode project is already in `NextTrain.Web/ios`: iPhone-only, portrait, app icon, branded launch screen, and the Info.plist strings above. The bundle ID is `com.longledev.nexttrain`; it can't change after the first upload.
    ```
    cd NextTrain.Web
    npm ci
