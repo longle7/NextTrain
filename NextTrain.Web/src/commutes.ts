@@ -32,6 +32,20 @@ export function commuteTiming(commute: Schedule, now: Date): CommuteTiming {
   return { state: 'never' }
 }
 
+/** The iPhone Live Activity shows from this long before a commute's window until the window ends. */
+export const LIVE_ACTIVITY_LEAD_MS = 15 * 60_000
+
+/** When the commute's Live Activity should end, if it should be showing at `now`; otherwise undefined. */
+export function liveActivityEnd(commute: Schedule, now: Date): Date | undefined {
+  const timing = commuteTiming(commute, now)
+  if (timing.state === 'now') return timing.ends
+  if (timing.state === 'soon' && timing.starts.getTime() - now.getTime() <= LIVE_ACTIVITY_LEAD_MS) {
+    const length = timeOn(now, commute.windowEnd).getTime() - timeOn(now, commute.windowStart).getTime()
+    return new Date(timing.starts.getTime() + length)
+  }
+  return undefined
+}
+
 /** Commutes in progress first, then by how soon they start. */
 export function sortCommutes<T extends Schedule>(commutes: T[], now: Date): T[] {
   const rank = (c: T) => {

@@ -2,7 +2,7 @@ import { Component, type ReactNode } from 'react'
 import { Link } from 'react-router'
 import { useOnline, useTitle } from './usePolling'
 import { MAJOR_SEVERITY } from './alerts'
-import { ApiError, stationRouteIds, type Alert, type Route, type Station } from './api'
+import { ApiError, lineLabel, stationRouteIds, type Alert, type Route, type Station } from './api'
 
 /** Full-width main action ("Save commute"). Works on <button> and <Link>. */
 export const primaryButton =
@@ -24,7 +24,7 @@ export function AppLogo() {
 /** Colored line pill, e.g. "RL" in red. Gray until routes load. Screen readers hear the full line name. */
 export function LineBadge({ routeId, routes }: { routeId: string; routes: Route[] | undefined }) {
   const route = routes?.find((r) => r.id.startsWith(routeId)) // 'Green' matches any branch
-  const label = routeId.startsWith('Green-') ? `GL ${routeId.slice(6)}` : routeId === 'Mattapan' ? 'M' : `${routeId[0]}L`
+  const label = lineLabel(routeId)
   const name = routeId === 'Green' ? 'Green Line' : (route?.name ?? routeId)
   return (
     <span

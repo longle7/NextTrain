@@ -52,6 +52,8 @@
 	</dict>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>NextTrain uses your location to show the subway stations closest to you. Your location stays on your device.</string>
+	<key>NSSupportsLiveActivities</key>
+	<true/>
 	<key>UIStatusBarStyle</key>
 	<string>UIStatusBarStyleLightContent</string>
 	<key>UILaunchStoryboardName</key>

@@ -2,12 +2,13 @@ import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router'
 import { alertsFor, majorAlert } from '../alerts'
 import {
-  ALERTS_REFRESH_MS, api, getAlerts, getRoutes, getStations, searchStations, stationRouteIds,
+  ALERTS_REFRESH_MS, api, commutePredictionsPath, getAlerts, getRoutes, getStations, searchStations, stationRouteIds,
   type Alert, type Commute, type Prediction, type Route, type Station,
 } from '../api'
-import { commuteTiming, daysLabel, sortCommutes, timingLabel, windowLabel } from '../commutes'
+import { commuteTiming, daysLabel, liveActivityEnd, sortCommutes, timingLabel, windowLabel } from '../commutes'
 import { Card, LineBadge, linkButton, primaryButton, SearchInput, StationLink, Status, WarningIcon } from '../components'
 import { locationErrorMessage, nearestStations, OUT_OF_AREA_MILES, walkLabel } from '../geo'
+import { endLiveActivities, liveActivityDetails, showLiveActivity } from '../liveActivity'
 import { recentStationIds } from '../recent'
 import { countdown, groupDepartures } from '../time'
 import { useNow, usePolling, useTitle } from '../usePolling'
@@ -204,6 +205,13 @@ function NextTrains({ station, routes, alerts }: { station: Station; routes: Rou
 function MyCommutes({ routes, alerts }: { routes: Route[] | undefined; alerts: Alert[] | undefined }) {
   const now = useNow(15_000)
   const commutes = usePolling(() => api<Commute[]>('/commutes'), 'commutes')
+  const sorted = commutes.data && sortCommutes(commutes.data, now)
+  // The iPhone Live Activity follows the soonest commute that's on, or starts within 15 minutes.
+  const liveId = sorted?.find((c) => liveActivityEnd(c, now))?.id
+  const loaded = sorted !== undefined
+  useEffect(() => {
+    if (loaded && liveId === undefined) void endLiveActivities()
+  }, [loaded, liveId])
 
   return (
     <section className="space-y-2">
@@ -230,31 +238,32 @@ function MyCommutes({ routes, alerts }: { routes: Route[] | undefined; alerts: A
         </Card>
       )}
       <ul className="space-y-2">
-        {commutes.data &&
-          sortCommutes(commutes.data, now).map((commute) => (
-            <li key={commute.id}>
-              <CommuteCard
-                commute={commute}
-                route={routes?.find((r) => r.id === commute.routeId)}
-                routes={routes}
-                now={now}
-                alert={
-                  alerts &&
-                  majorAlert(alertsFor(alerts, { routeIds: [commute.routeId], stopId: commute.mbtaStopId, directionId: commute.directionId }))
-                }
-              />
-            </li>
-          ))}
+        {sorted?.map((commute) => (
+          <li key={commute.id}>
+            <CommuteCard
+              commute={commute}
+              route={routes?.find((r) => r.id === commute.routeId)}
+              routes={routes}
+              now={now}
+              liveActivity={commute.id === liveId}
+              alert={
+                alerts &&
+                majorAlert(alertsFor(alerts, { routeIds: [commute.routeId], stopId: commute.mbtaStopId, directionId: commute.directionId }))
+              }
+            />
+          </li>
+        ))}
       </ul>
     </section>
   )
 }
 
-function CommuteCard({ commute, route, routes, now, alert }: {
+function CommuteCard({ commute, route, routes, now, liveActivity, alert }: {
   commute: Commute
   route: Route | undefined
   routes: Route[] | undefined
   now: Date
+  liveActivity: boolean // this commute drives the iPhone Live Activity
   alert: Alert | undefined // the worst service alert on this commute's line, station, and direction
 }) {
   const timing = commuteTiming(commute, now)
@@ -293,17 +302,30 @@ function CommuteCard({ commute, route, routes, now, alert }: {
           </span>
         </Link>
       </div>
-      {live && <CommuteDepartures commute={commute} />}
+      {live && <CommuteDepartures commute={commute} route={route} alert={alert} liveActivity={liveActivity} />}
     </Card>
   )
 }
 
 // Live only while the commute is on or about to be, so idle commutes don't spend MBTA requests.
-function CommuteDepartures({ commute }: { commute: Commute }) {
+function CommuteDepartures({ commute, route, alert, liveActivity }: {
+  commute: Commute
+  route: Route | undefined
+  alert: Alert | undefined
+  liveActivity: boolean
+}) {
   const now = useNow()
-  const path = `/stations/${encodeURIComponent(commute.mbtaStopId)}/predictions?route=${encodeURIComponent(commute.routeId)}&direction=${commute.directionId}`
+  const path = commutePredictionsPath(commute)
   const predictions = usePolling(() => api<Prediction[]>(path), path, 10_000)
   const departures = predictions.data ? (groupDepartures(predictions.data, now)[0]?.departures ?? []) : []
+
+  // Send the Live Activity the same trains as this card, only when they change (a train left, or new predictions).
+  const endsAt = liveActivity ? liveActivityEnd(commute, now) : undefined
+  const details = endsAt && predictions.data ? liveActivityDetails(commute, route, departures, endsAt, alert) : undefined
+  const detailsKey = details && JSON.stringify(details)
+  useEffect(() => {
+    if (detailsKey) void showLiveActivity(JSON.parse(detailsKey))
+  }, [detailsKey])
 
   return (
     <div className="flex min-h-12 items-center justify-between gap-3 border-t border-neutral-100 pt-3 dark:border-neutral-800">

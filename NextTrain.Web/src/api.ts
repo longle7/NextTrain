@@ -184,6 +184,14 @@ export const getStations = fetchOnce<Station[]>('/stations')
 
 export const stationRouteIds = (station: Station) => station.routeId.split(',')
 
+/** Live departures for one commute: its station, line, and direction. */
+export const commutePredictionsPath = (c: Pick<Commute, 'mbtaStopId' | 'routeId' | 'directionId'>) =>
+  `/stations/${encodeURIComponent(c.mbtaStopId)}/predictions?route=${encodeURIComponent(c.routeId)}&direction=${c.directionId}`
+
+/** A line's badge text: "RL", "GL B", "M". Shared by LineBadge and the iPhone Live Activity. */
+export const lineLabel = (routeId: string) =>
+  routeId.startsWith('Green-') ? `GL ${routeId.slice(6)}` : routeId === 'Mattapan' ? 'M' : `${routeId[0]}L`
+
 // How people type station names: "st" for Street or Saint, "sq" for Square, "ctr" for Center (or Newton Centre).
 const ALTERNATIVES: Record<string, string[]> = {
   st: ['street', 'saint'],

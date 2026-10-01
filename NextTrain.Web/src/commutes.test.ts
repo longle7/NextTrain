@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { commuteTiming, daysLabel, sortCommutes, timingLabel } from './commutes'
+import { commuteTiming, daysLabel, liveActivityEnd, sortCommutes, timingLabel } from './commutes'
 
 // Tuesday 29 Sep 2026, 7:50 AM device time.
 const now = new Date(2026, 8, 29, 7, 50)
@@ -44,4 +44,25 @@ it.each([
   ['Fri,Mon,Wed', 'Mon, Wed, Fri'],
 ])('daysLabel(%s) is %s', (days, expected) => {
   expect(daysLabel(days)).toBe(expected)
+})
+
+describe('liveActivityEnd (the iPhone Live Activity shows from 15 min before a commute until it ends)', () => {
+  it('shows during the window, until its end', () => {
+    expect(liveActivityEnd(commute('07:45:00', '08:15:00'), now)).toEqual(new Date(2026, 8, 29, 8, 15))
+  })
+
+  it('shows from 15 minutes before the start, ending when the window does', () => {
+    expect(liveActivityEnd(commute('08:05:00', '08:35:00'), now)).toEqual(new Date(2026, 8, 29, 8, 35))
+  })
+
+  it("doesn't show earlier than that, after the window, or on days the commute is off", () => {
+    expect(liveActivityEnd(commute('08:06:00', '08:35:00'), now)).toBeUndefined()
+    expect(liveActivityEnd(commute('07:00:00', '07:30:00'), now)).toBeUndefined()
+    expect(liveActivityEnd(commute('07:45:00', '08:15:00', 'Sat,Sun'), now)).toBeUndefined()
+  })
+
+  it('covers a window that starts just after midnight', () => {
+    const lateNight = new Date(2026, 8, 29, 23, 50)
+    expect(liveActivityEnd(commute('00:05:00', '00:35:00', 'Wed'), lateNight)).toEqual(new Date(2026, 8, 30, 0, 35))
+  })
 })
