@@ -1,6 +1,5 @@
 using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.HttpOverrides;
-using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using NextTrain.Api.Controllers;
 using NextTrain.Api.Data;
@@ -90,17 +89,12 @@ builder.Services.AddRateLimiter(options =>
             ? RateLimitPartition.GetNoLimiter("health")
             : RateLimitPartition.GetFixedWindowLimiter(context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
                 _ => new FixedWindowRateLimiterOptions { PermitLimit = perMinute, Window = TimeSpan.FromMinutes(1) }));
-    options.OnRejected = async (rejected, cancellationToken) =>
+    options.OnRejected = async (rejected, _) =>
     {
-        var response = rejected.HttpContext.Response;
-        response.StatusCode = StatusCodes.Status429TooManyRequests;
         if (rejected.Lease.TryGetMetadata(MetadataName.RetryAfter, out var retryAfter))
-            response.Headers.RetryAfter = ((int)Math.Ceiling(retryAfter.TotalSeconds)).ToString();
-        await response.WriteAsJsonAsync(new ProblemDetails
-        {
-            Status = StatusCodes.Status429TooManyRequests,
-            Title = "Too many requests. Wait a minute and try again.",
-        }, (System.Text.Json.JsonSerializerOptions?)null, "application/problem+json", cancellationToken);
+            rejected.HttpContext.Response.Headers.RetryAfter = ((int)Math.Ceiling(retryAfter.TotalSeconds)).ToString();
+        await Results.Problem(title: "Too many requests. Wait a minute and try again.", statusCode: StatusCodes.Status429TooManyRequests)
+            .ExecuteAsync(rejected.HttpContext);
     };
 });
 
