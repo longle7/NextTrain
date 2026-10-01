@@ -4,7 +4,7 @@ Everything App Store Connect asks for, drafted from what the app does today. Edi
 
 ## Screenshots
 
-Captured from the iPhone app build (native mode) with live MBTA data on October 1, 2026, at both sizes App Store Connect asks for:
+Captured in dark mode from the iPhone app build (native mode) with live MBTA data on October 1, 2026, at both sizes App Store Connect asks for:
 
 - `screenshots/`: 1290 × 2796, the **6.9" iPhone** slot
 - `screenshots/6.5-inch/`: 1284 × 2778, the **6.5" iPhone** slot
@@ -18,7 +18,7 @@ Captured from the iPhone app build (native mode) with live MBTA data on October 
 | `5-line-live-trains.png` | The Red Line diagram with live trains and direction arrows |
 | `6-lines.png` | Every line's service status |
 
-To retake them, run the app locally (API on 5112, Vite on 5173) and capture at 430 × 932 and 428 × 926 CSS pixels at 3× with a commute saved. Map shots need the MapKit key in user-secrets.
+To retake them, run the app locally (API on 5112, Vite on 5173) and capture at 430 × 932 and 428 × 926 CSS pixels at 3×, dark color scheme, with a commute saved. Map shots need the MapKit key in user-secrets.
 
 Make the app **iPhone-only** in Xcode (Supported Destinations: iPhone). Otherwise Apple also requires iPad screenshots and reviews the iPad layout.
 
