@@ -13,10 +13,6 @@ name: TestFlight
 on:
   workflow_dispatch:
 
-concurrency:
-  group: testflight
-  cancel-in-progress: false
-
 env:
   TEAM_ID: 3CXXU244US # Apple Developer team (public, not a secret)
 

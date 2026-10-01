@@ -1,4 +1,3 @@
-import { CONTACT_EMAIL } from '../legal'
 import { ContactEmail, ExternalLink, InternalLink, Section } from './LegalLayout'
 import { useTitle } from '../usePolling'
 
@@ -13,9 +12,6 @@ export default function SupportPage() {
         <p>
           Email <ContactEmail /> with questions, problems, or ideas. Tell us what you were doing and, if you can, the
           station or line. We usually reply within a few days.
-        </p>
-        <p className="text-sm text-neutral-500">
-          Copy the address: <span className="font-mono select-all">{CONTACT_EMAIL}</span>
         </p>
       </Section>
 
