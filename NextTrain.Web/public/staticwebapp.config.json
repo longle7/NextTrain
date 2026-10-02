@@ -1,5 +1,4 @@
 {
-  "routes": [{ "route": "/.*", "statusCode": 404 }],
   "navigationFallback": {
     "rewrite": "/index.html",
     "exclude": ["/assets/*", "/*.{png,svg,webmanifest,json,ico}"]
