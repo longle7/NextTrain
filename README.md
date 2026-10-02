@@ -121,6 +121,8 @@ Scaling (set in Azure, not by the deploy): a `cron` rule keeps one API instance 
 
 Protection: the API limits each client IP to `RateLimit:PerMinute` requests (600 by default; the app uses about 20), answering 429 with `Retry-After` beyond that, so one runaway client can't run up the bill or use up the MBTA key. The website sends security headers from `NextTrain.Web/public/staticwebapp.config.json`: a Content-Security-Policy, no framing by other sites, and location allowed only for NextTrain itself. **If the API address (`API_URL`) or a third-party service changes, update the policy's `connect-src`/`script-src`**, or the site can't reach it.
 
+Cloudflare sits in front of both `nexttrain.longledev.com` and `api.nexttrain.longledev.com` (proxied DNS records). It provides attack rules, bot blocking, and an edge rate limit; there are no country blocks. The API's ingress accepts only Cloudflare's IP ranges, so nothing can skip it, and `Proxy__Hops=2` tells the API that the visitor's IP is the second-to-last X-Forwarded-For entry (Cloudflare appends the visitor, then Azure appends Cloudflare). **If Cloudflare is ever removed from in front of the API, set `Proxy__Hops` back to 1 and remove the ingress IP restrictions**, or every request is refused or counted as Cloudflare's IP. The API serves a Cloudflare Origin CA certificate (valid to 2041), so its certificate never has to renew through the proxy.
+
 ## Road to the App Store
 
 The iPhone app wraps the web app with [Capacitor](https://capacitorjs.com); its Xcode project is `NextTrain.Web/ios` (bundle ID `com.longledev.nexttrain`). **[docs/app-store](docs/app-store/README.md)** has everything for the listing (screenshots, text, App Privacy answers, review notes) and the submission checklist.

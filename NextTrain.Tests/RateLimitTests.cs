@@ -58,6 +58,19 @@ public class RateLimitTests : IDisposable
     }
 
     [Fact]
+    public async Task BehindCloudflare_TheClientIsSecondFromTheEnd_AndForgedEntriesStillDontCount()
+    {
+        using var factory = _factory.WithWebHostBuilder(b => b.UseSetting("Proxy:Hops", "2"));
+        using var client = factory.CreateClient();
+        // Cloudflare appends the visitor, then Azure's ingress appends Cloudflare: "forged…, visitor, cloudflare".
+        for (var i = 0; i < 3; i++)
+            await client.SendAsync(Get("/nope", $"198.51.100.{i}, 203.0.113.20, 172.64.0.{i}"));
+
+        Assert.Equal(HttpStatusCode.TooManyRequests, (await client.SendAsync(Get("/nope", "198.51.100.99, 203.0.113.20, 172.64.0.9"))).StatusCode);
+        Assert.NotEqual(HttpStatusCode.TooManyRequests, (await client.SendAsync(Get("/nope", "203.0.113.21, 172.64.0.9"))).StatusCode);
+    }
+
+    [Fact]
     public async Task Health_IsNeverLimited()
     {
         using var client = _factory.CreateClient();
