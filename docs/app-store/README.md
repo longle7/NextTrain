@@ -96,19 +96,52 @@ Recently viewed stations stay on the device and aren't "collected". The website'
 
 ## Review notes
 
-Paste into **App Review Information → Notes**:
+App Review asked new developer accounts for this under Guideline 2.1 (October 2026). Paste it into **App Review Information → Notes** for every submission, and attach a fresh screen recording when asked (see "Screen recording" below).
 
 ```
-NextTrain shows live times for Boston's MBTA subway. No account or login is needed.
+1. PURPOSE AND AUDIENCE
+NextTrain is a free app for people who ride Boston's subway (the MBTA Red, Orange, Blue, Green, and Mattapan lines). It answers "when is my next train?" quickly: live departures for every subway station, service alerts, a live map and line diagrams showing where each train is, and saved daily commutes that show your next train on the Home screen when it's time to go. No account, no ads, no in-app purchases.
 
-On first launch, a one-time Welcome screen explains that times are estimates from MBTA data and asks the user to agree to the Terms of Use and Privacy Policy (both linked on that screen). Tap "Agree and continue" to start.
+2. SETUP AND HOW TO USE IT
+No login or account is needed, and there is nothing to set up.
+- On first launch, a one-time Welcome screen explains that times are estimates from MBTA data and asks the user to agree to the Terms of Use and Privacy Policy (both linked there). Tap "Agree and continue".
+- Location permission is optional and only used on the device to find nearby stations. Outside Boston, "Near you" says you're outside the service area; use Search (e.g. "Park Street") or the Lines and Map tabs instead.
+- Station pages: live departures by line and direction, alerts, and directions.
+- Lines tab: each line's status; open a line to see its trains move along the diagram.
+- Map tab: every train live on Apple Maps; tap a train for its destination and, where the MBTA reports it, how crowded each car is.
+- Commutes: Home -> Add a commute. Saved commutes are private to the device (stored under a random ID, not shared with anyone).
+- Data deletion: Settings -> Delete my data removes saved commutes from our server and clears local data. Help & support is in Settings.
+- Live Activities (version 1.1 and later): Settings -> Preview Live Activity, then lock the phone.
+There is no user-generated content visible to others and no paid content.
 
-Reviewing from outside Boston? "Near you" will say you're outside the service area. Search for "Park Street" or open the Lines tab to see live departures, service alerts, and trains moving on each line. The Map tab shows every train live on Apple Maps; tap a train for its destination and, where the MBTA reports it, how crowded each car is.
+3. EXTERNAL SERVICES
+- MBTA V3 API (Massachusetts Bay Transportation Authority): real-time predictions, vehicle positions, alerts, and station data, used under the MassDOT Developer License Agreement.
+- Apple MapKit JS: the map. Our server issues short-lived MapKit tokens.
+- Microsoft Azure: our API (Azure Container Apps), database for saved commutes (Azure SQL), and website (Azure Static Web Apps).
+- Cloudflare: DNS and email forwarding for longledev.com.
+The app uses no third-party sign-in, payment, advertising, analytics, or AI services.
 
-Location permission is optional; it's only used on the device to find nearby stations. To try commutes: Home → Add a commute. Settings → Delete my data removes all saved data. Help & support is in Settings.
+4. REGIONAL DIFFERENCES
+The app works the same in every region. Its content is about Boston's subway by nature; outside the Boston area, "Near you" shows that you're outside the service area, and everything else works normally.
 
-Live Activities (from version 1.1): a saved commute's next trains show on the Lock Screen and in the Dynamic Island from 15 minutes before it starts. To see one at any time of day: add a commute, then Settings → Preview Live Activity, and lock the phone.
+5. REGULATED INDUSTRY / THIRD-PARTY MATERIAL
+NextTrain is not in a regulated industry. Transit data is public MBTA data used under the MassDOT Developer License Agreement (https://cdn.mbta.com/sites/default/files/2023-08/mbta-massdot-develop-license-agreement.pdf), which permits apps like this one with attribution. The app credits MassDOT as the data provider (Settings), states that it is independent and not affiliated with or endorsed by the MBTA or MassDOT, and does not use MBTA logos. Maps are provided by Apple under the MapKit terms.
 ```
+
+### Screen recording
+
+Record on a real iPhone running the latest iOS, with the build that's in review (TestFlight), starting from the Home Screen. About 2 minutes:
+
+1. Tap the NextTrain icon (the recording must show the launch).
+2. Welcome screen → **Agree and continue**.
+3. Allow location → Home, "Near you" with live departures.
+4. Search "Park Street" → the station's live departures and alerts.
+5. **Lines** → Red Line → trains moving on the diagram.
+6. **Map** → zoom in (station names) → tap a train (destination, crowding) → a Green Line branch.
+7. Home → **Add a commute** (e.g. Park Street, Red Line, toward Alewife, weekdays) → Save → the commute card with its next train.
+8. Settings → Help & support → back → **Delete my data** → confirm.
+
+Upload the .mov as an attachment to the reply in App Store Connect.
 
 ## Info.plist strings
 
