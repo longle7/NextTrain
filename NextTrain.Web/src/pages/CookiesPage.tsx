@@ -7,7 +7,7 @@ export default function CookiesPage() {
     <LegalPage title="Cookie Policy">
       <p>
         Cookies and similar storage are small pieces of data a website keeps in your browser. NextTrain uses as few as
-        possible: only what it needs to work, plus analytics cookies on the website if you allow them.
+        possible: only what it needs to work and stay secure, plus analytics cookies on the website if you allow them.
       </p>
 
       <Section title="Needed for NextTrain to work">
@@ -18,6 +18,23 @@ export default function CookiesPage() {
             ['nexttrain.recentStations', 'The stations you viewed last, for Home (never sent to us)', 'Until you use Delete my data'],
             ['nexttrain.analyticsConsent', 'Remembers your analytics choice, so we don\'t ask again', 'Until you use Delete my data'],
             ['nexttrain.termsAccepted', 'Remembers which version of the Terms you agreed to, so we only ask again when they change', 'Until you delete the app or clear site data'],
+          ]}
+        />
+      </Section>
+
+      <Section title="Security cookies (website only)">
+        <p>
+          Cloudflare, which protects NextTrain from attacks and automated abuse, may set these on nexttrain.longledev.com.
+          They're strictly necessary for security, so they don't need your consent, and they aren't used for advertising or
+          to track you across sites. The iPhone app doesn't receive them.{' '}
+          <ExternalLink href="https://developers.cloudflare.com/fundamentals/reference/policies-compliances/cloudflare-cookies/">
+            Cloudflare's cookies
+          </ExternalLink>
+        </p>
+        <StorageTable
+          rows={[
+            ['__cf_bm', 'Tells people apart from automated bots', '30 minutes after your last visit'],
+            ['cf_clearance', "Remembers that you passed a security check, so you aren't asked again", '30 minutes'],
           ]}
         />
       </Section>

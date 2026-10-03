@@ -20,16 +20,22 @@ namespace NextTrain.Api.Controllers
     public class MbtaUnavailableFilter : IExceptionFilter
     {
         private readonly ProblemDetailsFactory _problems;
+        private readonly ILogger<MbtaUnavailableFilter> _log;
 
         // ProblemDetailsFactory builds the same JSON error shape ASP.NET uses everywhere (type, title, status, traceId).
-        public MbtaUnavailableFilter(ProblemDetailsFactory problems)
+        public MbtaUnavailableFilter(ProblemDetailsFactory problems, ILogger<MbtaUnavailableFilter> log)
         {
             _problems = problems;
+            _log = log;
         }
 
         public void OnException(ExceptionContext context)
         {
             if (context.Exception is not (HttpRequestException or TaskCanceledException)) return;
+
+            // One line, no stack trace: during an MBTA outage every request lands here, and the production logs
+            // (warnings and up, capped per day) should show the outage, not fill up with it.
+            _log.LogWarning("MBTA unavailable for {Path}: {Error}", context.HttpContext.Request.Path, context.Exception.Message);
 
             var problem = _problems.CreateProblemDetails(
                 context.HttpContext,
