@@ -57,7 +57,7 @@ export default function MapPage() {
   const routes = usePolling(getRoutes, 'routes')
   const stations = usePolling(getStations, 'stations')
   const shapes = usePolling(() => api<RouteShape[]>('/routes/shapes'), 'shapes')
-  const vehicles = usePolling(() => api<Vehicle[]>('/vehicles'), 'vehicles', REFRESH_MS)
+  const vehicles = usePolling(() => api<Vehicle[]>('/vehicles'), 'vehicles', REFRESH_MS, { remember: false }) // old positions mislead
   const tracks = useMemo(() => shapes.data?.map((s) => ({ routeId: s.routeId, points: decodePolyline(s.polyline) })), [shapes.data])
   // Puts each train on its own line, arrow along the track the way it's going (see snap.ts).
   const place = useMemo(
@@ -505,11 +505,8 @@ function StationPreview({ station, x, y, width, routes, onPointerEnter, onPointe
   onPointerLeave: () => void
 }) {
   const now = useNow()
-  const predictions = usePolling(
-    () => api<Prediction[]>(`/stations/${encodeURIComponent(station.mbtaStopId)}/predictions`),
-    `preview|${station.mbtaStopId}`,
-    REFRESH_MS,
-  )
+  const path = `/stations/${encodeURIComponent(station.mbtaStopId)}/predictions`
+  const predictions = usePolling(() => api<Prediction[]>(path), path, REFRESH_MS)
   const groups = predictions.data ? groupDepartures(predictions.data, now, 2) : []
 
   return (

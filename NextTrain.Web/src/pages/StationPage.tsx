@@ -5,7 +5,7 @@ import { ALERTS_REFRESH_MS, api, ApiError, getAlerts, getRoutes, stationRouteIds
 import { AccessibleIcon, AlertBanner, Card, LineBadge, LoadingText, NotFound, secondaryButton, Status } from '../components'
 import { rememberStation } from '../recent'
 import { agoLabel, clock, countdown, groupDepartures, noTrainsMessage, secondsAgo, STALE_AFTER_SECONDS } from '../time'
-import { useNow, usePolling, useTitle } from '../usePolling'
+import { failure, useNow, usePolling, useTitle } from '../usePolling'
 
 const REFRESH_MS = 10_000
 
@@ -13,12 +13,9 @@ export default function StationPage() {
   const { stopId = '' } = useParams()
   const now = useNow()
   const routes = usePolling(getRoutes, 'routes')
-  const station = usePolling(() => api<Station>(`/stations/${encodeURIComponent(stopId)}`), stopId)
-  const predictions = usePolling(
-    () => api<Prediction[]>(`/stations/${encodeURIComponent(stopId)}/predictions`),
-    stopId,
-    REFRESH_MS,
-  )
+  const stationPath = `/stations/${encodeURIComponent(stopId)}`
+  const station = usePolling(() => api<Station>(stationPath), stationPath)
+  const predictions = usePolling(() => api<Prediction[]>(`${stationPath}/predictions`), `${stationPath}/predictions`, REFRESH_MS)
 
   const alerts = usePolling(getAlerts, 'alerts', ALERTS_REFRESH_MS)
   const notFound = station.error instanceof ApiError && station.error.status === 404
@@ -82,7 +79,7 @@ export default function StationPage() {
         <AlertBanner key={alert.id} alert={alert} />
       ))}
 
-      <Status error={station.error ?? predictions.error} loading={!predictions.data && !predictions.error} />
+      <Status error={failure(station) ?? failure(predictions)} loading={!predictions.data && !predictions.error} />
 
       {predictions.data && groups.length === 0 && (
         <Card>
