@@ -1,6 +1,7 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { Link } from 'react-router'
 import { analyticsBlocked, forgetAnalyticsChoice, setAnalyticsChoice, useAnalyticsChoice } from '../analytics'
+import { forgetRemembered } from '../cache'
 import { api, commutePredictionsPath, forgetUserId, getRoutes, type Commute, type Prediction } from '../api'
 import { sortCommutes } from '../commutes'
 import { Card, dangerButton, primaryButton } from '../components'
@@ -20,6 +21,7 @@ export default function SettingsPage() {
       await api('/me', { method: 'DELETE' })
       forgetUserId()
       forgetRecentStations()
+      forgetRemembered()
       forgetAnalyticsChoice()
       void endLiveActivities()
       setDeletion('done')

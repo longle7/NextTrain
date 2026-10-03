@@ -13,7 +13,9 @@ import { usePolling, useTitle } from '../usePolling'
 export default function CommutePage() {
   const { id } = useParams()
   const [params] = useSearchParams()
-  const existing = usePolling(() => (id ? api<Commute>(`/commutes/${id}`) : Promise.resolve(undefined)), id ?? 'new')
+  const existing = usePolling(() => (id ? api<Commute>(`/commutes/${id}`) : Promise.resolve(undefined)), id ?? 'new', undefined, {
+    remember: false, // the form must start from the saved commute, never an older copy
+  })
   // Someone else's commute also answers 404 (see CommutesController), so this covers both.
   const notFound = existing.error instanceof ApiError && existing.error.status === 404
   useTitle(notFound ? 'Commute not found' : id ? 'Edit commute' : 'New commute')

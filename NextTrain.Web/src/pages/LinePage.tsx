@@ -3,7 +3,7 @@ import { alertsFor } from '../alerts'
 import { ALERTS_REFRESH_MS, api, getAlerts, getRoutes, type Station, type Vehicle } from '../api'
 import { AlertBanner, Card, LoadingText, NotFound, Status, StationLink } from '../components'
 import { directionsDown, trainsByStation, type LineTrain } from '../lineTrains'
-import { usePolling, useTitle } from '../usePolling'
+import { failure, usePolling, useTitle } from '../usePolling'
 
 const SORTS = [
   { id: 'line', label: 'Line order' },
@@ -19,10 +19,8 @@ export default function LinePage() {
   const sort: Sort = SORTS.find((s) => s.id === params.get('sort'))?.id ?? 'line'
 
   const routes = usePolling(getRoutes, 'routes')
-  const stations = usePolling(
-    () => api<Station[]>(`/stations?route=${encodeURIComponent(routeId)}&sort=${sort}`),
-    `${routeId}|${sort}`,
-  )
+  const stationsPath = `/stations?route=${encodeURIComponent(routeId)}&sort=${sort}`
+  const stations = usePolling(() => api<Station[]>(stationsPath), stationsPath)
   const alerts = usePolling(getAlerts, 'alerts', ALERTS_REFRESH_MS)
   // Live trains only show on the line-order strip, so only poll for them there.
   const lineOrder = sort === 'line'
@@ -30,6 +28,7 @@ export default function LinePage() {
     () => (lineOrder ? api<Vehicle[]>('/vehicles') : Promise.resolve<Vehicle[]>([])),
     `vehicles|${lineOrder}`,
     lineOrder ? 10_000 : undefined,
+    { remember: false }, // old train positions mislead
   )
   const route = routes.data?.find((r) => r.id === routeId)
   const notFound = !!routes.data && !route // e.g. /lines/Purple: no such subway line
@@ -68,7 +67,7 @@ export default function LinePage() {
         ))}
       </div>
 
-      <Status error={stations.error} loading={!stations.data} />
+      <Status error={failure(stations)} loading={!stations.data} />
       {stations.data?.length === 0 && <p className="text-neutral-500">No stations imported for this line yet.</p>}
 
       {sort === 'line' && stations.data && stations.data.length > 0 ? (

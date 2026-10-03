@@ -1,4 +1,5 @@
 import { useEffect, useState, useSyncExternalStore } from 'react'
+import { remember, remembered } from './cache'
 
 interface PollState<T> {
   data: T | undefined
@@ -8,18 +9,30 @@ interface PollState<T> {
 
 /**
  * Calls `fetcher` now and every `intervalMs` (if given) while mounted and visible, or until `key` changes.
- * Keeps the last good data when a refresh fails.
+ * `key` names what's fetched and is where it's remembered, so it must be unique per request: use its API path.
+ * Keeps the last good data when a refresh fails. With `remember` (the default), the last good data is also kept on
+ * the device and shown at once on the next visit, even offline; `updatedAt` says how old it is.
  */
-export function usePolling<T>(fetcher: () => Promise<T>, key: string, intervalMs?: number): PollState<T> {
-  const [state, setState] = useState<PollState<T> & { key: string }>({
-    key, data: undefined, error: undefined, updatedAt: undefined,
-  })
+export function usePolling<T>(
+  fetcher: () => Promise<T>,
+  key: string,
+  intervalMs?: number,
+  { remember: keep = true }: { remember?: boolean } = {},
+): PollState<T> {
+  const start = (k: string) => ({ key: k, error: undefined, ...((keep && remembered<T>(k)) || { data: undefined, updatedAt: undefined }) })
+  const [state, setState] = useState<PollState<T> & { key: string }>(() => start(key))
+  // A new key starts from what's remembered for it, not the previous key's data.
+  if (state.key !== key) setState(start(key))
 
   useEffect(() => {
     let cancelled = false
     const load = () =>
       fetcher().then(
-        (data) => !cancelled && setState({ key, data, error: undefined, updatedAt: new Date() }),
+        (data) => {
+          if (cancelled) return
+          setState({ key, data, error: undefined, updatedAt: new Date() })
+          if (keep) remember(key, data)
+        },
         (error: Error) => !cancelled && setState((s) => ({ ...s, key, error })),
       )
     load()
@@ -42,6 +55,9 @@ export function usePolling<T>(fetcher: () => Promise<T>, key: string, intervalMs
   // Don't show the previous key's data while the new key loads.
   return state.key === key ? state : { data: undefined, error: undefined, updatedAt: undefined }
 }
+
+/** The error worth a red box: only when there's nothing to show. With last-known data, pages say how old it is instead. */
+export const failure = <T,>(poll: PollState<T>) => (poll.data === undefined ? poll.error : undefined)
 
 /** Current time, updated every `intervalMs` (for countdowns). */
 export function useNow(intervalMs = 1000): Date {
