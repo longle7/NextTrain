@@ -10,8 +10,8 @@ import { Card, LineBadge, linkButton, primaryButton, SearchInput, StationLink, S
 import { locationErrorMessage, nearestStations, OUT_OF_AREA_MILES, walkLabel } from '../geo'
 import { endLiveActivities, liveActivityDetails, showLiveActivity } from '../liveActivity'
 import { recentStationIds } from '../recent'
-import { countdown, groupDepartures } from '../time'
-import { useNow, usePolling, useTitle } from '../usePolling'
+import { clock, countdown, groupDepartures, secondsAgo, STALE_AFTER_SECONDS } from '../time'
+import { failure, useNow, usePolling, useTitle } from '../usePolling'
 
 export default function HomePage() {
   const routes = usePolling(getRoutes, 'routes')
@@ -35,7 +35,7 @@ export default function HomePage() {
         onSubmit={() => results[0] && navigate(`/stations/${results[0].mbtaStopId}`)}
       />
 
-      <Status error={stations.error} loading={!!query.trim() && !stations.data && !stations.error} />
+      <Status error={failure(stations)} loading={!!query.trim() && !stations.data && !stations.error} />
 
       {query.trim() ? (
         <section>
@@ -178,10 +178,12 @@ function NextTrains({ station, routes, alerts }: { station: Station; routes: Rou
           {alert.summary}
         </p>
       )}
-      {predictions.error ? (
-        <p className="py-1 text-sm text-neutral-500">Live times unavailable</p>
-      ) : !predictions.data ? (
-        <div className="my-1 h-16 rounded-lg bg-neutral-100 motion-safe:animate-pulse dark:bg-neutral-800" role="status" aria-label="Loading" />
+      {!predictions.data ? (
+        predictions.error ? (
+          <p className="py-1 text-sm text-neutral-500">Live times unavailable</p>
+        ) : (
+          <div className="my-1 h-16 rounded-lg bg-neutral-100 motion-safe:animate-pulse dark:bg-neutral-800" role="status" aria-label="Loading" />
+        )
       ) : groups.length === 0 ? (
         <p className="py-1 text-sm text-neutral-500">No trains predicted right now</p>
       ) : (
@@ -198,6 +200,7 @@ function NextTrains({ station, routes, alerts }: { station: Station; routes: Rou
           {groups.length > NEARBY_ROWS && <li className="pt-1 text-sm font-semibold text-blue-600 dark:text-blue-400">All departures ›</li>}
         </ul>
       )}
+      <LastUpdated at={predictions.updatedAt} now={now} />
     </Link>
   )
 }
@@ -225,7 +228,7 @@ function MyCommutes({ routes, alerts }: { routes: Route[] | undefined; alerts: A
         )}
       </div>
       {/* One placeholder card, the size of a commute, so Home doesn't jump when they arrive. */}
-      <Status error={commutes.error} loading={!commutes.data && !commutes.error} rows={1} />
+      <Status error={failure(commutes)} loading={!commutes.data && !commutes.error} rows={1} />
       {commutes.data?.length === 0 && (
         <Card>
           <p className="text-neutral-500">Save the trips you take every day. When it's time to go, your next train shows up right here.</p>
@@ -328,22 +331,33 @@ function CommuteDepartures({ commute, route, alert, liveActivity }: {
   }, [detailsKey])
 
   return (
-    <div className="flex min-h-12 items-center justify-between gap-3 border-t border-neutral-100 pt-3 dark:border-neutral-800">
-      <span className="text-sm font-semibold text-neutral-500">Next train</span>
-      {predictions.error ? (
-        <span className="text-sm text-neutral-500">Live times unavailable</span>
-      ) : !predictions.data ? (
-        <span className="h-7 w-24 rounded bg-neutral-200 motion-safe:animate-pulse dark:bg-neutral-800" aria-label="Loading" />
-      ) : departures.length === 0 ? (
-        <span className="text-sm text-neutral-500">No trains predicted right now</span>
-      ) : (
-        <span className="text-right">
-          <span className="text-2xl font-bold tabular-nums">{countdown(departures[0], now)}</span>
-          {departures.length > 1 && (
-            <span className="block text-sm text-neutral-500">then {departures.slice(1).map((t) => countdown(t, now)).join(', ')}</span>
-          )}
-        </span>
-      )}
-    </div>
+    <>
+      <div className="flex min-h-12 items-center justify-between gap-3 border-t border-neutral-100 pt-3 dark:border-neutral-800">
+        <span className="text-sm font-semibold text-neutral-500">Next train</span>
+        {!predictions.data ? (
+          predictions.error ? (
+            <span className="text-sm text-neutral-500">Live times unavailable</span>
+          ) : (
+            <span className="h-7 w-24 rounded bg-neutral-200 motion-safe:animate-pulse dark:bg-neutral-800" aria-label="Loading" />
+          )
+        ) : departures.length === 0 ? (
+          <span className="text-sm text-neutral-500">No trains predicted right now</span>
+        ) : (
+          <span className="text-right">
+            <span className="text-2xl font-bold tabular-nums">{countdown(departures[0], now)}</span>
+            {departures.length > 1 && (
+              <span className="block text-sm text-neutral-500">then {departures.slice(1).map((t) => countdown(t, now)).join(', ')}</span>
+            )}
+          </span>
+        )}
+      </div>
+      <LastUpdated at={predictions.updatedAt} now={now} />
+    </>
   )
+}
+
+// Times older than a couple of refreshes, e.g. NextTrain opened offline in a tunnel, showing the last ones it had.
+function LastUpdated({ at, now }: { at: Date | undefined; now: Date }) {
+  if (!at || secondsAgo(at, now) <= STALE_AFTER_SECONDS) return null
+  return <p className="text-right text-xs text-amber-700 dark:text-amber-400">Last updated {clock(at)}. Times may be out of date.</p>
 }

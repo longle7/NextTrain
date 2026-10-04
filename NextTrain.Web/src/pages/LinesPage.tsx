@@ -1,7 +1,7 @@
 import { alertsFor, effectLabel, majorAlert } from '../alerts'
 import { ALERTS_REFRESH_MS, getAlerts, getRoutes, type Alert } from '../api'
 import { Card, Status, WarningIcon } from '../components'
-import { usePolling, useTitle } from '../usePolling'
+import { failure, usePolling, useTitle } from '../usePolling'
 
 export default function LinesPage() {
   const routes = usePolling(getRoutes, 'routes')
@@ -11,7 +11,7 @@ export default function LinesPage() {
   return (
     <>
       <h1 className="text-2xl font-bold">Subway lines</h1>
-      <Status error={routes.error} loading={!routes.data} rows={8} /> {/* one per subway line */}
+      <Status error={failure(routes)} loading={!routes.data} rows={8} /> {/* one per subway line */}
       <ul className="space-y-2">
         {routes.data?.map((route) => (
           <li key={route.id}>
