@@ -16,7 +16,7 @@ const red = [
 ]
 const redLine: Route = {
   id: 'Red', name: 'Red Line', color: '#DA291C', textColor: '#FFFFFF',
-  directionNames: ['South', 'North'], directionDestinations: ['Ashmont/Braintree', 'Alewife'],
+  directionNames: ['South', 'North'], directionDestinations: ['Ashmont/Braintree', 'Alewife'], type: 'subway', shortName: '',
 }
 
 const vehicle = (id: string, directionId: number, currentStatus: Vehicle['currentStatus'], stationId: string | null, stopName: string | null, routeId = 'Red'): Vehicle => ({

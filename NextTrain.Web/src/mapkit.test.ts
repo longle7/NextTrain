@@ -4,7 +4,7 @@ import { MAPKIT_INTEGRITY, MAPKIT_URL, trainCallout } from './mapkit'
 
 const red: Route = {
   id: 'Red', name: 'Red Line', color: '#DA291C', textColor: '#FFFFFF', directionNames: ['South', 'North'],
-  directionDestinations: ['Ashmont/Braintree', 'Alewife'],
+  directionDestinations: ['Ashmont/Braintree', 'Alewife'], type: 'subway', shortName: '',
 }
 const train = (v: Partial<Vehicle>): Vehicle => ({
   id: 'R-1', routeId: 'Red', directionId: 1, latitude: 42.36, longitude: -71.06, bearing: 90,

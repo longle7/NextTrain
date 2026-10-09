@@ -1,7 +1,10 @@
 import { useEffect } from 'react'
 import { Link, useParams } from 'react-router'
 import { alertsFor, majorAlert } from '../alerts'
-import { ALERTS_REFRESH_MS, api, ApiError, getAlerts, getRoutes, stationRouteIds, type Prediction, type Station } from '../api'
+import {
+  ALERTS_REFRESH_MS, api, ApiError, busRouteIds, getAlerts, getRoutes, isSubwayRoute, ROUTES, stationRouteIds, towardLabel,
+  type Alert, type Prediction, type Route, type Station,
+} from '../api'
 import { AccessibleIcon, AlertBanner, Card, LineBadge, LoadingText, NotFound, secondaryButton, Status } from '../components'
 import { rememberStation } from '../recent'
 import { agoLabel, clock, countdown, groupDepartures, noTrainsMessage, secondsAgo, STALE_AFTER_SECONDS } from '../time'
@@ -12,27 +15,41 @@ const REFRESH_MS = 10_000
 export default function StationPage() {
   const { stopId = '' } = useParams()
   const now = useNow()
-  const routes = usePolling(getRoutes, 'routes')
+  const routes = usePolling(getRoutes, ROUTES)
   const stationPath = `/stations/${encodeURIComponent(stopId)}`
   const station = usePolling(() => api<Station>(stationPath), stationPath)
-  const predictions = usePolling(() => api<Prediction[]>(`${stationPath}/predictions`), `${stationPath}/predictions`, REFRESH_MS)
+  // Its buses too: a station's bus routes, or everything at a bus stop.
+  const predictionsPath = `${stationPath}/predictions?bus=true`
+  const predictions = usePolling(() => api<Prediction[]>(predictionsPath), predictionsPath, REFRESH_MS)
 
   const alerts = usePolling(getAlerts, 'alerts', ALERTS_REFRESH_MS)
+  // Bus alerts only come per route (too many to load them all): this stop's routes.
+  const busIds = station.data ? busRouteIds(station.data) : []
+  const busAlertsPath = `/alerts?routes=${encodeURIComponent(busIds.join(','))}`
+  const busAlerts = usePolling(() => (busIds.length ? api<Alert[]>(busAlertsPath) : Promise.resolve([])), busAlertsPath, ALERTS_REFRESH_MS)
+  const busOnly = station.data?.routeId === ''
   const notFound = station.error instanceof ApiError && station.error.status === 404
-  useTitle(notFound ? 'Station not found' : station.data?.name)
+  useTitle(notFound ? 'Stop not found' : station.data?.name)
   useEffect(() => {
     if (station.data) rememberStation(station.data.mbtaStopId)
   }, [station.data])
 
   const groups = predictions.data ? groupDepartures(predictions.data, now) : []
+  // Trains and buses under their own headings at a station that has both.
+  const trainGroups = groups.filter((g) => isSubwayRoute(g.routeId))
+  const busGroups = groups.filter((g) => !isSubwayRoute(g.routeId))
+  const headings = trainGroups.length > 0 && busGroups.length > 0
   const age = predictions.updatedAt && secondsAgo(predictions.updatedAt, now)
   const stationAlerts =
     station.data && alerts.data
-      ? alertsFor(alerts.data, { routeIds: stationRouteIds(station.data), stopId: station.data.mbtaStopId })
+      ? alertsFor([...alerts.data, ...(busAlerts.data ?? [])], {
+          routeIds: [...stationRouteIds(station.data), ...busIds],
+          stopId: station.data.mbtaStopId,
+        })
       : []
 
   if (notFound) {
-    return <NotFound title="Station not found" message="There's no subway station at this address." back={{ to: '/lines', label: 'Browse lines' }} />
+    return <NotFound title="Stop not found" message="There's no station or bus stop at this address." back={{ to: '/lines', label: 'Browse lines' }} />
   }
 
   return (
@@ -41,8 +58,12 @@ export default function StationPage() {
         <h1 className="text-2xl font-bold">{station.data?.name ?? <LoadingText className="h-7 w-48" />}</h1>
         <div className="mt-1 flex flex-wrap gap-1">
           {station.data &&
-            stationRouteIds(station.data).map((id) => <LineBadge key={id} routeId={id} routes={routes.data} />)}
+            [...stationRouteIds(station.data), ...busIds].map((id) => <LineBadge key={id} routeId={id} routes={routes.data} />)}
         </div>
+        {/* Each side of the street is its own bus stop: say which way this one's buses go. */}
+        {station.data && busOnly && (
+          <p className="mt-1 text-sm text-neutral-600 dark:text-neutral-300">Bus stop · {towardLabel(station.data, routes.data, 4)}</p>
+        )}
         {/* Wheelchair users need to know before they go; MBTA elevator outages show as alerts below. */}
         {station.data?.isAccessible != null && (
           <p className={`mt-2 flex items-center gap-1.5 text-sm font-semibold ${station.data.isAccessible ? 'text-blue-700 dark:text-blue-300' : 'text-neutral-500'}`}>
@@ -83,40 +104,18 @@ export default function StationPage() {
 
       {predictions.data && groups.length === 0 && (
         <Card>
-          <p className="text-neutral-500">{noTrainsMessage(!!majorAlert(stationAlerts), now)}</p>
+          <p className="text-neutral-500">
+            {busOnly
+              ? "No buses are predicted here right now. Some routes don't run late at night or on weekends."
+              : noTrainsMessage(!!majorAlert(stationAlerts), now)}
+          </p>
         </Card>
       )}
 
-      <ul className="space-y-3">
-        {groups.map((g) => {
-          const route = routes.data?.find((r) => r.id === g.routeId)
-          const destination = route?.directionDestinations[g.directionId] ?? `Direction ${g.directionId}`
-          return (
-            <li key={`${g.routeId}|${g.directionId}`}>
-              <Card>
-                {/* Next train big on the right, the ones after it underneath: readable at a glance. */}
-                <div className="flex items-center justify-between gap-3">
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2">
-                      <LineBadge routeId={g.routeId} routes={routes.data} />
-                      <span className="truncate font-semibold">to {destination}</span>
-                    </div>
-                    {g.departures.length > 1 && (
-                      <p className="mt-1 text-sm text-neutral-500">
-                        Then {g.departures.slice(1).map((time) => countdown(time, now)).join(', ')}
-                      </p>
-                    )}
-                  </div>
-                  <div className="shrink-0 text-right">
-                    <div className="text-2xl font-bold tabular-nums">{countdown(g.departures[0], now)}</div>
-                    <div className="text-xs text-neutral-500">{clock(g.departures[0])}</div>
-                  </div>
-                </div>
-              </Card>
-            </li>
-          )
-        })}
-      </ul>
+      {headings && <h2 className="px-1 text-lg font-bold">Trains</h2>}
+      <Departures groups={trainGroups} routes={routes.data} now={now} />
+      {headings && <h2 className="px-1 text-lg font-bold">Buses</h2>}
+      <Departures groups={busGroups} routes={routes.data} now={now} />
 
       {age !== undefined &&
         (age > STALE_AFTER_SECONDS ? (
@@ -128,5 +127,40 @@ export default function StationPage() {
           <p className="text-center text-xs text-neutral-500">Live from MBTA, updated {agoLabel(age)}</p>
         ))}
     </>
+  )
+}
+
+function Departures({ groups, routes, now }: { groups: ReturnType<typeof groupDepartures>; routes: Route[] | undefined; now: Date }) {
+  return (
+    <ul className="space-y-3">
+      {groups.map((g) => {
+        const route = routes?.find((r) => r.id === g.routeId)
+        const destination = route?.directionDestinations[g.directionId] ?? `Direction ${g.directionId}`
+        return (
+          <li key={`${g.routeId}|${g.directionId}`}>
+            <Card>
+              {/* Next one big on the right, the ones after it underneath: readable at a glance. */}
+              <div className="flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2">
+                    <LineBadge routeId={g.routeId} routes={routes} />
+                    <span className="truncate font-semibold">to {destination}</span>
+                  </div>
+                  {g.departures.length > 1 && (
+                    <p className="mt-1 text-sm text-neutral-500">
+                      Then {g.departures.slice(1).map((time) => countdown(time, now)).join(', ')}
+                    </p>
+                  )}
+                </div>
+                <div className="shrink-0 text-right">
+                  <div className="text-2xl font-bold tabular-nums">{countdown(g.departures[0], now)}</div>
+                  <div className="text-xs text-neutral-500">{clock(g.departures[0])}</div>
+                </div>
+              </div>
+            </Card>
+          </li>
+        )
+      })}
+    </ul>
   )
 }

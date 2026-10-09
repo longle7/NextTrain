@@ -39,10 +39,14 @@ export function loadMapKit(): Promise<void> {
 
 const STATUS = { INCOMING_AT: 'Arriving at', STOPPED_AT: 'Stopped at', IN_TRANSIT_TO: 'Next stop:' }
 
-/** A train's card title, "Red Line to Alewife", then where it is ("Next stop: Park Street") when MBTA says. */
+/**
+ * A train's card title, "Red Line to Alewife" (a bus's, "Route 1 to Harvard Square"), then where it is ("Next stop:
+ * Park Street") when MBTA says.
+ */
 export function trainCallout(v: Vehicle, route: Route | undefined) {
+  const name = route?.type === 'bus' ? `Route ${route.shortName || route.id}` : (route?.name ?? v.routeId)
   return {
-    title: `${route?.name ?? v.routeId} to ${route?.directionDestinations[v.directionId] ?? 'unknown'}`,
+    title: `${name} to ${route?.directionDestinations[v.directionId] ?? 'unknown'}`,
     subtitle: v.stopName && v.currentStatus ? `${STATUS[v.currentStatus]} ${v.stopName}` : '',
   }
 }
@@ -56,15 +60,15 @@ const svgElement = (tag: string, attributes: Record<string, string>) => {
 }
 
 /**
- * A dot in the line's color with a white arrowhead pointing the way the train is heading (no arrow if unknown).
+ * A dot in the line's color with an arrowhead pointing the way the train (or bus) is heading (no arrow if unknown).
  * The arrowhead is notched, like a navigation arrow: a plain triangle looks the same turned by 120°, so its
- * direction can't be read.
+ * direction can't be read. `ink` draws the arrow and outline: white on the subway's colors, black on bus yellow.
  */
-export function trainElement(color: string, heading: number | null, label: string, preview: Preview) {
+export function trainElement(color: string, heading: number | null, label: string, preview: Preview, ink = 'white') {
   const svg = svgElement('svg', { viewBox: '0 0 24 24', width: '24', height: '24', role: 'img', class: 'train' })
-  svg.append(svgElement('circle', { cx: '12', cy: '12', r: '10', stroke: 'white', 'stroke-width': '2' }))
-  svg.append(svgElement('path', { d: 'M12 4.5 L17 17 L12 14 L7 17 Z', fill: 'white', 'stroke-linejoin': 'round' }))
-  updateTrainElement(svg, color, heading, label)
+  svg.append(svgElement('circle', { cx: '12', cy: '12', r: '10', 'stroke-width': '2' }))
+  svg.append(svgElement('path', { d: 'M12 4.5 L17 17 L12 14 L7 17 Z', 'stroke-linejoin': 'round' }))
+  updateTrainElement(svg, color, heading, label, ink)
   // Its card: on mouse hover, or on a tap (a touchscreen has no hover).
   svg.addEventListener('pointerenter', (event) => event.pointerType === 'mouse' && preview.show(svg))
   svg.addEventListener('pointerleave', (event) => event.pointerType === 'mouse' && preview.hide())
@@ -73,9 +77,11 @@ export function trainElement(color: string, heading: number | null, label: strin
 }
 
 // heading: degrees clockwise from north. label: what a screen reader says ("Red Line to Alewife. Next stop: …").
-export function updateTrainElement(svg: Element, color: string, heading: number | null, label: string) {
+export function updateTrainElement(svg: Element, color: string, heading: number | null, label: string, ink = 'white') {
   const [circle, arrow] = svg.children as unknown as [SVGElement, SVGElement]
   circle.style.fill = color // a style property, so an invalid value is just ignored
+  circle.style.stroke = ink
+  arrow.style.fill = ink
   arrow.style.display = heading === null ? 'none' : ''
   ;(svg as SVGElement).style.transform = `rotate(${heading ?? 0}deg)`
   svg.setAttribute('aria-label', label)
@@ -112,10 +118,10 @@ function nearestDot(x: number, y: number, fallback: HTMLElement): HTMLElement {
  * neighbor's invisible edge. Hovering with a mouse, or focusing with the keyboard, shows its next trains; Escape
  * hides them.
  */
-export function stationElement(name: string, open: () => void, preview: Preview) {
+export function stationElement(name: string, open: () => void, preview: Preview, kind: 'station' | 'stop' = 'station') {
   const dot = Object.assign(document.createElement('div'), { className: 'station-dot', tabIndex: 0 })
   dot.setAttribute('role', 'button')
-  dot.setAttribute('aria-label', `${name} station`)
+  dot.setAttribute('aria-label', `${name} ${kind}`)
   dot.setAttribute('aria-describedby', 'station-preview')
   // Its name, shown beside the dot once the map is zoomed in (CSS: .show-names); the dot's aria-label already says it.
   const label = Object.assign(document.createElement('span'), { className: 'station-name', textContent: name })

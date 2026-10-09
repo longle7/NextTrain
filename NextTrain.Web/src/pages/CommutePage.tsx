@@ -1,7 +1,8 @@
 import { useState, type ReactNode } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router'
 import {
-  api, ApiError, getRoutes, getStations, searchStations, stationRouteIds,
+  api, ApiError, busDirections, busRouteIds, findRoute, getBusStops, getRoutes, getStations, ROUTES, searchStations,
+  stationRouteIds, towardLabel,
   type Commute, type CommuteInput, type Route, type Station,
 } from '../api'
 import { WEEK } from '../commutes'
@@ -27,8 +28,11 @@ export default function CommutePage() {
 
 function CommuteForm({ existing, initialStopId }: { existing: Commute | undefined; initialStopId: string }) {
   const navigate = useNavigate()
-  const routes = usePolling(getRoutes, 'routes')
+  const routes = usePolling(getRoutes, ROUTES)
   const stations = usePolling(getStations, 'stations')
+  const busStops = usePolling(getBusStops, '/bus-stops', undefined, { remember: false }) // ~1 MB: the browser caches it
+  // Stations first, so a search for "Harvard" offers the station before the bus stops near it.
+  const allStops = stations.data && busStops.data ? [...stations.data, ...busStops.data] : stations.data
 
   const [stopId, setStopId] = useState(existing?.mbtaStopId ?? initialStopId)
   const [routeId, setRouteId] = useState(existing?.routeId ?? '')
@@ -39,12 +43,17 @@ function CommuteForm({ existing, initialStopId }: { existing: Commute | undefine
   const [error, setError] = useState<string>()
   const [saving, setSaving] = useState(false)
 
-  const station = stations.data?.find((s) => s.mbtaStopId === stopId)
-  const stationRoutes = station ? stationRouteIds(station) : []
+  const station = allStops?.find((s) => s.mbtaStopId === stopId)
+  const stationRoutes = station ? [...stationRouteIds(station), ...busRouteIds(station)] : []
   // A single-line station needs no choice.
   const chosenRouteId = stationRoutes.includes(routeId) ? routeId : stationRoutes.length === 1 ? stationRoutes[0] : undefined
-  const route = routes.data?.find((r) => r.id === chosenRouteId)
-  const ready = station && chosenRouteId && directionId !== undefined && start < end && days.length > 0
+  const route = findRoute(routes.data, chosenRouteId ?? '')
+  // A train goes both ways from a station; a bus usually just one way from a stop (each side of the street is its own
+  // stop), and then there's no choice to make.
+  const directions = route?.type === 'bus' && station ? busDirections(station, route.id) : [0, 1]
+  const chosenDirection =
+    directionId !== undefined && directions.includes(directionId) ? directionId : directions.length === 1 ? directions[0] : undefined
+  const ready = station && chosenRouteId && chosenDirection !== undefined && start < end && days.length > 0
 
   const pickStation = (id: string) => {
     setStopId(id)
@@ -55,7 +64,7 @@ function CommuteForm({ existing, initialStopId }: { existing: Commute | undefine
   const save = async () => {
     if (!ready) return
     const body: CommuteInput = {
-      mbtaStopId: station.mbtaStopId, routeId: chosenRouteId, directionId,
+      mbtaStopId: station.mbtaStopId, routeId: chosenRouteId, directionId: chosenDirection,
       windowStart: start, windowEnd: end, activeDays: days.join(','),
     }
     await submit(() => api(existing ? `/commutes/${existing.id}` : '/commutes', { method: existing ? 'PUT' : 'POST', body: JSON.stringify(body) }))
@@ -93,7 +102,7 @@ function CommuteForm({ existing, initialStopId }: { existing: Commute | undefine
             </div>
           </Card>
         ) : (
-          <StationPicker stations={stations.data} routes={routes.data} onPick={pickStation} />
+          <StationPicker stations={allStops} routes={routes.data} onPick={pickStation} />
         )}
       </Step>
 
@@ -119,8 +128,8 @@ function CommuteForm({ existing, initialStopId }: { existing: Commute | undefine
       {route && (
         <Step title="Which way?">
           <div className="grid grid-cols-2 gap-2">
-            {route.directionDestinations.map((destination, i) => (
-              <Choice key={i} selected={directionId === i} onClick={() => setDirectionId(i)}>
+            {route.directionDestinations.map((destination, i) => directions.includes(i) && (
+              <Choice key={i} selected={chosenDirection === i} onClick={() => setDirectionId(i)}>
                 <span className="text-left">
                   <span className="block">{destination}</span>
                   <span className="block text-xs font-normal text-neutral-500">{bound(route, i)}</span>
@@ -184,15 +193,19 @@ function StationPicker({ stations, routes, onPick }: { stations: Station[] | und
   const results = stations ? (query.trim() ? searchStations(stations, query, 6) : recent) : []
   return (
     <div className="space-y-2">
-      <SearchInput value={query} onChange={setQuery} placeholder="Search stations" onSubmit={() => results[0] && onPick(results[0].mbtaStopId)} />
+      <SearchInput value={query} onChange={setQuery} placeholder="Search stations or bus stops" onSubmit={() => results[0] && onPick(results[0].mbtaStopId)} />
       {!query.trim() && results.length > 0 && <p className="px-1 text-sm font-semibold text-neutral-500">Recent</p>}
       {results.map((s) => (
         <button key={s.mbtaStopId} onClick={() => onPick(s.mbtaStopId)} className="w-full text-left">
           <Card>
             <span className="flex items-center justify-between gap-2">
-              <span className="font-medium">{s.name}</span>
-              <span className="flex gap-1">
-                {stationRouteIds(s).map((id) => (
+              <span>
+                <span className="font-medium">{s.name}</span>
+                {/* Both sides of a street have a stop with the same name: this says which one. */}
+                {!s.routeId && <span className="block text-sm text-neutral-500">{towardLabel(s, routes)}</span>}
+              </span>
+              <span className="flex max-w-[45%] shrink-0 flex-wrap justify-end gap-1">
+                {[...stationRouteIds(s), ...busRouteIds(s)].slice(0, 4).map((id) => (
                   <LineBadge key={id} routeId={id} routes={routes} />
                 ))}
               </span>

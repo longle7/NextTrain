@@ -1,8 +1,9 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { Link, useNavigate } from 'react-router'
 import { alertsFor, majorAlert } from '../alerts'
 import {
-  ALERTS_REFRESH_MS, api, commutePredictionsPath, getAlerts, getRoutes, getStations, searchStations, stationRouteIds,
+  ALERTS_REFRESH_MS, api, commutePredictionsPath, getAlerts, getBusStops, getRoutes, getStations, isSubwayRoute, ROUTES,
+  searchRoutes, searchStations, stationRouteIds, towardLabel,
   type Alert, type Commute, type Prediction, type Route, type Station,
 } from '../api'
 import { commuteTiming, daysLabel, liveActivityEnd, sortCommutes, timingLabel, windowLabel } from '../commutes'
@@ -14,35 +15,51 @@ import { clock, countdown, groupDepartures, secondsAgo, STALE_AFTER_SECONDS } fr
 import { failure, useNow, usePolling, useTitle } from '../usePolling'
 
 export default function HomePage() {
-  const routes = usePolling(getRoutes, 'routes')
+  const routes = usePolling(getRoutes, ROUTES)
   const stations = usePolling(getStations, 'stations')
+  const busStops = usePolling(getBusStops, '/bus-stops', undefined, { remember: false }) // ~1 MB: the browser caches it
   const navigate = useNavigate()
   const alerts = usePolling(getAlerts, 'alerts', ALERTS_REFRESH_MS) // one poll shared by commutes and nearby
   const [query, setQuery] = useState('')
+  // Stations first, then bus routes by number ("66"), then bus stops.
   const results = stations.data ? searchStations(stations.data, query) : []
+  const routeResults = routes.data ? searchRoutes(routes.data, query) : []
+  // "66" means route 66, not 665 Broadway: an exact route number shows just the route.
+  const exactRoute = routeResults.some((r) => (r.shortName || r.id).toLowerCase() === query.trim().toLowerCase())
+  const stopResults = busStops.data && !exactRoute ? searchStations(busStops.data, query, 6) : []
+  const nothingFound = !!stations.data && !!busStops.data && results.length + routeResults.length + stopResults.length === 0
   const [recentIds] = useState(recentStationIds) // read once per visit to Home
-  const recent = recentIds.flatMap((id) => stations.data?.find((s) => s.mbtaStopId === id) ?? [])
+  const recent = recentIds.flatMap((id) => stations.data?.find((s) => s.mbtaStopId === id) ?? busStops.data?.find((s) => s.mbtaStopId === id) ?? [])
   useTitle(undefined)
+
+  const openTopResult = () => {
+    if (results[0]) navigate(`/stations/${results[0].mbtaStopId}`)
+    else if (routeResults[0]) navigate(`/lines/${routeResults[0].id}`)
+    else if (stopResults[0]) navigate(`/stations/${stopResults[0].mbtaStopId}`)
+  }
 
   return (
     <>
       {/* The header shows the name; screen readers still need a page heading to start from. */}
       <h1 className="sr-only">NextTrain</h1>
-      <SearchInput
-        value={query}
-        onChange={setQuery}
-        placeholder="Search stations"
-        onSubmit={() => results[0] && navigate(`/stations/${results[0].mbtaStopId}`)}
-      />
+      <SearchInput value={query} onChange={setQuery} placeholder="Search stations, stops, or bus routes" onSubmit={openTopResult} />
 
       <Status error={failure(stations)} loading={!!query.trim() && !stations.data && !stations.error} />
 
       {query.trim() ? (
-        <section>
-          {stations.data && results.length === 0 && (
-            <p className="px-1 text-neutral-500">No stations match “{query.trim()}”.</p>
-          )}
+        <section className="space-y-4">
+          {nothingFound && <p className="px-1 text-neutral-500">Nothing matches “{query.trim()}”.</p>}
           <StationList stations={results} routes={routes.data} />
+          {routeResults.length > 0 && (
+            <ResultGroup title="Bus routes">
+              <RouteList routes={routeResults} />
+            </ResultGroup>
+          )}
+          {stopResults.length > 0 && (
+            <ResultGroup title="Bus stops">
+              <StationList stations={stopResults} routes={routes.data} />
+            </ResultGroup>
+          )}
         </section>
       ) : (
         <>
@@ -62,7 +79,7 @@ export default function HomePage() {
             </section>
           )}
           {stations.data ? (
-            <Nearby stations={stations.data} routes={routes.data} alerts={alerts.data} />
+            <Nearby stations={stations.data} busStops={busStops.data} routes={routes.data} alerts={alerts.data} />
           ) : (
             // Keeps Home's layout steady while stations load, instead of the section popping in. (A failure already
             // shows at the top of the page.)
@@ -79,13 +96,40 @@ export default function HomePage() {
   )
 }
 
+// A bus stop also says where its buses go ("1 toward Harvard Square"): each side of the street is its own stop.
 function StationList({ stations, routes }: { stations: Station[]; routes: Route[] | undefined }) {
   return (
     <ul className="space-y-2">
       {stations.map((station) => (
         <li key={station.mbtaStopId}>
           <Card>
-            <StationLink station={station} routes={routes} />
+            <StationLink station={station} routes={routes} detail={towardLabel(station, routes) || undefined} />
+          </Card>
+        </li>
+      ))}
+    </ul>
+  )
+}
+
+function ResultGroup({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <div className="space-y-2">
+      <h2 className="px-1 text-sm font-bold text-neutral-500">{title}</h2>
+      {children}
+    </div>
+  )
+}
+
+function RouteList({ routes }: { routes: Route[] }) {
+  return (
+    <ul className="space-y-2">
+      {routes.map((route) => (
+        <li key={route.id}>
+          <Card to={`/lines/${route.id}`}>
+            <span className="flex items-center gap-3">
+              <LineBadge routeId={route.id} routes={routes} />
+              <span className="min-w-0 flex-1 truncate font-medium">{route.name}</span>
+            </span>
           </Card>
         </li>
       ))}
@@ -95,7 +139,15 @@ function StationList({ stations, routes }: { stations: Station[]; routes: Route[
 
 type Located = { state: 'idle' | 'locating' } | { state: 'error'; message: string } | { state: 'found'; coords: GeolocationCoordinates }
 
-function Nearby({ stations, routes, alerts }: { stations: Station[]; routes: Route[] | undefined; alerts: Alert[] | undefined }) {
+// Bus stops farther than this aren't "near you" (about a 12-minute walk).
+const BUS_STOP_MILES = 0.5
+
+function Nearby({ stations, busStops, routes, alerts }: {
+  stations: Station[]
+  busStops: Station[] | undefined
+  routes: Route[] | undefined
+  alerts: Alert[] | undefined
+}) {
   const [location, setLocation] = useState<Located>({ state: 'idle' })
 
   const locate = () => {
@@ -117,6 +169,11 @@ function Nearby({ stations, routes, alerts }: { stations: Station[]; routes: Rou
 
   const nearest = location.state === 'found' ? nearestStations(stations, location.coords) : []
   const outOfArea = nearest.length > 0 && nearest[0].miles > OUT_OF_AREA_MILES
+  // Worked out on the device, like the stations: your location never leaves the phone.
+  const nearbyStops =
+    location.state === 'found' && busStops
+      ? nearestStations(busStops, location.coords, 4).filter(({ miles }) => miles <= BUS_STOP_MILES)
+      : []
 
   return (
     <section className="space-y-2">
@@ -124,24 +181,45 @@ function Nearby({ stations, routes, alerts }: { stations: Station[]; routes: Rou
       {outOfArea ? (
         <Card>
           <p className="text-neutral-500">
-            You're outside the MBTA subway area. Search for a station above to see its live departures.
+            You're outside the MBTA area. Search for a station or bus stop above to see its live departures.
           </p>
         </Card>
       ) : location.state === 'found' ? (
-        <ul className="space-y-2">
-          {nearest.map(({ station, miles }, i) => (
-            <li key={station.mbtaStopId}>
-              <Card>
-                <StationLink station={station} routes={routes} detail={walkLabel(miles)} />
-                {i === 0 && <NextTrains station={station} routes={routes} alerts={alerts} />}
-              </Card>
-            </li>
-          ))}
-        </ul>
+        <>
+          <ul className="space-y-2">
+            {nearest.map(({ station, miles }, i) => (
+              <li key={station.mbtaStopId}>
+                <Card>
+                  <StationLink station={station} routes={routes} detail={walkLabel(miles)} />
+                  {i === 0 && <NextTrains station={station} routes={routes} alerts={alerts} />}
+                </Card>
+              </li>
+            ))}
+          </ul>
+          {nearbyStops.length > 0 && (
+            <>
+              <h3 className="px-1 pt-2 font-bold">Bus stops</h3>
+              <ul className="space-y-2">
+                {nearbyStops.map(({ station, miles }, i) => (
+                  <li key={station.mbtaStopId}>
+                    <Card>
+                      <StationLink
+                        station={station}
+                        routes={routes}
+                        detail={[walkLabel(miles), towardLabel(station, routes)].filter(Boolean).join(' · ')}
+                      />
+                      {i === 0 && <NextTrains station={station} routes={routes} alerts={alerts} />}
+                    </Card>
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
+        </>
       ) : (
         <Card>
           <p className="text-neutral-500">
-            {location.state === 'error' ? location.message : 'See the closest T stations and how far a walk they are.'}
+            {location.state === 'error' ? location.message : 'See the closest T stations and bus stops, and how far a walk they are.'}
           </p>
           <button
             onClick={locate}
@@ -160,7 +238,7 @@ function Nearby({ stations, routes, alerts }: { stations: Station[]; routes: Rou
   )
 }
 
-// The closest station's next train each way, right on Home: the answer when you're already at the station.
+// The closest station's next train each way (or bus stop's next buses), right on Home: the answer when you're already there.
 const NEARBY_ROWS = 6
 
 function NextTrains({ station, routes, alerts }: { station: Station; routes: Route[] | undefined; alerts: Alert[] | undefined }) {
@@ -185,7 +263,7 @@ function NextTrains({ station, routes, alerts }: { station: Station; routes: Rou
           <div className="my-1 h-16 rounded-lg bg-neutral-100 motion-safe:animate-pulse dark:bg-neutral-800" role="status" aria-label="Loading" />
         )
       ) : groups.length === 0 ? (
-        <p className="py-1 text-sm text-neutral-500">No trains predicted right now</p>
+        <p className="py-1 text-sm text-neutral-500">{station.routeId ? 'No trains predicted right now' : 'No buses predicted right now'}</p>
       ) : (
         <ul>
           {groups.slice(0, NEARBY_ROWS).map((g) => (
@@ -205,9 +283,14 @@ function NextTrains({ station, routes, alerts }: { station: Station; routes: Rou
   )
 }
 
-function MyCommutes({ routes, alerts }: { routes: Route[] | undefined; alerts: Alert[] | undefined }) {
+function MyCommutes({ routes, alerts: subwayAlerts }: { routes: Route[] | undefined; alerts: Alert[] | undefined }) {
   const now = useNow(15_000)
   const commutes = usePolling(() => api<Commute[]>('/commutes'), 'commutes')
+  // Bus alerts only come per route (there are too many to load them all): the ones for your bus commutes.
+  const busRoutes = [...new Set(commutes.data?.map((c) => c.routeId).filter((id) => !isSubwayRoute(id)))].sort().join(',')
+  const busAlertsPath = `/alerts?routes=${encodeURIComponent(busRoutes)}`
+  const busAlerts = usePolling(() => (busRoutes ? api<Alert[]>(busAlertsPath) : Promise.resolve([])), busAlertsPath, ALERTS_REFRESH_MS)
+  const alerts = subwayAlerts && [...subwayAlerts, ...(busAlerts.data ?? [])]
   const sorted = commutes.data && sortCommutes(commutes.data, now)
   // The iPhone Live Activity follows the soonest commute that's on, or starts within 15 minutes.
   const liveId = sorted?.find((c) => liveActivityEnd(c, now))?.id
@@ -231,7 +314,7 @@ function MyCommutes({ routes, alerts }: { routes: Route[] | undefined; alerts: A
       <Status error={failure(commutes)} loading={!commutes.data && !commutes.error} rows={1} />
       {commutes.data?.length === 0 && (
         <Card>
-          <p className="text-neutral-500">Save the trips you take every day. When it's time to go, your next train shows up right here.</p>
+          <p className="text-neutral-500">Save the trips you take every day. When it's time to go, your next train or bus shows up right here.</p>
           <Link
             to="/commutes/new"
             className={`mt-3 ${primaryButton}`}

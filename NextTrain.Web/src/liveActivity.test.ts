@@ -8,7 +8,7 @@ const commute: Commute = {
 }
 const red: Route = {
   id: 'Red', name: 'Red Line', color: '#DA291C', textColor: '#FFFFFF',
-  directionNames: ['South', 'North'], directionDestinations: ['Ashmont/Braintree', 'Alewife'],
+  directionNames: ['South', 'North'], directionDestinations: ['Ashmont/Braintree', 'Alewife'], type: 'subway', shortName: '',
 }
 
 it('sends the Live Activity the commute, its line, the next trains, and the worst alert, with times in Unix seconds', () => {

@@ -1,20 +1,24 @@
 // Types mirror the NextTrain API responses (camelCase JSON).
 
 export interface Route {
-  id: string
-  name: string
+  id: string // MBTA's: "Red", "Green-B", "1", or "741" for SL1
+  name: string // "Red Line"; a bus route's ends, "Harvard Square - Nubian Station"
   color: string
   textColor: string
   directionNames: string[]
   directionDestinations: string[]
+  type: 'subway' | 'bus'
+  shortName: string // what riders call a bus route: "1", "SL1"; "" or a branch letter for the subway
 }
 
+/** A subway station or a bus stop. */
 export interface Station {
   mbtaStopId: string
   name: string
   latitude: number
   longitude: number
-  routeId: string // comma-separated for transfer stations, e.g. "Orange,Red"
+  routeId: string // subway lines, comma-separated for transfer stations ("Orange,Red"); "" at a bus-only stop
+  busRoutes?: string | null // bus routes and the directions they stop here in: "1:0,741:1"
   averageWeekdayBoardings: number | null
   isAccessible: boolean | null // step-free wheelchair access; null when MBTA has no information
 }
@@ -164,11 +168,11 @@ export function forgetUserId() {
 const randomId = () =>
   crypto.randomUUID?.() ?? Array.from(crypto.getRandomValues(new Uint8Array(16)), (b) => b.toString(16).padStart(2, '0')).join('')
 
-// Fetches `path` once per page load and shares the result; a failure allows a retry.
-function fetchOnce<T>(path: string): () => Promise<T> {
+// Fetches `path` once per page load and shares the result (reshaped by `shape`, if given); a failure allows a retry.
+function fetchOnce<T, R = T>(path: string, shape?: (data: R) => T): () => Promise<T> {
   let promise: Promise<T> | undefined
   return () =>
-    (promise ??= api<T>(path).catch((e) => {
+    (promise ??= api<R>(path).then((data) => (shape ? shape(data) : (data as unknown as T))).catch((e) => {
       promise = undefined
       throw e
     }))
@@ -178,35 +182,112 @@ function fetchOnce<T>(path: string): () => Promise<T> {
 export const ALERTS_REFRESH_MS = 60_000
 export const getAlerts = () => api<Alert[]>('/alerts')
 
-// Routes and stations almost never change.
-export const getRoutes = fetchOnce<Route[]>('/routes')
+// Routes and stations almost never change. ROUTES is subway lines then bus routes; `usePolling(getRoutes, ROUTES)`.
+export const ROUTES = '/routes?type=all'
+export const getRoutes = fetchOnce<Route[]>(ROUTES)
 export const getStations = fetchOnce<Station[]>('/stations')
 
-export const stationRouteIds = (station: Station) => station.routeId.split(',')
+// Every bus stop that isn't a subway station (~6,600), as Stations, so search and "Near you" treat them alike.
+// Searched on the device: your location never leaves the phone. Too big to keep in the offline cache (usePolling's
+// `remember: false`); the browser keeps it for an hour.
+export const getBusStops = fetchOnce<Station[], Omit<Station, 'routeId' | 'averageWeekdayBoardings'>[]>('/bus-stops', (stops) =>
+  stops.map((s) => ({ ...s, routeId: '', averageWeekdayBoardings: null })),
+)
+
+/** A station's subway lines; none at a bus-only stop. */
+export const stationRouteIds = (station: Station) => (station.routeId ? station.routeId.split(',') : [])
+
+/** The bus routes that stop here, each once: "1:0,1:1,741:1" gives ["1", "741"]. */
+export const busRouteIds = (station: Station) => [...new Set(busPairs(station).map(([route]) => route))]
+
+/** The directions a bus route stops here in: each side of the street is its own stop, so usually just one. */
+export const busDirections = (station: Station, routeId: string) => busPairs(station).filter(([route]) => route === routeId).map(([, d]) => d)
+
+const busPairs = (station: Station) =>
+  (station.busRoutes ?? '').split(',').filter(Boolean).map((pair): [string, number] => {
+    const [route, direction] = pair.split(':')
+    return [route, Number(direction)]
+  })
+
+/** Whether a route ID is a subway line (vs. a bus route), known even before routes load. */
+export const isSubwayRoute = (routeId: string) => /^(Red|Orange|Blue|Mattapan|Green(-[A-Z])?)$/.test(routeId)
+
+/** Where a bus stop's buses go: "1 toward Harvard Square · 47 toward Central Square". Empty for a subway station. */
+export function towardLabel(station: Station, routes: Route[] | undefined, max = 2): string {
+  const parts = busPairs(station).flatMap(([routeId, direction]) => {
+    const route = routes?.find((r) => r.id === routeId)
+    return route ? [`${route.shortName || route.id} toward ${route.directionDestinations[direction]}`] : []
+  })
+  return parts.length > max ? `${parts.slice(0, max).join(' · ')} · +${parts.length - max} more` : parts.join(' · ')
+}
 
 /** Live departures for one commute: its station, line, and direction. */
 export const commutePredictionsPath = (c: Pick<Commute, 'mbtaStopId' | 'routeId' | 'directionId'>) =>
   `/stations/${encodeURIComponent(c.mbtaStopId)}/predictions?route=${encodeURIComponent(c.routeId)}&direction=${c.directionId}`
 
-/** A line's badge text: "RL", "GL B", "M". Shared by LineBadge and the iPhone Live Activity. */
-export const lineLabel = (routeId: string) =>
-  routeId.startsWith('Green-') ? `GL ${routeId.slice(6)}` : routeId === 'Mattapan' ? 'M' : `${routeId[0]}L`
+/**
+ * A route's badge text: "RL", "GL B", "M", or a bus's number ("1", "SL1"). Shared by LineBadge and the iPhone Live
+ * Activity. Bus route IDs aren't always their numbers (SL1 is "741"), so buses need the route.
+ */
+export const lineLabel = (routeId: string, route?: Route) =>
+  !isSubwayRoute(routeId) ? (route?.shortName || routeId)
+  : routeId.startsWith('Green-') ? `GL ${routeId.slice(6)}` : routeId === 'Mattapan' ? 'M' : `${routeId[0]}L`
+
+/** A route by ID: exact, since bus route "1" must not match "10". "Green" (all branches) takes the first branch. */
+export const findRoute = (routes: Route[] | undefined, routeId: string) =>
+  routes?.find((r) => r.id === routeId) ?? (routeId === 'Green' ? routes?.find((r) => r.id.startsWith('Green-')) : undefined)
+
+/** Routes matching what someone typed, by number ("66", "sl1") or by where they go ("harvard"). Best first. */
+export function searchRoutes(routes: Route[], query: string, limit = 5): Route[] {
+  const q = query.trim().toLowerCase()
+  if (!q) return []
+  const rank = (route: Route) => {
+    const number = (route.shortName || route.id).toLowerCase()
+    if (number === q) return 0
+    if (route.type === 'bus' && number.startsWith(q)) return 1
+    if (q.length >= 3 && route.name.toLowerCase().includes(q)) return 2
+    return undefined
+  }
+  return routes
+    .filter((r) => r.type === 'bus')
+    .map((route) => ({ route, rank: rank(route) }))
+    .filter((r): r is { route: Route; rank: number } => r.rank !== undefined)
+    .sort((a, b) => a.rank - b.rank)
+    .slice(0, limit)
+    .map((r) => r.route)
+}
 
 // How people type station names: "st" for Street or Saint, "sq" for Square, "ctr" for Center (or Newton Centre).
+// Bus stop names abbreviate the other way ("Massachusetts Ave"), so the full words find them too.
 const ALTERNATIVES: Record<string, string[]> = {
   st: ['street', 'saint'],
   sq: ['square'],
   ctr: ['center', 'centre'],
-  center: ['centre'],
+  center: ['centre', 'ctr'],
   centre: ['center'],
   govt: ['government'],
   xing: ['crossing'],
   mfa: ['museum'],
+  street: ['st'],
+  avenue: ['ave'],
+  av: ['ave'],
+  square: ['sq'],
+  road: ['rd'],
+  boulevard: ['blvd'],
+  opposite: ['opp'],
 }
-// Often added to names that don't have them: "Harvard Square" for Harvard, "Park Street Station".
-const OPTIONAL = new Set(['square', 'sq', 'station', 'stop', 't'])
+// Often added to names that don't have them: "Harvard Square" for Harvard, "Park Street Station", "Mass Ave at Bow".
+const OPTIONAL = new Set(['square', 'sq', 'station', 'stop', 't', 'at', 'and'])
 
 const words = (text: string) => text.toLowerCase().replaceAll("'", '').split(/[^a-z0-9]+/).filter(Boolean)
+
+// Each name's words, worked out once: searching ~6,600 bus stops on every keystroke has to be quick on a phone.
+const wordsCache = new WeakMap<Station, string[]>()
+const nameWords = (station: Station) => {
+  let cached = wordsCache.get(station)
+  if (!cached) wordsCache.set(station, (cached = words(station.name)))
+  return cached
+}
 
 /**
  * Station search that forgives how people type. Best first: names starting with the query, then names where every
@@ -216,7 +297,7 @@ export function searchStations(stations: Station[], query: string, limit = 8): S
   const q = words(query)
   if (q.length === 0) return []
   const rank = (station: Station) => {
-    const name = words(station.name)
+    const name = nameWords(station)
     const matches = (w: string) => name.some((n) => n.startsWith(w) || ALTERNATIVES[w]?.some((alt) => n.startsWith(alt)))
     if (name.join(' ').startsWith(q.join(' '))) return 0
     if (q.some(matches) && q.every((w) => matches(w) || OPTIONAL.has(w))) return 1

@@ -24,10 +24,12 @@ Make the app **iPhone-only** in Xcode (Supported Destinations: iPhone). Otherwis
 
 ## Listing text
 
+Updated for **version 1.2 (buses)**; 1.0 went out with the subway-only wording. The name and subtitle can change with any new version.
+
 | Field | Draft |
 |---|---|
-| Name (30 max) | NextTrain – Boston Subway |
-| Subtitle (30 max) | Live subway times and alerts |
+| Name (30 max) | NextTrain – Boston T & Bus |
+| Subtitle (30 max) | Live subway & bus times |
 | Category | Navigation (secondary: Travel) |
 | Age rating | 4+ |
 | Price | *you decide* (free fits the scope) |
@@ -38,37 +40,40 @@ Make the app **iPhone-only** in Xcode (Supported Destinations: iPhone). Otherwis
 **Keywords** (100 max, comma-separated, no spaces needed). Keep "MBTA" out: App Review flags other companies' trademarks used as keywords (guideline 2.3.7).
 
 ```
-boston,subway,train,transit,commute,red line,orange line,green line,blue line,arrivals,metro
+boston,subway,bus,train,transit,commute,red line,orange line,green line,blue line,silver line,metro
 ```
 
 **Promotional text** (170 max, can be changed any time without a new build):
 
 ```
-Know when your train leaves. Live departures, service alerts, and your daily commute at a glance, for every station on the Red, Orange, Blue, Green, and Mattapan lines.
+Know when your train or bus leaves. Live departures, alerts, and your daily commute at a glance, for every subway station and bus stop in Boston.
 ```
 
 **Description** (4,000 max):
 
 ```
-NextTrain shows live times for Boston's subway, built for the trip you take every day.
+NextTrain shows live times for Boston's subway and buses, built for the trip you take every day.
 
 YOUR COMMUTE, AT A GLANCE
 Save the trips you take: your station, line, direction, and the time you usually leave. When it's time to go, the next train is waiting on the home screen, with any delay or suspension that affects it.
 
 LIVE DEPARTURES
-Every station shows its next trains for each line and direction, counting down in real time and refreshing every 10 seconds.
+Every station and bus stop shows its next trains and buses for each route and direction, counting down in real time and refreshing every 10 seconds.
+
+BUSES TOO
+All 150 MBTA bus routes, Silver Line included. Find a route by its number ("66", "SL1"), see its stops in order and its buses moving along them, and save a bus commute. Each side of the street is its own stop, and NextTrain tells you which way each one goes.
 
 NEAR YOU
-See the closest stations, how far a walk they are, and the next trains at the nearest one. Your location never leaves your phone.
+See the closest stations and bus stops, how far a walk they are, and the next trains and buses at the nearest ones. Your location never leaves your phone.
 
 SERVICE ALERTS
 Delays, shuttle buses, suspensions, and station closures appear on the lines, stations, and commutes they affect.
 
 LIVE LINE DIAGRAMS AND MAP
-Watch every train move along its line, or across the whole system on the map, with arrows showing which way each one is heading. Zoom in to see station names, or filter to a single line or Green Line branch.
+Watch every train move along its line, or across the whole system on the map, with arrows showing which way each one is heading. Zoom in to see station names, filter to a single line or Green Line branch, or pick a bus route to see its streets, stops, and buses.
 
 HOW FULL IS IT?
-Tap a train on the map to see where it's headed and, where the MBTA reports it, how crowded each car is.
+Tap a train or bus on the map to see where it's headed and, where the MBTA reports it, how crowded it is (for trains, car by car).
 
 SEARCH THAT GETS YOU
 "harvard sq", "park st", "gov ctr": type it the way you say it.
@@ -77,6 +82,17 @@ PRIVATE BY DESIGN
 No account, no ads, no tracking. Your commutes are saved under a random ID, and Settings → Delete my data erases everything.
 
 Live data comes from the MBTA. NextTrain is an independent app and isn't affiliated with or endorsed by the MBTA.
+```
+
+**What's New in Version 1.2** (4,000 max):
+
+```
+Buses are here. All 150 MBTA bus routes, Silver Line included:
+- Search for a route by number ("66", "SL1") or a stop by street
+- Bus stops near you, with the next buses at the closest one
+- Every route's stops in order, with its buses moving along them
+- A route's streets and live buses on the map, with how crowded each bus is
+- Save a bus commute, with Live Activities on your Lock Screen
 ```
 
 ## App Privacy answers
@@ -100,7 +116,7 @@ App Review asked new developer accounts for this under Guideline 2.1 (October 20
 
 ```
 1. PURPOSE AND AUDIENCE
-NextTrain is a free app for people who ride Boston's subway (the MBTA Red, Orange, Blue, Green, and Mattapan lines). It answers "when is my next train?" quickly: live departures for every subway station, service alerts, a live map and line diagrams showing where each train is, and saved daily commutes that show your next train on the Home screen when it's time to go. No account, no ads, no in-app purchases.
+NextTrain is a free app for people who ride Boston's subway (the MBTA Red, Orange, Blue, Green, and Mattapan lines) and, from version 1.2, its buses (all 150 routes, Silver Line included). It answers "when is my next train?" quickly: live departures for every subway station, service alerts, a live map and line diagrams showing where each train is, and saved daily commutes that show your next train on the Home screen when it's time to go. No account, no ads, no in-app purchases.
 
 2. SETUP AND HOW TO USE IT
 No login or account is needed, and there is nothing to set up.
@@ -112,6 +128,7 @@ No login or account is needed, and there is nothing to set up.
 - Commutes: Home -> Add a commute. Saved commutes are private to the device (stored under a random ID, not shared with anyone).
 - Data deletion: Settings -> Delete my data removes saved commutes from our server and clears local data. Help & support is in Settings.
 - Live Activities (version 1.1 and later): Settings -> Preview Live Activity, then lock the phone.
+- Buses (version 1.2 and later): search a route number such as "66" or "SL1", or open Lines -> Buses. On the Map, the Bus chip shows one route's streets, stops, and live buses. Tap a bus stop for its next buses.
 There is no user-generated content visible to others and no paid content.
 
 3. EXTERNAL SERVICES

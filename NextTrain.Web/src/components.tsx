@@ -2,7 +2,7 @@ import { Component, type ReactNode } from 'react'
 import { Link } from 'react-router'
 import { useOnline, useTitle } from './usePolling'
 import { MAJOR_SEVERITY } from './alerts'
-import { ApiError, lineLabel, stationRouteIds, type Alert, type Route, type Station } from './api'
+import { ApiError, busRouteIds, findRoute, lineLabel, stationRouteIds, type Alert, type Route, type Station } from './api'
 
 /** Full-width main action ("Save commute"). Works on <button> and <Link>. */
 export const primaryButton =
@@ -21,11 +21,14 @@ export function AppLogo() {
   return <img src="/favicon.svg" alt="" className="size-8" />
 }
 
-/** Colored line pill, e.g. "RL" in red. Gray until routes load. Screen readers hear the full line name. */
+/**
+ * Colored route pill: "RL" in red, or a bus's number ("1" in yellow, "SL1" in silver). Gray until routes load.
+ * Screen readers hear the full name ("Red Line", "Route 1").
+ */
 export function LineBadge({ routeId, routes }: { routeId: string; routes: Route[] | undefined }) {
-  const route = routes?.find((r) => r.id.startsWith(routeId)) // 'Green' matches any branch
-  const label = lineLabel(routeId)
-  const name = routeId === 'Green' ? 'Green Line' : (route?.name ?? routeId)
+  const route = findRoute(routes, routeId)
+  const label = lineLabel(routeId, route)
+  const name = routeId === 'Green' ? 'Green Line' : route?.type === 'bus' ? `Route ${label}` : (route?.name ?? routeId)
   return (
     <span
       className="inline-flex h-6 min-w-9 shrink-0 items-center justify-center rounded-full bg-mbta-silver px-2 text-xs font-bold whitespace-nowrap text-white"
@@ -87,6 +90,8 @@ function friendlyError(error: Error): string {
 }
 
 /** A station's name and its line badges, linking to its departures. `hideRoute` drops the line you're already on. */
+const MAX_BUS_BADGES = 3
+
 export function StationLink({ station, routes, hideRoute, detail }: {
   station: Station
   routes: Route[] | undefined
@@ -97,6 +102,8 @@ export function StationLink({ station, routes, hideRoute, detail }: {
   // Several Green branches read better as one "GL" badge.
   const greens = transfers.filter((id) => id.startsWith('Green-'))
   const badges = [...new Set(transfers.map((id) => (greens.length > 1 && id.startsWith('Green-') ? 'Green' : id)))]
+  // Then its buses, a few at most: a busway can have 15.
+  const buses = busRouteIds(station).filter((id) => id !== hideRoute).sort((a, b) => a.localeCompare(b, undefined, { numeric: true }))
   return (
     <Link to={`/stations/${station.mbtaStopId}`} className="flex min-h-11 flex-1 items-center justify-between gap-2 py-1 hover:underline">
       <span>
@@ -109,10 +116,19 @@ export function StationLink({ station, routes, hideRoute, detail }: {
         )}
         {detail && <span className="block text-sm text-neutral-500">{detail}</span>}
       </span>
-      <span className="flex flex-wrap justify-end gap-1">
+      <span className="flex max-w-[45%] shrink-0 flex-wrap justify-end gap-1">
         {badges.map((id) => (
           <LineBadge key={id} routeId={id} routes={routes} />
         ))}
+        {buses.slice(0, MAX_BUS_BADGES).map((id) => (
+          <LineBadge key={id} routeId={id} routes={routes} />
+        ))}
+        {buses.length > MAX_BUS_BADGES && (
+          <span className="inline-flex h-6 items-center rounded-full bg-neutral-200 px-2 text-xs font-bold text-neutral-700 dark:bg-neutral-800 dark:text-neutral-200">
+            +{buses.length - MAX_BUS_BADGES}
+            <span className="sr-only"> more bus routes</span>
+          </span>
+        )}
       </span>
     </Link>
   )
