@@ -17,6 +17,7 @@ export default function CookiesPage() {
             ['nexttrain.userId', 'A random ID that your saved commutes are stored under', 'Until you use Delete my data'],
             ['nexttrain.recentStations', 'The stations you viewed last, for Home (never sent to us)', 'Until you use Delete my data'],
             ['nexttrain.analyticsConsent', 'Remembers your analytics choice, so we don\'t ask again', 'Until you use Delete my data'],
+            ['nexttrain.cache.*', 'The last train times, stations, alerts, and commutes NextTrain loaded, so it can show them (with their age) when you open it offline, e.g. in a tunnel', 'Until newer data replaces it, or you use Delete my data'],
             ['nexttrain.termsAccepted', 'Remembers which version of the Terms you agreed to, so we only ask again when they change', 'Until you delete the app or clear site data'],
           ]}
         />
