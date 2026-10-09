@@ -12,7 +12,7 @@ export default function TermsPage() {
 
       <Section title="What NextTrain is">
         <p>
-          NextTrain is a free app that shows MBTA subway arrival predictions, service alerts, and train positions. It's
+          NextTrain is a free app that shows MBTA subway and bus arrival predictions, service alerts, and train and bus positions. It's
           for general information only. Train times come from the MBTA and can be late, wrong, or missing: service
           changes, delays, and outages happen. Don't rely on NextTrain where timing is critical or for your safety. Check
           official MBTA sources and signs in stations.

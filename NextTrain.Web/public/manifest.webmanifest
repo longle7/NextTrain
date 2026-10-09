@@ -1,7 +1,7 @@
 {
   "name": "NextTrain",
   "short_name": "NextTrain",
-  "description": "Live MBTA subway departures, a live train map, and your saved commutes.",
+  "description": "Live MBTA subway and bus departures, a live map of every train and bus route, and your saved commutes.",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#171717",

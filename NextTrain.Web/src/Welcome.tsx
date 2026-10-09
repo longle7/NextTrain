@@ -63,7 +63,7 @@ export default function Welcome() {
           </h2>
         </div>
         <ul className="space-y-2 text-sm">
-          <li>Live departures for every MBTA subway station, and trains moving on the map.</li>
+          <li>Live departures for every MBTA subway station and bus stop, with trains and buses moving on the map.</li>
           <li>Save your commutes to see your next train the moment you open the app.</li>
           <li>No account needed, and no ads.</li>
         </ul>

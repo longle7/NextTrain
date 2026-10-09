@@ -7,7 +7,7 @@ export default function PrivacyPage() {
   return (
     <LegalPage title="Privacy Policy">
       <p>
-        NextTrain shows live MBTA subway times. It's operated by {OPERATOR} ("we", "us") and built to collect as little
+        NextTrain shows live MBTA subway and bus times. It's operated by {OPERATOR} ("we", "us") and built to collect as little
         about you as possible: there are no accounts, no ads, and we never sell or share your personal information.
       </p>
 
@@ -38,7 +38,8 @@ export default function PrivacyPage() {
           <li>
             <strong>Technical data.</strong> Like any website, our hosting receives your IP address and basic request
             details (such as the page requested and your browser type) in order to deliver NextTrain and keep it secure. We
-            don't keep request logs ourselves.
+            don't keep request logs ourselves. When something goes wrong on our server, it records the error (never your IP
+            address or your commutes) for up to 30 days so we can fix it.
           </li>
           <li>
             <strong>Messages you send us.</strong> If you email us or report a problem on GitHub, we receive what you send,
@@ -59,6 +60,14 @@ export default function PrivacyPage() {
           <li>
             <strong>Microsoft Azure</strong> hosts the website, our server, and its database, in the United States.{' '}
             <ExternalLink href="https://privacy.microsoft.com/en-us/privacystatement">Microsoft's privacy statement</ExternalLink>
+          </li>
+          <li>
+            <strong>Cloudflare</strong> protects the website and our server from attacks and automated abuse, and runs our
+            domain's DNS and email forwarding. Every request to NextTrain passes through Cloudflare, which receives your IP
+            address and the request details, may set security cookies on the website (see the{' '}
+            <InternalLink to="/cookies">Cookie Policy</InternalLink>), and keeps short-lived records of blocked or suspicious
+            requests.{' '}
+            <ExternalLink href="https://www.cloudflare.com/privacypolicy/">Cloudflare's privacy policy</ExternalLink>
           </li>
           <li>
             <strong>Apple Maps</strong> draws the map. Map images load from Apple's servers, which receive your IP address
