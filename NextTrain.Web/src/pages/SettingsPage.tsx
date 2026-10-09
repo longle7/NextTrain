@@ -1,3 +1,5 @@
+import { App } from '@capacitor/app'
+import { Capacitor } from '@capacitor/core'
 import { useEffect, useState, type ReactNode } from 'react'
 import { Link } from 'react-router'
 import { analyticsBlocked, forgetAnalyticsChoice, setAnalyticsChoice, useAnalyticsChoice } from '../analytics'
@@ -13,6 +15,11 @@ import { useTitle } from '../usePolling'
 export default function SettingsPage() {
   const [deletion, setDeletion] = useState<'idle' | 'deleting' | 'done' | 'failed'>('idle')
   useTitle('Settings')
+  // The iPhone app's real version and build, e.g. "1.1 (12)", so support emails say which build; the website's own otherwise.
+  const [version, setVersion] = useState(__APP_VERSION__)
+  useEffect(() => {
+    if (Capacitor.isNativePlatform()) void App.getInfo().then((info) => setVersion(`${info.version} (${info.build})`), () => {})
+  }, [])
 
   const deleteMyData = async () => {
     if (!confirm("Delete your saved commutes from NextTrain? This can't be undone.")) return
@@ -80,7 +87,7 @@ export default function SettingsPage() {
           </Row>
           <Row>
             <span className="flex min-h-12 flex-1 items-center justify-between">
-              Version <span className="text-neutral-500">{__APP_VERSION__}</span>
+              Version <span className="text-neutral-500">{version}</span>
             </span>
           </Row>
         </ul>
