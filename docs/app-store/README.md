@@ -118,7 +118,7 @@ There is no user-generated content visible to others and no paid content.
 - MBTA V3 API (Massachusetts Bay Transportation Authority): real-time predictions, vehicle positions, alerts, and station data, used under the MassDOT Developer License Agreement.
 - Apple MapKit JS: the map. Our server issues short-lived MapKit tokens.
 - Microsoft Azure: our API (Azure Container Apps), database for saved commutes (Azure SQL), and website (Azure Static Web Apps).
-- Cloudflare: DNS and email forwarding for longledev.com.
+- Cloudflare: DNS and email forwarding for longledev.com, and protection of the website and API from attacks and automated abuse.
 The app uses no third-party sign-in, payment, advertising, analytics, or AI services.
 
 4. REGIONAL DIFFERENCES
