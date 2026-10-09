@@ -1,7 +1,10 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useNavigate, useSearchParams } from 'react-router'
-import { api, getRoutes, getStations, stationRouteIds, type Car, type Prediction, type Route, type RouteShape, type Station, type Vehicle } from '../api'
-import { LineBadge, Status } from '../components'
+import {
+  api, findRoute, getRoutes, getStations, ROUTES, searchRoutes, stationRouteIds,
+  type Car, type Prediction, type Route, type RouteShape, type Station, type Vehicle,
+} from '../api'
+import { LineBadge, SearchInput, Status } from '../components'
 import { boundsOf, locationErrorMessage, nearestStations, OUT_OF_AREA_MILES } from '../geo'
 import { loadMapKit, stationElement, trainCallout, trainElement, updateTrainElement, userElement, type Preview } from '../mapkit'
 import { decodePolyline } from '../polyline'
@@ -53,11 +56,25 @@ export default function MapPage() {
   // In the URL (?line=Green&branch=Green-B), so Back and shared links keep it.
   const line = LINES.find((l) => l.id === params.get('line'))
   const branch = line?.branches?.find(([id]) => id === params.get('branch'))?.[0]
-  const shown = routesFor(line, branch)
-  const routes = usePolling(getRoutes, 'routes')
-  const stations = usePolling(getStations, 'stations')
-  const shapes = usePolling(() => api<RouteShape[]>('/routes/shapes'), 'shapes')
-  const vehicles = usePolling(() => api<Vehicle[]>('/vehicles'), 'vehicles', REFRESH_MS, { remember: false }) // old positions mislead
+  // Bus mode (?line=bus&route=741): one bus route at a time, its streets, stops, and buses. There are ~150 routes and
+  // hundreds of buses; all at once would bury the map.
+  const busMode = params.get('line') === 'bus'
+  const busRoute = (busMode && params.get('route')) || undefined
+  const shown = useMemo(() => (busMode ? (busRoute ? [busRoute] : []) : routesFor(line, branch)), [busMode, busRoute, line, branch])
+  const routes = usePolling(getRoutes, ROUTES)
+  const bus = busMode ? `?route=${encodeURIComponent(busRoute ?? '')}` : '' // a query string, or nothing for the subway
+  const stationsPath = busMode ? `/stations${bus}` : 'stations'
+  const stations = usePolling(busMode ? () => (busRoute ? api<Station[]>(stationsPath) : Promise.resolve([])) : getStations, stationsPath)
+  const shapesPath = busMode ? `/routes/${encodeURIComponent(busRoute ?? '')}/shapes` : '/routes/shapes'
+  const shapes = usePolling(() => (busMode && !busRoute ? Promise.resolve([]) : api<RouteShape[]>(shapesPath)), busMode ? shapesPath : 'shapes')
+  const vehiclesPath = `/vehicles${bus}`
+  const vehicles = usePolling(
+    () => (busMode && !busRoute ? Promise.resolve([]) : api<Vehicle[]>(vehiclesPath)),
+    busMode ? vehiclesPath : 'vehicles',
+    REFRESH_MS,
+    { remember: false }, // old positions mislead
+  )
+  const busRouteInfo = busRoute ? findRoute(routes.data, busRoute) : undefined
   const tracks = useMemo(() => shapes.data?.map((s) => ({ routeId: s.routeId, points: decodePolyline(s.polyline) })), [shapes.data])
   // Puts each train on its own line, arrow along the track the way it's going (see snap.ts).
   const place = useMemo(
@@ -137,15 +154,19 @@ export default function MapPage() {
     return () => dark.removeEventListener('change', apply)
   }, [map])
 
-  // Lines
+  // Lines (and bus routes). Bus yellow is too pale on a light map by itself, so a darker line runs underneath it.
   useEffect(() => {
     if (!map || !tracks) return
-    const color = (id: string) => routes.data?.find((r) => r.id === id)?.color ?? 'gray'
-    const overlays = tracks
-      .filter((t) => onLine(shown, t.routeId))
-      .map((t) => new mapkit.PolylineOverlay(t.points.map(coordinate), {
-        style: new mapkit.Style({ strokeColor: color(t.routeId), lineWidth: 5, strokeOpacity: 0.9, lineJoin: 'round', lineCap: 'round' }),
-      }))
+    const line = (t: { routeId: string; points: [number, number][] }, color: string, lineWidth: number) =>
+      new mapkit.PolylineOverlay(t.points.map(coordinate), {
+        style: new mapkit.Style({ strokeColor: color, lineWidth, strokeOpacity: 0.9, lineJoin: 'round', lineCap: 'round' }),
+      })
+    const visible = tracks.filter((t) => onLine(shown, t.routeId))
+    const pale = (id: string) => findRoute(routes.data, id)?.textColor === '#000000'
+    const overlays = [
+      ...visible.filter((t) => pale(t.routeId)).map((t) => line(t, '#6b4f00', 8)),
+      ...visible.map((t) => line(t, findRoute(routes.data, t.routeId)?.color ?? 'gray', 5)),
+    ]
     map.addOverlays(overlays)
     return () => void map.removeOverlays(overlays)
   }, [map, tracks, routes.data, shown])
@@ -160,9 +181,11 @@ export default function MapPage() {
   // Stations: tap to open departures
   useEffect(() => {
     if (!map || !stations.data) return
-    const annotations = stations.data.filter((s) => stationRouteIds(s).some((id) => onLine(shown, id))).map((s) => {
+    // In bus mode the list is already the route's stops (bus stops have no subway lines to filter on).
+    const annotations = stations.data.filter((s) => busMode || stationRouteIds(s).some((id) => onLine(shown, id))).map((s) => {
       const open = () => navigate(`/stations/${s.mbtaStopId}`)
-      return new mapkit.Annotation(new mapkit.Coordinate(s.latitude, s.longitude), () => stationElement(s.name, open, previews.forStation(s)), {
+      const kind = s.routeId ? 'station' : 'stop'
+      return new mapkit.Annotation(new mapkit.Coordinate(s.latitude, s.longitude), () => stationElement(s.name, open, previews.forStation(s), kind), {
         ...centered(24), // the dot's tap area; it looks 12 px
         title: s.name, // plain text: MapKit never parses it as HTML
         enabled: false, // the dot handles its own taps (see stationElement)
@@ -174,7 +197,7 @@ export default function MapPage() {
       map.removeAnnotations(annotations)
       previews.hide(true) // its dot is gone
     }
-  }, [map, stations.data, navigate, shown, previews])
+  }, [map, stations.data, navigate, shown, previews, busMode])
 
   // Panning or zooming moves the markers out from under the card, so close it; Escape, or a tap on the map away from
   // a marker (how a phone closes a train's card), closes it too.
@@ -202,8 +225,9 @@ export default function MapPage() {
     const live = new Set<string>()
     for (const v of vehicles.data.filter((v) => onLine(shown, v.routeId))) {
       live.add(v.id)
-      const route = routes.data?.find((r) => r.id === v.routeId)
+      const route = findRoute(routes.data, v.routeId)
       const color = route?.color ?? 'gray'
+      const ink = route?.textColor ?? 'white' // the arrow: white on the subway's colors, black on bus yellow
       const { title, subtitle } = trainCallout(v, route)
       const label = subtitle ? `${title}. ${subtitle}` : title
       // Until the tracks load, the raw GPS position and compass bearing.
@@ -211,7 +235,7 @@ export default function MapPage() {
       const { latitude, longitude, heading } = place?.({ ...v, destination }) ?? { ...v, heading: v.bearing }
       let annotation = trains.current.get(v.id)
       if (!annotation) {
-        annotation = new mapkit.Annotation(coordinate([latitude, longitude]), () => trainElement(color, heading, label, previews.forTrain(v.id)), {
+        annotation = new mapkit.Annotation(coordinate([latitude, longitude]), () => trainElement(color, heading, label, previews.forTrain(v.id), ink), {
           ...centered(24),
           enabled: false, // the train handles its own hover and taps (our card, not MapKit's callout)
           displayPriority: mapkit.Annotation.DisplayPriority.Required,
@@ -220,7 +244,7 @@ export default function MapPage() {
         trains.current.set(v.id, annotation)
       } else {
         annotation.coordinate = coordinate([latitude, longitude])
-        updateTrainElement(annotation.element, color, heading, label)
+        updateTrainElement(annotation.element, color, heading, label, ink)
       }
     }
     for (const [id, annotation] of trains.current) {
@@ -360,11 +384,19 @@ export default function MapPage() {
             label={l?.id ?? 'All'}
             name={l ? `${l.id} Line` : 'All lines'}
             color={l && routes.data?.find((r) => r.id.startsWith(l.id))?.color}
-            selected={line === l}
+            selected={!busMode && line === l}
             onSelect={() => setParams(l ? { line: l.id } : {}, { replace: true })}
           />
         ))}
+        <Chip label="Bus" name="Buses" color={BUS_YELLOW} ink="#000000" selected={busMode} onSelect={() => setParams({ line: 'bus' }, { replace: true })} />
       </div>
+      {busMode && (
+        <BusPicker
+          routes={routes.data}
+          selected={busRoute}
+          onSelect={(id) => setParams({ line: 'bus', route: id }, { replace: true })}
+        />
+      )}
       {line?.branches && (
         <div role="radiogroup" aria-label={`Show ${line.id} Line branch`} className="-mx-4 -mt-2 flex gap-2 overflow-x-auto px-4 [scrollbar-width:none]">
           {[undefined, ...line.branches].map((b) => (
@@ -394,7 +426,7 @@ export default function MapPage() {
           </p>
         )}
         {preview && 'station' in preview && (
-          <StationPreview key={preview.station.mbtaStopId} {...preview} routes={routes.data} onPointerEnter={previews.enterCard} onPointerLeave={previews.leaveCard} />
+          <StationPreview key={preview.station.mbtaStopId} {...preview} routes={routes.data} bus={busMode} onPointerEnter={previews.enterCard} onPointerLeave={previews.leaveCard} />
         )}
         {preview && 'trainId' in preview && trainCard && (
           <TrainPreview vehicle={trainCard} at={preview} routes={routes.data} onPointerEnter={previews.enterCard} onPointerLeave={previews.leaveCard} />
@@ -410,9 +442,14 @@ export default function MapPage() {
           </svg>
         </button>
       </div>
-      {vehicles.data && !vehicles.data.some((v) => onLine(shown, v.routeId)) && (
+      {busMode && !busRoute && (
+        <p className="text-center text-sm font-semibold text-neutral-500">Pick a bus route to see its streets, stops, and buses.</p>
+      )}
+      {vehicles.data && (!busMode || busRoute) && !vehicles.data.some((v) => onLine(shown, v.routeId)) && (
         <p role="status" className="text-center text-sm font-semibold text-neutral-500">
-          {noTrainsRunning(branch ? routes.data?.find((r) => r.id === branch)?.name : line && `${line.id} Line`)}
+          {busMode
+            ? `No ${busRouteInfo ? `Route ${busRouteInfo.shortName || busRouteInfo.id} ` : ''}buses are running right now.`
+            : noTrainsRunning(branch ? routes.data?.find((r) => r.id === branch)?.name : line && `${line.id} Line`)}
         </p>
       )}
       {locateMessage && (
@@ -421,7 +458,9 @@ export default function MapPage() {
         </p>
       )}
       <p className="text-center text-xs text-neutral-500">
-        Trains update every 10 seconds; arrows show the direction of travel. Tap a train for where it's headed, or a station for departures.
+        {busMode
+          ? "Buses update every 10 seconds; arrows show the direction of travel. Tap a bus for where it's headed, or a stop for departures."
+          : "Trains update every 10 seconds; arrows show the direction of travel. Tap a train for where it's headed, or a station for departures."}
       </p>
     </>
   )
@@ -434,11 +473,17 @@ function noTrainsRunning(name: string | undefined) {
   return `No ${name ? `${name} ` : ''}trains are running right now.`
 }
 
-/** A filter chip. `label` is what it shows ("B"); `name` is what screen readers hear ("Green Line B"). */
-function Chip({ label, name, color, selected, small, onSelect }: {
+const BUS_YELLOW = '#FFC72C'
+
+/**
+ * A filter chip. `label` is what it shows ("B"); `name` is what screen readers hear ("Green Line B"). `ink` is the text
+ * color when selected: white on the subway's colors, black on bus yellow.
+ */
+function Chip({ label, name, color, ink = '#FFFFFF', selected, small, onSelect }: {
   label: string
   name: string
   color: string | undefined
+  ink?: string
   selected: boolean
   small?: boolean
   onSelect: () => void
@@ -450,11 +495,41 @@ function Chip({ label, name, color, selected, small, onSelect }: {
       aria-label={name}
       onClick={onSelect}
       className={`flex shrink-0 items-center gap-1.5 rounded-full font-semibold shadow-sm ${small ? 'min-h-8 px-3 text-xs' : 'min-h-9 px-3.5 text-sm'} ${selected ? 'text-white' : 'bg-white dark:bg-neutral-900'} ${selected && !color ? 'bg-neutral-900 dark:bg-white dark:text-neutral-900' : ''}`}
-      style={selected && color ? { backgroundColor: color } : undefined}
+      style={selected && color ? { backgroundColor: color, color: ink } : undefined}
     >
       {color && !selected && <span className="size-2.5 rounded-full" style={{ backgroundColor: color }} />}
       {label}
     </button>
+  )
+}
+
+// Bus mode's route picker: type a number ("66", "sl1") or a place, then pick from the matching routes. Before typing,
+// the chosen route and the first routes in MBTA's order (Silver Line first).
+function BusPicker({ routes, selected, onSelect }: { routes: Route[] | undefined; selected: string | undefined; onSelect: (id: string) => void }) {
+  const [query, setQuery] = useState('')
+  const buses = routes?.filter((r) => r.type === 'bus') ?? []
+  const matches = query.trim() ? searchRoutes(buses, query, 12) : buses.slice(0, 12)
+  const chosen = selected ? findRoute(routes, selected) : undefined
+  const shown = chosen && !matches.includes(chosen) ? [chosen, ...matches] : matches
+  return (
+    <div className="space-y-2">
+      <SearchInput value={query} onChange={setQuery} placeholder="Bus route number, e.g. 66 or SL1" onSubmit={() => matches[0] && onSelect(matches[0].id)} />
+      <div role="radiogroup" aria-label="Show bus route" className="-mx-4 flex gap-2 overflow-x-auto px-4 [scrollbar-width:none]">
+        {shown.map((r) => (
+          <Chip
+            key={r.id}
+            small
+            label={r.shortName || r.id}
+            name={`Route ${r.shortName || r.id}, ${r.name}`}
+            color={r.color}
+            ink={r.textColor}
+            selected={selected === r.id}
+            onSelect={() => onSelect(r.id)}
+          />
+        ))}
+        {query.trim() && matches.length === 0 && <p className="py-1 text-sm text-neutral-500">No bus route matches “{query.trim()}”.</p>}
+      </div>
+    </div>
   )
 }
 
@@ -495,17 +570,19 @@ function MarkerCard({ id, x, y, width, onPointerEnter, onPointerLeave, children 
  * A station's next trains, over the map beside its dot: on mouse hover or keyboard focus. Each direction's next two
  * departures, refreshed every 10 seconds while it's open. Select the station for all of them.
  */
-function StationPreview({ station, x, y, width, routes, onPointerEnter, onPointerLeave }: {
+function StationPreview({ station, x, y, width, routes, bus, onPointerEnter, onPointerLeave }: {
   station: Station
   x: number
   y: number
   width: number
   routes: Route[] | undefined
+  bus: boolean // on a bus route's map: include the station's buses
   onPointerEnter: () => void
   onPointerLeave: () => void
 }) {
   const now = useNow()
-  const path = `/stations/${encodeURIComponent(station.mbtaStopId)}/predictions`
+  const path = `/stations/${encodeURIComponent(station.mbtaStopId)}/predictions${bus ? '?bus=true' : ''}`
+  const what = bus || !station.routeId ? 'Bus' : 'Train'
   const predictions = usePolling(() => api<Prediction[]>(path), path, REFRESH_MS)
   const groups = predictions.data ? groupDepartures(predictions.data, now, 2) : []
 
@@ -513,11 +590,11 @@ function StationPreview({ station, x, y, width, routes, onPointerEnter, onPointe
     <MarkerCard id="station-preview" x={x} y={y} width={width} onPointerEnter={onPointerEnter} onPointerLeave={onPointerLeave}>
       <p className="font-semibold">{station.name}</p>
       {predictions.error ? (
-        <p className="text-neutral-500">Train times aren't available right now.</p>
+        <p className="text-neutral-500">{what} times aren't available right now.</p>
       ) : !predictions.data ? (
-        <p className="text-neutral-500">Loading train times…</p>
+        <p className="text-neutral-500">Loading {what.toLowerCase()} times…</p>
       ) : groups.length === 0 ? (
-        <p className="text-neutral-500">{noTrainsMessage(false, now)}</p>
+        <p className="text-neutral-500">{what === 'Bus' ? 'No buses are predicted here right now.' : noTrainsMessage(false, now)}</p>
       ) : (
         <ul className="space-y-2">
           {groups.map((g) => (
@@ -532,7 +609,7 @@ function StationPreview({ station, x, y, width, routes, onPointerEnter, onPointe
           ))}
         </ul>
       )}
-      <p className="text-xs text-neutral-500">Select the station for all departures.</p>
+      <p className="text-xs text-neutral-500">Select the {station.routeId ? 'station' : 'stop'} for all departures.</p>
     </MarkerCard>
   )
 }
@@ -566,7 +643,8 @@ function TrainPreview({ vehicle, at, routes, onPointerEnter, onPointerLeave }: {
   onPointerEnter: () => void
   onPointerLeave: () => void
 }) {
-  const route = routes?.find((r) => r.id === vehicle.routeId)
+  const route = findRoute(routes, vehicle.routeId)
+  const bus = route?.type === 'bus' // a bus reports crowding for the whole bus: one level, no cars
   const { title, subtitle } = trainCallout(vehicle, route)
   const reported = vehicle.cars.flatMap((c) => c.crowding ?? [])
   const counts = new Map(reported.map((c) => [c, reported.filter((x) => x === c).length]))
@@ -581,7 +659,12 @@ function TrainPreview({ vehicle, at, routes, onPointerEnter, onPointerLeave }: {
         {title}
       </p>
       {subtitle && <p className="text-neutral-600 dark:text-neutral-300">{subtitle}</p>}
-      {typical ? (
+      {typical && bus ? (
+        <p>
+          <span className="font-semibold">{CROWDING[typical].label}</span>
+          <span className="text-neutral-500"> · crowding from MBTA</span>
+        </p>
+      ) : typical ? (
         <div className="space-y-1.5">
           <p>
             <span className="font-semibold">{CROWDING[typical].label}</span>
@@ -605,7 +688,7 @@ function TrainPreview({ vehicle, at, routes, onPointerEnter, onPointerLeave }: {
           <p className="text-xs text-neutral-500">Front car first. Crowding from MBTA.</p>
         </div>
       ) : (
-        vehicle.cars.length > 0 && <p className="text-neutral-500">{vehicle.cars.length} cars</p>
+        !bus && vehicle.cars.length > 0 && <p className="text-neutral-500">{vehicle.cars.length} cars</p>
       )}
     </MarkerCard>
   )

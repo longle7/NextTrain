@@ -57,7 +57,7 @@ export function liveActivityDetails(
     commuteId: commute.id,
     stationName: commute.stationName,
     destination: route?.directionDestinations[commute.directionId] ?? '',
-    lineName: lineLabel(commute.routeId),
+    lineName: lineLabel(commute.routeId, route),
     lineColor: route?.color ?? '#7C878E',
     lineTextColor: route?.textColor ?? '#FFFFFF',
     endsAt: Math.round(endsAt.getTime() / 1000),

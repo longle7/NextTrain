@@ -24,15 +24,20 @@ export function directionsDown(stations: Station[], destinations: string[]): boo
   return [zeroDown, !zeroDown]
 }
 
-/** The route's live trains by the station they're stopped at or approaching. */
-export function trainsByStation(vehicles: Vehicle[], route: Route, stations: Station[]): Map<string, LineTrain[]> {
-  const down = directionsDown(stations, route.directionDestinations)
+/**
+ * The route's live trains by the station they're stopped at or approaching. With `oneDirection` (a bus route, whose
+ * stops are listed one way at a time), only that direction's vehicles, all moving down the list.
+ */
+export function trainsByStation(vehicles: Vehicle[], route: Route, stations: Station[], oneDirection?: number): Map<string, LineTrain[]> {
+  const down = oneDirection === undefined ? directionsDown(stations, route.directionDestinations) : [true, true]
+  const noun = route.type === 'bus' ? 'Bus' : 'Train'
   const byStation = new Map<string, LineTrain[]>()
   for (const v of vehicles) {
     if (v.routeId !== route.id || !v.stationId) continue
+    if (oneDirection !== undefined && v.directionId !== oneDirection) continue
     const atStation = v.currentStatus === 'STOPPED_AT'
-    const where = `${atStation ? 'stopped at' : 'approaching'} ${v.stopName ?? 'the next station'}`
-    const train = { id: v.id, down: down[v.directionId] ?? false, atStation, label: `Train to ${route.directionDestinations[v.directionId]}, ${where}` }
+    const where = `${atStation ? 'stopped at' : 'approaching'} ${v.stopName ?? `the next ${route.type === 'bus' ? 'stop' : 'station'}`}`
+    const train = { id: v.id, down: down[v.directionId] ?? false, atStation, label: `${noun} to ${route.directionDestinations[v.directionId]}, ${where}` }
     byStation.set(v.stationId, [...(byStation.get(v.stationId) ?? []), train])
   }
   return byStation
