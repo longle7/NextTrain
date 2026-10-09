@@ -25,15 +25,17 @@ namespace NextTrain.Api.Controllers
             _lookup = lookup;
         }
 
-        // GET /stations?route=Red&sort=line
+        // GET /stations?route=Red&sort=line, or a bus route's stops one way: /stations?route=1&direction=0&sort=line
+        // No route: every subway station (what older app versions expect; bus stops are at /bus-stops).
         // Stations come from the database sorted A-Z; the other sorts reorder that list.
         [HttpGet]
         public async Task<ActionResult<IEnumerable<Station>>> GetAll(
             [FromServices] IMbtaClient mbta,
-            [FromQuery] string? route,
+            [FromQuery, RegularExpression(StationRoutes.RouteIdPattern)] string? route,
+            [FromQuery, Range(0, 1)] int? direction,
             [FromQuery] StationSort sort = StationSort.Name)
         {
-            var stations = await _lookup.GetAllStationsAsync(route);
+            var stations = await _lookup.GetAllStationsAsync(route, direction);
 
             switch (sort)
             {
@@ -47,7 +49,7 @@ namespace NextTrain.Api.Controllers
                 case StationSort.Line:
                     // MBTA lists a route's stops in the order trains visit them. Number each stop by its place in
                     // that list, then sort our stations by that number (anything MBTA didn't list goes last).
-                    var lineOrder = await mbta.GetStopDtosAsync(route);
+                    var lineOrder = await mbta.GetStopDtosAsync(route, direction);
                     var position = lineOrder.Select((stop, i) => (stop.Id, i)).ToDictionary(x => x.Id, x => x.i);
                     return Ok(stations.OrderBy(s => position.GetValueOrDefault(s.MbtaStopId, int.MaxValue)));
 
@@ -64,15 +66,16 @@ namespace NextTrain.Api.Controllers
             return station is null ? NotFound() : station;
         }
 
-        // GET /stations/place-pktrm/predictions?route=Red&direction=0
+        // GET /stations/place-pktrm/predictions?route=Red&direction=0, and ?bus=true to include its buses.
         // Flow: find the station in our database (404 if unknown) -> ask MBTA for its upcoming trains (cached
         // 10 seconds) -> reshape, filter, and sort them for the app.
         [HttpGet("{mbtaStopId}/predictions")]
         public async Task<ActionResult<IEnumerable<PredictionResponse>>> GetPredictions(
             string mbtaStopId,
             [FromServices] IMbtaClient mbta,
-            [FromQuery] string? route,
-            [FromQuery, Range(0, 1)] int? direction)
+            [FromQuery, RegularExpression(StationRoutes.RouteIdPattern)] string? route,
+            [FromQuery, Range(0, 1)] int? direction,
+            [FromQuery] bool bus = false)
         {
             var station = await _lookup.GetByMbtaStopIdAsync(mbtaStopId);
             if (station is null)
@@ -80,9 +83,15 @@ namespace NextTrain.Api.Controllers
                 return NotFound();
             }
 
-            // Always fetch all of the station's routes, then filter below: that way every route/direction
-            // combination for this station shares one cached MBTA response.
-            var predictions = await mbta.GetPredictionsAsync(station.MbtaStopId, station.RouteId);
+            // Subway lines always. Buses too when asked (older app versions don't ask, and know nothing about buses),
+            // at a bus-only stop, or for one of this stop's bus routes (a bus commute).
+            var withBuses = bus || station.RouteId == "" || (route is not null && station.ServesBus(route));
+            var routeIds = string.Join(",", station.SubwayRouteIds().Concat(withBuses ? station.BusRouteIds() : []));
+            if (routeIds == "") return Ok(Array.Empty<PredictionResponse>());
+
+            // Fetch all of those routes, then filter below: that way every route/direction combination for this
+            // station shares one cached MBTA response.
+            var predictions = await mbta.GetPredictionsAsync(station.MbtaStopId, routeIds);
 
             return Ok(predictions
                 // No departure: the train ends here (nothing to board) or skips this stop.

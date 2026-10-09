@@ -2,6 +2,7 @@ using System.ComponentModel.DataAnnotations;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using NextTrain.Api.Data;
+using NextTrain.Api.Services;
 using NextTrain.Core.Domain;
 
 namespace NextTrain.Api.Controllers
@@ -133,9 +134,14 @@ namespace NextTrain.Api.Controllers
             {
                 ModelState.AddModelError(nameof(request.MbtaStopId), $"Unknown station '{request.MbtaStopId}'.");
             }
-            else if (!station.RouteId.Split(',').Contains(request.RouteId))
+            else if (!station.SubwayRouteIds().Contains(request.RouteId) && !station.ServesBus(request.RouteId))
             {
                 ModelState.AddModelError(nameof(request.RouteId), $"Route '{request.RouteId}' does not serve {station.Name}.");
+            }
+            else if (!station.SubwayRouteIds().Contains(request.RouteId) && !station.ServesBus(request.RouteId, request.DirectionId))
+            {
+                // Each side of the street is its own bus stop, so a bus stop usually serves one direction.
+                ModelState.AddModelError(nameof(request.DirectionId), $"That bus doesn't stop at {station.Name} in that direction.");
             }
 
             if (request.WindowStart >= request.WindowEnd)

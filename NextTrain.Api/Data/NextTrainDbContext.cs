@@ -27,6 +27,7 @@ namespace NextTrain.Api.Data
                 entity.Property(s => s.MbtaStopId).IsRequired().HasMaxLength(50);
                 entity.Property(s => s.Name).IsRequired().HasMaxLength(200);
                 entity.Property(s => s.RouteId).HasMaxLength(50);
+                entity.Property(s => s.BusRoutes).HasMaxLength(1000); // the busiest busways have ~15 routes
             });
 
             modelBuilder.Entity<UserCommute>(entity =>
