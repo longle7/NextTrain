@@ -145,16 +145,19 @@ namespace NextTrain.Api.Services
         public async Task<IReadOnlyList<MbtaShape>> GetRouteShapesAsync(string routeId)
         {
             // Typical patterns (typicality 1), both directions: buses can take different streets each way, and
-            // MBTA marks only rapid transit patterns as "canonical". Variants often share a shape; keep each once.
+            // MBTA marks only rapid transit patterns as "canonical". MBTA can't filter by typicality, so it's done here
+            // (2-4 are detours and short trips); if a route somehow has no typical pattern, all of them. Variants often
+            // share a shape; keep each once.
             var payload = await GetCachedAsync<MbtaIncludeResponseDto>(
                 $"https://api-v3.mbta.com/route_patterns?filter[route]={Uri.EscapeDataString(routeId)}" +
-                "&filter[typicality]=1&include=representative_trip.shape&fields[shape]=polyline",
+                "&include=representative_trip.shape&fields[shape]=polyline",
                 RouteCacheDuration);
             if (payload is null) return new List<MbtaShape>();
 
+            var typical = payload.Data.Where(p => p.Attributes.Typicality == 1).Select(p => p.RelatedId("representative_trip")).ToHashSet();
             var polylines = payload.Included.Where(r => r.Type == "shape").ToDictionary(s => s.Id, s => s.Attributes.Polyline);
             return payload.Included
-                .Where(r => r.Type == "trip")
+                .Where(r => r.Type == "trip" && (typical.Count == 0 || typical.Contains(r.Id)))
                 .Select(t => new MbtaShape(t.RelatedId("route") ?? routeId, polylines.GetValueOrDefault(t.RelatedId("shape") ?? "") ?? ""))
                 .Where(s => s.Polyline != "")
                 .Distinct()
