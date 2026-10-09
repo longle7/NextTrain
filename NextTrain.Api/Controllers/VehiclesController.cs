@@ -1,4 +1,6 @@
+using System.ComponentModel.DataAnnotations;
 using Microsoft.AspNetCore.Mvc;
+using NextTrain.Api.Services;
 using NextTrain.Core.Services;
 
 namespace NextTrain.Api.Controllers
@@ -11,8 +13,12 @@ namespace NextTrain.Api.Controllers
     [Route("vehicles")]
     public class VehiclesController : ControllerBase
     {
-        // GET /vehicles (a 503 when MBTA is down comes from MbtaUnavailableFilter)
+        // GET /vehicles: every subway train. ?route=1: that route's vehicles, e.g. a bus route's buses.
+        // (A 503 when MBTA is down comes from MbtaUnavailableFilter.)
         [HttpGet]
-        public Task<IReadOnlyList<MbtaVehicle>> GetAll([FromServices] IMbtaClient mbta) => mbta.GetSubwayVehiclesAsync();
+        public Task<IReadOnlyList<MbtaVehicle>> GetAll(
+            [FromServices] IMbtaClient mbta,
+            [FromQuery, RegularExpression(StationRoutes.RouteIdListPattern)] string? route) =>
+            route is null ? mbta.GetSubwayVehiclesAsync() : mbta.GetRouteVehiclesAsync(route);
     }
 }

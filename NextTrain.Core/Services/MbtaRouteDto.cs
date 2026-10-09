@@ -20,7 +20,11 @@ namespace NextTrain.Core.Services
 
     public class MbtaRouteAttributesDto
     {
-        public string LongName { get; set; } = string.Empty;   // "Red Line"
+        public string LongName { get; set; } = string.Empty;   // "Red Line", "Harvard Square - Nubian Station"
+
+        public string ShortName { get; set; } = string.Empty;  // what riders call a bus route: "1", "SL1"; "" for most subway lines
+
+        public int Type { get; set; }                          // 0 light rail, 1 subway, 3 bus
 
         public string Color { get; set; } = string.Empty;      // hex without '#', e.g., "DA291C"
 

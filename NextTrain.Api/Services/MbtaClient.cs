@@ -50,11 +50,12 @@ namespace NextTrain.Api.Services
             _apiKey = configuration["Mbta:ApiKey"];
         }
 
-        public async Task<IReadOnlyList<MbtaStopDto>> GetStopDtosAsync(string routeId)
+        public async Task<IReadOnlyList<MbtaStopDto>> GetStopDtosAsync(string routeId, int? directionId = null)
         {
             // Returned in line order. Cached like routes: stations almost never change.
             var payload = await GetCachedAsync<MbtaStopsResponseDto>(
-                $"https://api-v3.mbta.com/stops?filter[route]={Uri.EscapeDataString(routeId)}", RouteCacheDuration);
+                $"https://api-v3.mbta.com/stops?filter[route]={Uri.EscapeDataString(routeId)}" +
+                (directionId is null ? "" : $"&filter[direction_id]={directionId}"), RouteCacheDuration);
 
             return payload?.Data ?? new List<MbtaStopDto>();
         }
@@ -75,11 +76,25 @@ namespace NextTrain.Api.Services
             return payload?.Data.OrderBy(r => r.Attributes.SortOrder).ToList() ?? new List<MbtaRouteDto>();
         }
 
-        public async Task<IReadOnlyList<MbtaVehicle>> GetSubwayVehiclesAsync()
+        public async Task<IReadOnlyList<MbtaRouteDto>> GetBusRoutesAsync()
+        {
+            var payload = await GetCachedAsync<MbtaRoutesResponseDto>(
+                "https://api-v3.mbta.com/routes?filter[type]=3", RouteCacheDuration);
+            return payload?.Data.OrderBy(r => r.Attributes.SortOrder).ToList() ?? new List<MbtaRouteDto>();
+        }
+
+        public Task<IReadOnlyList<MbtaVehicle>> GetSubwayVehiclesAsync() =>
+            GetVehiclesAsync("filter[route_type]=0,1");
+
+        public Task<IReadOnlyList<MbtaVehicle>> GetRouteVehiclesAsync(string routeIds) =>
+            GetVehiclesAsync($"filter[route]={Uri.EscapeDataString(routeIds)}");
+
+        private async Task<IReadOnlyList<MbtaVehicle>> GetVehiclesAsync(string filter)
         {
             var payload = await GetCachedAsync<MbtaIncludeResponseDto>(
-                "https://api-v3.mbta.com/vehicles?filter[route_type]=0,1&include=stop&fields[stop]=name" +
-                "&fields[vehicle]=latitude,longitude,bearing,direction_id,current_status,carriages", PredictionCacheDuration);
+                $"https://api-v3.mbta.com/vehicles?{filter}&include=stop&fields[stop]=name" +
+                "&fields[vehicle]=latitude,longitude,bearing,direction_id,current_status,carriages,occupancy_status,occupancy_percentage",
+                PredictionCacheDuration);
             if (payload is null) return new List<MbtaVehicle>();
 
             // Vehicles report a platform stop; its parent_station is the station the app knows.
@@ -94,10 +109,16 @@ namespace NextTrain.Api.Services
                         v.Attributes.Latitude!.Value, v.Attributes.Longitude!.Value,
                         v.Attributes.Bearing, v.Attributes.CurrentStatus,
                         stop?.Attributes.Name, stop?.RelatedId("parent_station") ?? stop?.Id,
-                        (v.Attributes.Carriages ?? []).Select(Car).ToList());
+                        Cars(v.Attributes));
                 })
                 .ToList();
         }
+
+        // A train reports crowding per car; a bus reports it for the whole bus, which becomes its one "car".
+        private static List<MbtaCar> Cars(MbtaResourceAttributesDto v) =>
+            v.Carriages is { Count: > 0 } carriages ? carriages.Select(Car).ToList()
+            : v.OccupancyStatus is not null ? [Car(new MbtaCarriageDto { OccupancyStatus = v.OccupancyStatus, OccupancyPercentage = v.OccupancyPercentage })]
+            : [];
 
         // "NO_DATA_AVAILABLE" (most cars today) becomes null, so the app shows nothing rather than a guess.
         private static MbtaCar Car(MbtaCarriageDto c) =>
@@ -119,6 +140,32 @@ namespace NextTrain.Api.Services
                 .Select(t => new MbtaShape(t.RelatedId("route") ?? "", polylines.GetValueOrDefault(t.RelatedId("shape") ?? "") ?? ""))
                 .Where(s => s.Polyline != "")
                 .ToList();
+        }
+
+        public async Task<IReadOnlyList<MbtaShape>> GetRouteShapesAsync(string routeId)
+        {
+            // Typical patterns (typicality 1), both directions: buses can take different streets each way, and
+            // MBTA marks only rapid transit patterns as "canonical". Variants often share a shape; keep each once.
+            var payload = await GetCachedAsync<MbtaIncludeResponseDto>(
+                $"https://api-v3.mbta.com/route_patterns?filter[route]={Uri.EscapeDataString(routeId)}" +
+                "&filter[typicality]=1&include=representative_trip.shape&fields[shape]=polyline",
+                RouteCacheDuration);
+            if (payload is null) return new List<MbtaShape>();
+
+            var polylines = payload.Included.Where(r => r.Type == "shape").ToDictionary(s => s.Id, s => s.Attributes.Polyline);
+            return payload.Included
+                .Where(r => r.Type == "trip")
+                .Select(t => new MbtaShape(t.RelatedId("route") ?? routeId, polylines.GetValueOrDefault(t.RelatedId("shape") ?? "") ?? ""))
+                .Where(s => s.Polyline != "")
+                .Distinct()
+                .ToList();
+        }
+
+        public async Task<IReadOnlyList<MbtaAlertDto>> GetRouteAlertsAsync(string routeIds)
+        {
+            var payload = await GetCachedAsync<MbtaAlertsResponseDto>(
+                $"https://api-v3.mbta.com/alerts?filter[route]={Uri.EscapeDataString(routeIds)}&filter[datetime]=NOW", AlertCacheDuration);
+            return payload?.Data ?? new List<MbtaAlertDto>();
         }
 
         public async Task<IReadOnlyList<MbtaAlertDto>> GetSubwayAlertsAsync()

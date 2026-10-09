@@ -36,6 +36,8 @@ namespace NextTrain.Core.Services
         public int DirectionId { get; set; }
         public string? CurrentStatus { get; set; } // "INCOMING_AT", "STOPPED_AT", "IN_TRANSIT_TO"
         public List<MbtaCarriageDto>? Carriages { get; set; }  // the train's cars, front to back
+        public string? OccupancyStatus { get; set; }           // a bus's crowding (buses report it for the whole vehicle)
+        public int? OccupancyPercentage { get; set; }
 
         // Stop
         public string? Name { get; set; }
