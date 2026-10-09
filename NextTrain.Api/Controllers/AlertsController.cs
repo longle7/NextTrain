@@ -1,4 +1,6 @@
+using System.ComponentModel.DataAnnotations;
 using Microsoft.AspNetCore.Mvc;
+using NextTrain.Api.Services;
 using NextTrain.Core.Services;
 
 namespace NextTrain.Api.Controllers
@@ -12,10 +14,13 @@ namespace NextTrain.Api.Controllers
     {
         // GET /alerts: every subway alert in effect now, most severe first. We send them all (one cached response
         // for everyone); the app picks the ones that match each line, station, and commute (see alerts.ts).
+        // ?routes=1,741: those routes' alerts instead (bus detours, ...); there are too many bus alerts to send all.
         [HttpGet]
-        public async Task<IEnumerable<AlertResponse>> GetAll([FromServices] IMbtaClient mbta)
+        public async Task<IEnumerable<AlertResponse>> GetAll(
+            [FromServices] IMbtaClient mbta,
+            [FromQuery, RegularExpression(StationRoutes.RouteIdListPattern)] string? routes)
         {
-            var alerts = await mbta.GetSubwayAlertsAsync();
+            var alerts = routes is null ? await mbta.GetSubwayAlertsAsync() : await mbta.GetRouteAlertsAsync(routes);
             return alerts.OrderByDescending(a => a.Attributes.Severity).Select(AlertResponse.From);
         }
     }

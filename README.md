@@ -123,6 +123,8 @@ Protection: the API limits each client IP to `RateLimit:PerMinute` requests (600
 
 Cloudflare sits in front of both `nexttrain.longledev.com` and `api.nexttrain.longledev.com` (proxied DNS records). It provides attack rules, bot blocking, and an edge rate limit; there are no country blocks. The API's ingress accepts only Cloudflare's IP ranges, so nothing can skip it, and `Proxy__Hops=2` tells the API that the visitor's IP is the second-to-last X-Forwarded-For entry (Cloudflare appends the visitor, then Azure appends Cloudflare). **If Cloudflare is ever removed from in front of the API, set `Proxy__Hops` back to 1 and remove the ingress IP restrictions**, or every request is refused or counted as Cloudflare's IP. The API serves a Cloudflare Origin CA certificate (valid to 2041), so its certificate never has to renew through the proxy.
 
+Production logs: the Container Apps environment sends logs to the Log Analytics workspace `nexttrain-logs` (30-day retention, 0.1 GB/day cap, inside Azure's free 5 GB a month). `appsettings.Production.json` keeps warnings and errors only (plus start-up lines), and never request logs or IP addresses, as the Privacy Policy says. To read them: Azure portal → `nexttrain-logs` → Logs → `ContainerAppConsoleLogs_CL | where TimeGenerated > ago(1d) | project TimeGenerated, Log_s` (app output) or `ContainerAppSystemLogs_CL` (restarts, scaling, probes).
+
 ## Road to the App Store
 
 The iPhone app wraps the web app with [Capacitor](https://capacitorjs.com); its Xcode project is `NextTrain.Web/ios` (bundle ID `com.longledev.nexttrain`). **[docs/app-store](docs/app-store/README.md)** has everything for the listing (screenshots, text, App Privacy answers, review notes) and the submission checklist.
