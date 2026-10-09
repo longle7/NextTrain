@@ -7,7 +7,7 @@ export default function PrivacyPage() {
   return (
     <LegalPage title="Privacy Policy">
       <p>
-        NextTrain shows live MBTA subway times. It's operated by {OPERATOR} ("we", "us") and built to collect as little
+        NextTrain shows live MBTA subway and bus times. It's operated by {OPERATOR} ("we", "us") and built to collect as little
         about you as possible: there are no accounts, no ads, and we never sell or share your personal information.
       </p>
 

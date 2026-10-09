@@ -127,7 +127,7 @@ function LiveActivities() {
     <Section title="Live Activities">
       <Card>
         <p className="text-sm text-neutral-500">
-          From 15 minutes before a saved commute until it ends, its next trains count down on your Lock Screen and in the
+          From 15 minutes before a saved commute until it ends, its next trains or buses count down on your Lock Screen and in the
           Dynamic Island. Turn this off in iPhone Settings → NextTrain → Live Activities.
         </p>
         <button onClick={showPreview} disabled={preview === 'starting'} className={`mt-2 ${primaryButton}`}>

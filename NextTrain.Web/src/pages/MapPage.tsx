@@ -348,7 +348,7 @@ export default function MapPage() {
         setLocating(false)
         const nearest = stations.data && nearestStations(stations.data, coords, 1)[0]
         if (nearest && nearest.miles > OUT_OF_AREA_MILES) {
-          setLocateMessage("You're outside the MBTA subway area.")
+          setLocateMessage("You're outside the MBTA area.")
           return
         }
         const here = new mapkit.Coordinate(coords.latitude, coords.longitude)
