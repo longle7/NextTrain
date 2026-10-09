@@ -10,7 +10,6 @@ import { commuteTiming, daysLabel, liveActivityEnd, sortCommutes, timingLabel, w
 import { Card, LineBadge, linkButton, primaryButton, SearchInput, StationLink, Status, WarningIcon } from '../components'
 import { locationErrorMessage, nearestStations, OUT_OF_AREA_MILES, walkLabel } from '../geo'
 import { endLiveActivities, liveActivityDetails, showLiveActivity } from '../liveActivity'
-import { recentStationIds } from '../recent'
 import { clock, countdown, groupDepartures, secondsAgo, STALE_AFTER_SECONDS } from '../time'
 import { failure, useNow, usePolling, useTitle } from '../usePolling'
 
@@ -28,8 +27,6 @@ export default function HomePage() {
   const exactRoute = routeResults.some((r) => (r.shortName || r.id).toLowerCase() === query.trim().toLowerCase())
   const stopResults = busStops.data && !exactRoute ? searchStations(busStops.data, query, 6) : []
   const nothingFound = !!stations.data && !!busStops.data && results.length + routeResults.length + stopResults.length === 0
-  const [recentIds] = useState(recentStationIds) // read once per visit to Home
-  const recent = recentIds.flatMap((id) => stations.data?.find((s) => s.mbtaStopId === id) ?? busStops.data?.find((s) => s.mbtaStopId === id) ?? [])
   useTitle(undefined)
 
   const openTopResult = () => {
@@ -64,27 +61,13 @@ export default function HomePage() {
       ) : (
         <>
           <MyCommutes routes={routes.data} alerts={alerts.data} />
-          {recent.length > 0 && (
-            <section className="space-y-2">
-              <h2 className="px-1 text-lg font-bold">Recent</h2>
-              <Card>
-                <ul className="-my-1 divide-y divide-neutral-100 dark:divide-neutral-800">
-                  {recent.map((station) => (
-                    <li key={station.mbtaStopId} className="flex">
-                      <StationLink station={station} routes={routes.data} />
-                    </li>
-                  ))}
-                </ul>
-              </Card>
-            </section>
-          )}
           {stations.data ? (
             <Nearby stations={stations.data} busStops={busStops.data} routes={routes.data} alerts={alerts.data} />
           ) : (
             // Keeps Home's layout steady while stations load, instead of the section popping in. (A failure already
             // shows at the top of the page.)
             !stations.error && (
-              <section className="space-y-2">
+              <section id="near-you" className="space-y-2">
                 <h2 className="px-1 text-lg font-bold">Near you</h2>
                 <Status loading rows={1} />
               </section>
@@ -142,6 +125,49 @@ type Located = { state: 'idle' | 'locating' } | { state: 'error'; message: strin
 // Bus stops farther than this aren't "near you" (about a 12-minute walk).
 const BUS_STOP_MILES = 0.5
 
+// New here (no commutes yet): the three things NextTrain does, each one tap away. Gone once a commute is saved.
+function GetStarted() {
+  const search = () => document.querySelector<HTMLInputElement>('input[type="search"]')?.focus()
+  // Lands on "Use my location", so the location prompt comes from the rider's own tap on it.
+  const nearby = () => {
+    const section = document.getElementById('near-you')
+    section?.scrollIntoView({ block: 'start' })
+    section?.querySelector('button')?.focus({ preventScroll: true })
+  }
+  const step = 'flex min-h-11 w-full items-center gap-3 text-left'
+  const number = (n: number) => (
+    <span aria-hidden className="grid size-7 shrink-0 place-items-center rounded-full bg-blue-600 text-sm text-white dark:bg-blue-400 dark:text-neutral-900">
+      {n}
+    </span>
+  )
+  return (
+    <Card>
+      <p className="font-bold">Get started</p>
+      <ol className="mt-2 space-y-1">
+        <li>
+          <button onClick={search} className={`${step} font-semibold`}>
+            {number(1)}Search for a station, stop, or bus route
+          </button>
+        </li>
+        <li>
+          <button onClick={nearby} className={`${step} font-semibold`}>
+            {number(2)}See what's near you
+          </button>
+        </li>
+        <li>
+          {/* Not a button: the Add a commute button below is the way in. */}
+          <span className={`${step} text-neutral-600 dark:text-neutral-300`}>
+            {number(3)}Save the trip you take every day, and its next train or bus shows up here
+          </span>
+        </li>
+      </ol>
+      <Link to="/commutes/new" className={`mt-3 ${primaryButton}`}>
+        Add a commute
+      </Link>
+    </Card>
+  )
+}
+
 function Nearby({ stations, busStops, routes, alerts }: {
   stations: Station[]
   busStops: Station[] | undefined
@@ -176,7 +202,7 @@ function Nearby({ stations, busStops, routes, alerts }: {
       : []
 
   return (
-    <section className="space-y-2">
+    <section id="near-you" className="space-y-2">
       <h2 className="px-1 text-lg font-bold">Near you</h2>
       {outOfArea ? (
         <Card>
@@ -312,17 +338,7 @@ function MyCommutes({ routes, alerts: subwayAlerts }: { routes: Route[] | undefi
       </div>
       {/* One placeholder card, the size of a commute, so Home doesn't jump when they arrive. */}
       <Status error={failure(commutes)} loading={!commutes.data && !commutes.error} rows={1} />
-      {commutes.data?.length === 0 && (
-        <Card>
-          <p className="text-neutral-500">Save the trips you take every day. When it's time to go, your next train or bus shows up right here.</p>
-          <Link
-            to="/commutes/new"
-            className={`mt-3 ${primaryButton}`}
-          >
-            Add a commute
-          </Link>
-        </Card>
-      )}
+      {commutes.data?.length === 0 && <GetStarted />}
       <ul className="space-y-2">
         {sorted?.map((commute) => (
           <li key={commute.id}>

@@ -14,6 +14,9 @@ import { useNow, usePolling, useTitle } from '../usePolling'
 
 const REFRESH_MS = 10_000
 
+// The one-time tip over the map (see MapTip). Listed on the Cookies page.
+const TIP_KEY = 'nexttrain.mapTipSeen'
+
 // Filter chips. Red and Green offer a second row to narrow to one branch; Mattapan sits under Red, as MBTA runs it.
 interface Line {
   id: string
@@ -86,6 +89,13 @@ export default function MapPage() {
   const trains = useRef(new Map<string, mapkit.Annotation>())
   const me = useRef<mapkit.Annotation>(undefined)
   const [map, setMap] = useState<mapkit.Map>()
+  // Lines, stations, and trains are drawn together once all of them have loaded (or failed), not one after another,
+  // and trains go straight onto their tracks.
+  const settled = (poll: { data?: unknown; error?: Error }) => poll.data !== undefined || !!poll.error
+  const ready = !!map && settled(shapes) && settled(stations) && settled(routes) && settled(vehicles)
+  // MapKit paints lines right away but its markers a moment later, so the map stays covered until the markers are on
+  // it too. Only the first time: after that, changes draw in place.
+  const [drawn, setDrawn] = useState(false)
   const [mapError, setMapError] = useState<Error>()
   const [locating, setLocating] = useState(false)
   const [locateMessage, setLocateMessage] = useState<string>()
@@ -156,7 +166,7 @@ export default function MapPage() {
 
   // Lines (and bus routes). Bus yellow is too pale on a light map by itself, so a darker line runs underneath it.
   useEffect(() => {
-    if (!map || !tracks) return
+    if (!ready || !map || !tracks) return
     const line = (t: { routeId: string; points: [number, number][] }, color: string, lineWidth: number) =>
       new mapkit.PolylineOverlay(t.points.map(coordinate), {
         style: new mapkit.Style({ strokeColor: color, lineWidth, strokeOpacity: 0.9, lineJoin: 'round', lineCap: 'round' }),
@@ -169,18 +179,19 @@ export default function MapPage() {
     ]
     map.addOverlays(overlays)
     return () => void map.removeOverlays(overlays)
-  }, [map, tracks, routes.data, shown])
+  }, [ready, map, tracks, routes.data, shown])
 
-  // Picking a line or branch zooms to fit it; All goes back to downtown.
+  // Picking a line or branch zooms to fit it (and you, once located, so your dot stays in view); All goes back to downtown.
   useEffect(() => {
-    if (!map || !tracks) return
-    const region = shown && regionAround(tracks.filter((t) => onLine(shown, t.routeId)).flatMap((t) => t.points))
+    if (!ready || !map || !tracks) return
+    const you = me.current ? [[me.current.coordinate.latitude, me.current.coordinate.longitude] as [number, number]] : []
+    const region = shown && regionAround([...tracks.filter((t) => onLine(shown, t.routeId)).flatMap((t) => t.points), ...you])
     map.setRegionAnimated(region || bostonRegion(), animate())
-  }, [map, tracks, shown])
+  }, [ready, map, tracks, shown])
 
   // Stations: tap to open departures
   useEffect(() => {
-    if (!map || !stations.data) return
+    if (!ready || !map || !stations.data) return
     // In bus mode the list is already the route's stops (bus stops have no subway lines to filter on).
     const annotations = stations.data.filter((s) => busMode || stationRouteIds(s).some((id) => onLine(shown, id))).map((s) => {
       const open = () => navigate(`/stations/${s.mbtaStopId}`)
@@ -197,7 +208,21 @@ export default function MapPage() {
       map.removeAnnotations(annotations)
       previews.hide(true) // its dot is gone
     }
-  }, [map, stations.data, navigate, shown, previews, busMode])
+  }, [ready, map, stations.data, navigate, shown, previews, busMode])
+
+  useEffect(() => {
+    const element = container.current
+    if (!ready || drawn || !element) return
+    const check = () => (!stations.data?.length || element.querySelector('.station-dot')) && setDrawn(true)
+    const observer = new MutationObserver(check)
+    observer.observe(element, { childList: true, subtree: true })
+    const timer = setTimeout(() => setDrawn(true), 5000) // never stay covered, whatever MapKit does
+    check()
+    return () => {
+      observer.disconnect()
+      clearTimeout(timer)
+    }
+  }, [ready, drawn, stations.data])
 
   // Panning or zooming moves the markers out from under the card, so close it; Escape, or a tap on the map away from
   // a marker (how a phone closes a train's card), closes it too.
@@ -221,8 +246,9 @@ export default function MapPage() {
 
   // Trains: move existing markers instead of recreating them, so an open card follows its train through a refresh.
   useEffect(() => {
-    if (!map || !vehicles.data) return
+    if (!ready || !map || !vehicles.data) return
     const live = new Set<string>()
+    let added = false
     for (const v of vehicles.data.filter((v) => onLine(shown, v.routeId))) {
       live.add(v.id)
       const route = findRoute(routes.data, v.routeId)
@@ -242,6 +268,7 @@ export default function MapPage() {
         })
         map.addAnnotation(annotation)
         trains.current.set(v.id, annotation)
+        added = true
       } else {
         annotation.coordinate = coordinate([latitude, longitude])
         updateTrainElement(annotation.element, color, heading, label, ink)
@@ -253,6 +280,7 @@ export default function MapPage() {
         trains.current.delete(id)
       }
     }
+    if (added) keepOnTop(map, me.current) // a new train mustn't cover your location
     // An open train card moves with its train (or closes if it left the map).
     setPreview((p) => {
       if (!p || !('trainId' in p)) return p
@@ -260,16 +288,14 @@ export default function MapPage() {
       const at = element && cardAt(element, frame.current)
       return at ? { ...p, ...at } : undefined
     })
-  }, [map, vehicles.data, routes.data, shown, place, previews])
+  }, [ready, map, vehicles.data, routes.data, shown, place, previews])
 
-  // Keep trains above stations: MapKit draws annotations in the order they were added, and the station effect
-  // above re-adds stations whenever they or the line change.
+  // Keep trains above stations, and your location above both: MapKit draws annotations in the order they were added,
+  // and the station effect above re-adds stations whenever they or the line change.
   useEffect(() => {
-    if (!map || !stations.data) return
-    const markers = [...trains.current.values()]
-    map.removeAnnotations(markers)
-    map.addAnnotations(markers)
-  }, [map, stations.data, shown])
+    if (!ready || !map || !stations.data) return
+    keepOnTop(map, ...trains.current.values(), me.current)
+  }, [ready, map, stations.data, shown])
 
   // Apple Maps: loads MapKit (once per visit) with a token from our API, then draws the map.
   // Declared after the effects that add lines and markers: React runs cleanups in declaration order, so leaving the
@@ -412,15 +438,16 @@ export default function MapPage() {
           ))}
         </div>
       )}
+      <MapTip />
       {/* isolate keeps the map's own z-indexes below the sticky header; touch-none gives every touch gesture (pan,
           pinch) to the map, never the page */}
       <div ref={frame} className="relative isolate">
         <div
           ref={container}
           data-testid="map"
-          className={`${showNames ? 'show-names ' : ''}touch-none h-[calc(100dvh-19rem-env(safe-area-inset-top)-env(safe-area-inset-bottom))] min-h-80 overflow-hidden rounded-xl bg-neutral-200 shadow-sm dark:bg-neutral-800`}
+          className={`${showNames ? 'show-names ' : ''}${drawn ? '' : '*:opacity-0 '}touch-none h-[calc(100dvh-19rem-env(safe-area-inset-top)-env(safe-area-inset-bottom))] min-h-80 overflow-hidden rounded-xl bg-neutral-200 shadow-sm dark:bg-neutral-800`}
         />
-        {!map && !mapError && (
+        {!drawn && !mapError && (
           <p role="status" className="absolute inset-0 grid place-items-center text-sm font-semibold text-neutral-500 motion-safe:animate-pulse">
             Loading map…
           </p>
@@ -459,10 +486,50 @@ export default function MapPage() {
       )}
       <p className="text-center text-xs text-neutral-500">
         {busMode
-          ? "Buses update every 10 seconds; arrows show the direction of travel. Tap a bus for where it's headed, or a stop for departures."
-          : "Trains update every 10 seconds; arrows show the direction of travel. Tap a train for where it's headed, or a station for departures."}
+          ? "Buses update every 10 seconds. Zoom in to see which way each one is going; tap a bus for where it's headed, or a stop for departures."
+          : "Trains update every 10 seconds. Zoom in to see which way each one is going; tap a train for where it's headed, or a station for departures."}
       </p>
     </>
+  )
+}
+
+// Moves markers to the top, in the order given (MapKit draws the last added on top).
+function keepOnTop(map: mapkit.Map, ...markers: (mapkit.Annotation | undefined)[]) {
+  const present = markers.filter((m): m is mapkit.Annotation => !!m)
+  map.removeAnnotations(present)
+  map.addAnnotations(present)
+}
+
+// First visit to the map: what you can tap, until "Got it". Above the map, not over it, so it hides nothing; a note,
+// not a dialog, so it never takes focus.
+function MapTip() {
+  const [seen, setSeen] = useState(() => {
+    try {
+      return !!localStorage.getItem(TIP_KEY)
+    } catch {
+      return false
+    }
+  })
+  if (seen) return null
+  const dismiss = () => {
+    try {
+      localStorage.setItem(TIP_KEY, '1')
+    } catch {
+      // Can't remember it; it's closed for this visit.
+    }
+    setSeen(true)
+  }
+  return (
+    <div role="note" aria-label="Map tip" className="flex items-center gap-3 rounded-xl bg-white p-3 text-sm shadow-sm dark:bg-neutral-900">
+      <ul className="flex-1 space-y-0.5">
+        <li>Tap a station for its departures.</li>
+        <li>Tap a train to see where it's headed.</li>
+        <li>Pick a line above to show just that line.</li>
+      </ul>
+      <button onClick={dismiss} className="min-h-11 shrink-0 rounded-lg bg-neutral-900 px-4 font-semibold text-white dark:bg-white dark:text-neutral-900">
+        Got it
+      </button>
+    </div>
   )
 }
 

@@ -8,6 +8,13 @@ import './index.css'
 // In the iPhone app, act like native UI (see index.css). The website is unaffected.
 if (Capacitor.isNativePlatform()) document.documentElement.classList.add('native')
 
+// Recently viewed stations were removed from NextTrain; clear what earlier versions stored.
+try {
+  localStorage.removeItem('nexttrain.recentStations')
+} catch {
+  // storage blocked: nothing stored
+}
+
 // Only if this visitor already chose Allow (see analytics.ts); otherwise nothing loads.
 startAnalyticsIfAllowed()
 
