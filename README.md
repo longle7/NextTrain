@@ -129,7 +129,7 @@ Production logs: the Container Apps environment sends logs to the Log Analytics 
 
 The iPhone app wraps the web app with [Capacitor](https://capacitorjs.com); its Xcode project is `NextTrain.Web/ios` (bundle ID `com.longledev.nexttrain`). **[docs/app-store](docs/app-store/README.md)** has everything for the listing (screenshots, text, App Privacy answers, review notes) and the submission checklist.
 
-**No Mac needed:** the **TestFlight** workflow (`.github/workflows/testflight.yml`, run by hand from the Actions tab) builds the app on a GitHub Mac and uploads it to TestFlight, signed automatically with an App Store Connect API key stored as the `ASC_KEY_ID`, `ASC_ISSUER_ID`, and `ASC_PRIVATE_KEY` secrets. On a Mac instead:
+**No Mac needed:** the **TestFlight** workflow (`.github/workflows/testflight.yml`, run by hand from the Actions tab) builds the app on a GitHub Mac, uploads it to TestFlight, and sends it to every tester group, submitting it for Apple's beta review when external testers are included: `gh workflow run testflight.yml -f notes="What's new"`. It's signed automatically with an App Store Connect API key stored as the `ASC_KEY_ID`, `ASC_ISSUER_ID`, and `ASC_PRIVATE_KEY` secrets. On a Mac instead:
 
 ```
 cd NextTrain.Web && VITE_API_URL=https://api.nexttrain.longledev.com npm run ios && npx cap open ios

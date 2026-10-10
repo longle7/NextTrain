@@ -52,6 +52,9 @@ jobs:
           npm test
           npm run build
 
+      - name: TestFlight script tests
+        run: node --test ".github/scripts/*.test.mjs"
+
   # Compiles the iPhone app and its Live Activity extension (unsigned), so Swift or Xcode project mistakes show up
   # here instead of in a TestFlight upload. Free on GitHub's Mac runners for public repositories.
   ios-build:
