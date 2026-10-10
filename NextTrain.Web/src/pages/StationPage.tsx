@@ -69,7 +69,8 @@ export default function StationPage() {
             {station.data.isAccessible ? 'Wheelchair accessible' : 'Not wheelchair accessible'}
           </p>
         )}
-        {station.data?.isAccessible && access.data?.length === 0 && (
+        {/* Stations only: a bus stop is at street level, so its (empty) list says nothing. */}
+        {station.data?.routeId && station.data.isAccessible && access.data?.length === 0 && (
           <p className="mt-0.5 pl-6.5 text-sm text-neutral-500">No elevator or escalator outages reported</p>
         )}
       </div>
