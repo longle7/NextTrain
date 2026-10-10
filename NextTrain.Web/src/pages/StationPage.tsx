@@ -1,4 +1,3 @@
-import { useEffect } from 'react'
 import { Link, useParams } from 'react-router'
 import { alertsFor, majorAlert } from '../alerts'
 import {
@@ -6,7 +5,6 @@ import {
   type Alert, type Prediction, type Route, type Station,
 } from '../api'
 import { AccessibleIcon, AlertBanner, Card, LineBadge, LoadingText, NotFound, secondaryButton, Status } from '../components'
-import { rememberStation } from '../recent'
 import { agoLabel, clock, countdown, groupDepartures, noTrainsMessage, secondsAgo, STALE_AFTER_SECONDS } from '../time'
 import { failure, useNow, usePolling, useTitle } from '../usePolling'
 
@@ -30,9 +28,6 @@ export default function StationPage() {
   const busOnly = station.data?.routeId === ''
   const notFound = station.error instanceof ApiError && station.error.status === 404
   useTitle(notFound ? 'Stop not found' : station.data?.name)
-  useEffect(() => {
-    if (station.data) rememberStation(station.data.mbtaStopId)
-  }, [station.data])
 
   const groups = predictions.data ? groupDepartures(predictions.data, now) : []
   // Trains and buses under their own headings at a station that has both.

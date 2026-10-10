@@ -85,3 +85,10 @@ function timeOn(day: Date, time: string): Date {
 }
 
 const startOfDay = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime()
+
+// The commute form numbers its steps as shown; it skips "Which line?" and "Which way?" when there's only one choice.
+/** Numbers for the steps after the first, given whether each one shows (undefined for a hidden step). */
+export function stepNumbers(shown: boolean[]) {
+  let n = 1
+  return shown.map((s) => (s ? ++n : undefined))
+}

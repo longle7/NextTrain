@@ -8,7 +8,6 @@ import { api, commutePredictionsPath, forgetUserId, getRoutes, type Commute, typ
 import { sortCommutes } from '../commutes'
 import { Card, dangerButton, primaryButton } from '../components'
 import { endLiveActivities, liveActivitiesAvailable, liveActivityDetails, showLiveActivity } from '../liveActivity'
-import { forgetRecentStations } from '../recent'
 import { groupDepartures } from '../time'
 import { useTitle } from '../usePolling'
 
@@ -27,7 +26,6 @@ export default function SettingsPage() {
     try {
       await api('/me', { method: 'DELETE' })
       forgetUserId()
-      forgetRecentStations()
       forgetRemembered()
       forgetAnalyticsChoice()
       void endLiveActivities()
@@ -45,7 +43,7 @@ export default function SettingsPage() {
         <Card>
           <p className="text-sm text-neutral-500">
             NextTrain has no accounts. Your saved commutes are stored under a random ID created on this device, never your
-            name, email, or location. Recently viewed stations stay on this device. Delete my data removes your commutes
+            name, email, or location. Delete my data removes your commutes
             from our server and clears everything NextTrain stored on this device, including your analytics choice.
           </p>
           <button onClick={deleteMyData} disabled={deletion === 'deleting'} className={`mt-2 ${dangerButton}`}>

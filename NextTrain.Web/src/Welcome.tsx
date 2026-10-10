@@ -62,14 +62,10 @@ export default function Welcome() {
             Welcome to NextTrain
           </h2>
         </div>
-        <ul className="space-y-2 text-sm">
-          <li>Live departures for every MBTA subway station and bus stop, with trains and buses moving on the map.</li>
-          <li>Save your commutes to see your next train the moment you open the app.</li>
-          <li>No account needed, and no ads.</li>
-        </ul>
+        <p>Live MBTA subway and bus times, and your daily commute at a glance. No account, no ads.</p>
         <p className="rounded-lg bg-amber-50 p-3 text-sm text-amber-950 dark:bg-amber-950/60 dark:text-amber-50">
-          Train times are estimates from MBTA data and can be late or wrong. Check official MBTA signs and announcements
-          when timing matters. NextTrain is independent and isn't affiliated with the MBTA.
+          Times are MBTA estimates and can be wrong, so check official signs when timing matters. NextTrain isn't
+          affiliated with the MBTA.
         </p>
         <p className="text-sm text-neutral-600 dark:text-neutral-300">
           By continuing, you agree to the{' '}
