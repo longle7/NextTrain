@@ -237,6 +237,18 @@ export const lineLabel = (routeId: string, route?: Route) =>
 export const findRoute = (routes: Route[] | undefined, routeId: string) =>
   routes?.find((r) => r.id === routeId) ?? (routeId === 'Green' ? routes?.find((r) => r.id.startsWith('Green-')) : undefined)
 
+/** Bus routes in the groups riders know them by, each in MBTA's order: Silver Line, Crosstown, then the rest. */
+export function busGroups(routes: Route[]): [title: string, routes: Route[]][] {
+  const buses = routes.filter((r) => r.type === 'bus')
+  const starts = (prefix: string) => (r: Route) => (r.shortName || r.id).startsWith(prefix)
+  const groups: [string, Route[]][] = [
+    ['Silver Line', buses.filter(starts('SL'))],
+    ['Crosstown', buses.filter(starts('CT'))],
+    ['Local and express', buses.filter((r) => !starts('SL')(r) && !starts('CT')(r))],
+  ]
+  return groups.filter(([, list]) => list.length > 0)
+}
+
 /** Routes matching what someone typed, by number ("66", "sl1") or by where they go ("harvard"). Best first. */
 export function searchRoutes(routes: Route[], query: string, limit = 5): Route[] {
   const q = query.trim().toLowerCase()

@@ -9,7 +9,7 @@ import { stepNumbers, WEEK } from '../commutes'
 import { Card, dangerButton, LineBadge, linkButton, NotFound, primaryButton, SearchInput, Status } from '../components'
 import { usePolling, useTitle } from '../usePolling'
 
-// /commutes/new (optionally ?station=place-pktrm) and /commutes/:id
+// /commutes/new (optionally ?station=place-pktrm&route=Red, e.g. from the map) and /commutes/:id
 export default function CommutePage() {
   const { id } = useParams()
   const [params] = useSearchParams()
@@ -22,10 +22,10 @@ export default function CommutePage() {
 
   if (notFound) return <NotFound title="Commute not found" message="This commute doesn't exist on this device. It may have been deleted." />
   if (id && !existing.data) return <Status error={existing.error} loading={!existing.error} />
-  return <CommuteForm key={id ?? 'new'} existing={existing.data} initialStopId={params.get('station') ?? ''} />
+  return <CommuteForm key={id ?? 'new'} existing={existing.data} initialStopId={params.get('station') ?? ''} initialRouteId={params.get('route') ?? ''} />
 }
 
-function CommuteForm({ existing, initialStopId }: { existing: Commute | undefined; initialStopId: string }) {
+function CommuteForm({ existing, initialStopId, initialRouteId }: { existing: Commute | undefined; initialStopId: string; initialRouteId: string }) {
   const navigate = useNavigate()
   const routes = usePolling(getRoutes, ROUTES)
   const stations = usePolling(getStations, 'stations')
@@ -34,7 +34,7 @@ function CommuteForm({ existing, initialStopId }: { existing: Commute | undefine
   const allStops = stations.data && busStops.data ? [...stations.data, ...busStops.data] : stations.data
 
   const [stopId, setStopId] = useState(existing?.mbtaStopId ?? initialStopId)
-  const [routeId, setRouteId] = useState(existing?.routeId ?? '')
+  const [routeId, setRouteId] = useState(existing?.routeId ?? initialRouteId) // used only if the stop serves it
   const [directionId, setDirectionId] = useState(existing?.directionId)
   const [start, setStart] = useState(() => existing?.windowStart.slice(0, 5) ?? suggestedWindow()[0])
   const [end, setEnd] = useState(() => existing?.windowEnd.slice(0, 5) ?? suggestedWindow()[1])

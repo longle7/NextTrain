@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
-  busDirections, busRouteIds, findRoute, isSubwayRoute, lineLabel, searchRoutes, searchStations, stationRouteIds, towardLabel,
+  busDirections, busGroups, busRouteIds, findRoute, isSubwayRoute, lineLabel, searchRoutes, searchStations, stationRouteIds, towardLabel,
   type Route, type Station,
 } from './api'
 import { trainsByStation } from './lineTrains'
@@ -99,5 +99,16 @@ describe('buses on a route page and the map', () => {
     const commute = { id: 1, mbtaStopId: '17091', stationName: 'Terminal A', routeId: '741', directionId: 1, windowStart: '07:45:00', windowEnd: '08:15:00', activeDays: 'Mon' }
     const details = liveActivityDetails(commute, sl1, [], new Date(0), undefined)
     expect([details.lineName, details.destination, details.lineColor, details.lineTextColor]).toEqual(['SL1', 'South Station', '#FFC72C', '#000000'])
+  })
+})
+
+describe('bus route groups', () => {
+  it('groups Silver Line, Crosstown, then the rest, each in MBTA order, and leaves out the subway', () => {
+    const all = [...routes, route('708', 'CT3', ['Beth Israel', 'Andrew']), route('742', 'SL2', ['Design Center', 'South Station'])]
+    expect(busGroups(all).map(([title, list]) => [title, list.map((r) => r.shortName)])).toEqual([
+      ['Silver Line', ['SL1', 'SL2']],
+      ['Crosstown', ['CT3']],
+      ['Local and express', ['1', '10', '66', '116']],
+    ])
   })
 })
