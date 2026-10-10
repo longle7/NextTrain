@@ -9,7 +9,8 @@ namespace NextTrain.Core.Services
     }
 
     /// <summary>
-    /// A single real-time prediction for a trip at a stop.
+    /// A single real-time prediction for a trip at a stop. Timetable entries (MBTA's /schedules) have the same shape, so
+    /// they use it too. Only the route relationship is read: a schedule also has list-valued ones ("added_routes").
     /// </summary>
     public class MbtaPredictionDto
     {
@@ -24,6 +25,9 @@ namespace NextTrain.Core.Services
         public DateTimeOffset? DepartureTime { get; set; }
 
         public int DirectionId { get; set; }
+
+        // Schedules only: 1 means no boarding at this stop.
+        public int? PickupType { get; set; }
     }
 
     public class MbtaPredictionRelationshipsDto

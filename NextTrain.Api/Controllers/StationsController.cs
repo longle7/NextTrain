@@ -1,4 +1,5 @@
 ﻿using System.ComponentModel.DataAnnotations;
+using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.Mvc;
 using NextTrain.Api.Services;
 using NextTrain.Core.Domain;
@@ -66,7 +67,8 @@ namespace NextTrain.Api.Controllers
             return station is null ? NotFound() : station;
         }
 
-        // GET /stations/place-pktrm/predictions?route=Red&direction=0, and ?bus=true to include its buses.
+        // GET /stations/place-pktrm/predictions?route=Red&direction=0, ?bus=true to include its buses, and
+        // ?schedules=true to fill in timetable times where nothing is predicted.
         // Flow: find the station in our database (404 if unknown) -> ask MBTA for its upcoming trains (cached
         // 10 seconds) -> reshape, filter, and sort them for the app.
         [HttpGet("{mbtaStopId}/predictions")]
@@ -75,7 +77,8 @@ namespace NextTrain.Api.Controllers
             [FromServices] IMbtaClient mbta,
             [FromQuery, RegularExpression(StationRoutes.RouteIdPattern)] string? route,
             [FromQuery, Range(0, 1)] int? direction,
-            [FromQuery] bool bus = false)
+            [FromQuery] bool bus = false,
+            [FromQuery] bool schedules = false)
         {
             var station = await _lookup.GetByMbtaStopIdAsync(mbtaStopId);
             if (station is null)
@@ -91,12 +94,25 @@ namespace NextTrain.Api.Controllers
 
             // Fetch all of those routes, then filter below: that way every route/direction combination for this
             // station shares one cached MBTA response.
-            var predictions = await mbta.GetPredictionsAsync(station.MbtaStopId, routeIds);
-
-            return Ok(predictions
+            var predictions = (await mbta.GetPredictionsAsync(station.MbtaStopId, routeIds))
                 // No departure: the train ends here (nothing to board) or skips this stop.
                 .Where(p => p.Attributes.DepartureTime is not null)
                 .Select(p => new PredictionResponse(p.Relationships.Route.Data.Id, p.Attributes.DirectionId, p.Attributes.DepartureTime!.Value))
+                .ToList();
+
+            // Where MBTA predicts nothing for a route one way (late at night, an infrequent bus), its next three trips
+            // from the timetable, marked as scheduled. Never mixed with live times for the same route and direction.
+            if (schedules)
+            {
+                var predicted = predictions.Select(p => (p.RouteId, p.DirectionId)).ToHashSet();
+                predictions.AddRange((await mbta.GetSchedulesAsync(station.MbtaStopId, routeIds))
+                    .Where(s => !predicted.Contains((s.RouteId, s.DirectionId)))
+                    .GroupBy(s => (s.RouteId, s.DirectionId))
+                    .SelectMany(g => g.Take(3))
+                    .Select(s => new PredictionResponse(s.RouteId, s.DirectionId, s.DepartureTime, Scheduled: true)));
+            }
+
+            return Ok(predictions
                 .Where(p => route is null || p.RouteId == route)
                 .Where(p => direction is null || p.DirectionId == direction)
                 .OrderBy(p => p.DepartureTime));
@@ -110,5 +126,9 @@ namespace NextTrain.Api.Controllers
         Ridership  // busiest first; stations without data last
     }
 
-    public record PredictionResponse(string RouteId, int DirectionId, DateTimeOffset DepartureTime);
+    // Scheduled: a timetable time, not a live prediction. Left out of the JSON when false, so apps that never ask for
+    // schedules get exactly the answers they always have.
+    public record PredictionResponse(
+        string RouteId, int DirectionId, DateTimeOffset DepartureTime,
+        [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] bool Scheduled = false);
 }

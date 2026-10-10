@@ -9,7 +9,7 @@ import { boundsOf, locationErrorMessage, nearestStations, OUT_OF_AREA_MILES } fr
 import { loadMapKit, stationElement, trainCallout, trainElement, updateTrainElement, userElement, type Preview } from '../mapkit'
 import { decodePolyline } from '../polyline'
 import { trackSnapper } from '../snap'
-import { countdown, groupDepartures, noTrainsMessage } from '../time'
+import { departureLabel, groupDepartures, noTrainsMessage } from '../time'
 import { useNow, usePolling, useTitle } from '../usePolling'
 
 const REFRESH_MS = 10_000
@@ -708,7 +708,7 @@ function StationPreview({ station, x, y, width, routes, bus, shown, onPointerEnt
   onPointerLeave: () => void
 }) {
   const now = useNow()
-  const path = `/stations/${encodeURIComponent(station.mbtaStopId)}/predictions${bus ? '?bus=true' : ''}`
+  const path = `/stations/${encodeURIComponent(station.mbtaStopId)}/predictions?schedules=true${bus ? '&bus=true' : ''}`
   const what = bus || !station.routeId ? 'Bus' : 'Train'
   const predictions = usePolling(() => api<Prediction[]>(path), path, REFRESH_MS)
   const groups = predictions.data ? groupDepartures(predictions.data, now, 2) : []
@@ -738,7 +738,10 @@ function StationPreview({ station, x, y, width, routes, bus, shown, onPointerEnt
               {/* Times under the destination, so a long one ("Ashmont/Braintree") never runs into them. */}
               <div className="min-w-0 flex-1">
                 <p>to {routes?.find((r) => r.id === g.routeId)?.directionDestinations[g.directionId] ?? '…'}</p>
-                <p className="font-semibold tabular-nums">{g.departures.map((d) => countdown(d, now)).join(', ')}</p>
+                <p className="font-semibold tabular-nums">
+                  {g.scheduled && 'Scheduled '}
+                  {g.departures.map((d) => departureLabel(d, g.scheduled, now)).join(', ')}
+                </p>
               </div>
             </li>
           ))}

@@ -5,7 +5,7 @@ import {
   type Alert, type Prediction, type Route, type Station,
 } from '../api'
 import { AccessibleIcon, AlertBanner, Card, LineBadge, LoadingText, NotFound, secondaryButton, Status } from '../components'
-import { agoLabel, clock, countdown, groupDepartures, noTrainsMessage, secondsAgo, STALE_AFTER_SECONDS } from '../time'
+import { agoLabel, clock, departureLabel, groupDepartures, noTrainsMessage, secondsAgo, STALE_AFTER_SECONDS } from '../time'
 import { failure, useNow, usePolling, useTitle } from '../usePolling'
 
 const REFRESH_MS = 10_000
@@ -16,8 +16,9 @@ export default function StationPage() {
   const routes = usePolling(getRoutes, ROUTES)
   const stationPath = `/stations/${encodeURIComponent(stopId)}`
   const station = usePolling(() => api<Station>(stationPath), stationPath)
-  // Its buses too: a station's bus routes, or everything at a bus stop.
-  const predictionsPath = `${stationPath}/predictions?bus=true`
+  // Its buses too: a station's bus routes, or everything at a bus stop. Timetable times fill in where nothing is
+  // predicted (late at night, an infrequent bus).
+  const predictionsPath = `${stationPath}/predictions?bus=true&schedules=true`
   const predictions = usePolling(() => api<Prediction[]>(predictionsPath), predictionsPath, REFRESH_MS)
 
   const alerts = usePolling(getAlerts, 'alerts', ALERTS_REFRESH_MS)
@@ -143,13 +144,14 @@ function Departures({ groups, routes, now }: { groups: ReturnType<typeof groupDe
                   </div>
                   {g.departures.length > 1 && (
                     <p className="mt-1 text-sm text-neutral-500">
-                      Then {g.departures.slice(1).map((time) => countdown(time, now)).join(', ')}
+                      Then {g.departures.slice(1).map((time) => departureLabel(time, g.scheduled, now)).join(', ')}
                     </p>
                   )}
                 </div>
                 <div className="shrink-0 text-right">
-                  <div className="text-2xl font-bold tabular-nums">{countdown(g.departures[0], now)}</div>
-                  <div className="text-xs text-neutral-500">{clock(g.departures[0])}</div>
+                  <div className="text-2xl font-bold tabular-nums">{departureLabel(g.departures[0], g.scheduled, now)}</div>
+                  {/* A timetable time isn't a live prediction: say so where the clock time would be. */}
+                  <div className="text-xs text-neutral-500">{g.scheduled ? 'Scheduled' : clock(g.departures[0])}</div>
                 </div>
               </div>
             </Card>

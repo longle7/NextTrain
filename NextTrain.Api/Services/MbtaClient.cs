@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using System.Net.Http;
 using System.Net.Http.Json;
@@ -29,6 +30,11 @@ namespace NextTrain.Api.Services
 
         // Alerts change within minutes, not seconds.
         public static readonly TimeSpan AlertCacheDuration = TimeSpan.FromMinutes(1);
+
+        // The timetable doesn't change; the window moves on each minute (see ScheduleWindow).
+        public static readonly TimeSpan ScheduleCacheDuration = TimeSpan.FromMinutes(1);
+
+        private static readonly TimeZoneInfo Boston = TimeZoneInfo.FindSystemTimeZoneById("America/New_York");
 
         // MBTA JSON uses snake_case (e.g., "arrival_time", "platform_code").
         private static readonly JsonSerializerOptions JsonOptions = new()
@@ -67,6 +73,33 @@ namespace NextTrain.Api.Services
 
             var payload = await GetCachedAsync<MbtaPredictionsResponseDto>(url, PredictionCacheDuration);
             return payload?.Data ?? new List<MbtaPredictionDto>();
+        }
+
+        public async Task<IReadOnlyList<MbtaScheduledDeparture>> GetSchedulesAsync(string mbtaStopId, string routeIds)
+        {
+            var (date, from, to) = ScheduleWindow(DateTimeOffset.UtcNow);
+            var payload = await GetCachedAsync<MbtaPredictionsResponseDto>(
+                $"https://api-v3.mbta.com/schedules?filter[stop]={Uri.EscapeDataString(mbtaStopId)}" +
+                $"&filter[route]={Uri.EscapeDataString(routeIds)}&filter[date]={date}&filter[min_time]={from}&filter[max_time]={to}" +
+                "&sort=departure_time&fields[schedule]=departure_time,direction_id,pickup_type", ScheduleCacheDuration);
+            return payload?.Data
+                .Where(s => s.Attributes.DepartureTime is not null && s.Attributes.PickupType != 1)
+                .Select(s => new MbtaScheduledDeparture(s.Relationships.Route.Data.Id, s.Attributes.DirectionId, s.Attributes.DepartureTime!.Value))
+                .ToList() ?? new List<MbtaScheduledDeparture>();
+        }
+
+        /// <summary>
+        /// The next three hours of MBTA's timetable, in its terms: a service date and times on it. A service day runs
+        /// from about 3 AM to the last trips after midnight, which MBTA writes past 24:00 (1:30 AM is "25:30" on the day
+        /// before).
+        /// </summary>
+        public static (string Date, string From, string To) ScheduleWindow(DateTimeOffset now)
+        {
+            var local = TimeZoneInfo.ConvertTime(now, Boston);
+            var afterMidnight = local.Hour < 3;
+            var minutes = (afterMidnight ? 24 * 60 : 0) + local.Hour * 60 + local.Minute;
+            static string Time(int m) => $"{m / 60:00}:{m % 60:00}";
+            return ((afterMidnight ? local.AddDays(-1) : local).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture), Time(minutes), Time(minutes + 180));
         }
 
         public async Task<IReadOnlyList<MbtaRouteDto>> GetSubwayRoutesAsync()
