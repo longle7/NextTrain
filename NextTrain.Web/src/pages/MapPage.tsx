@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { useNavigate, useSearchParams } from 'react-router'
+import { Link, useNavigate, useSearchParams } from 'react-router'
 import {
-  api, findRoute, getRoutes, getStations, ROUTES, searchRoutes, stationRouteIds,
+  api, busGroups, busRouteIds, findRoute, getRoutes, getStations, ROUTES, searchRoutes, stationRouteIds, towardLabel,
   type Car, type Prediction, type Route, type RouteShape, type Station, type Vehicle,
 } from '../api'
-import { LineBadge, SearchInput, Status } from '../components'
+import { LineBadge, linkButton, primaryButton, SearchInput, secondaryButton, Status } from '../components'
 import { boundsOf, locationErrorMessage, nearestStations, OUT_OF_AREA_MILES } from '../geo'
 import { loadMapKit, stationElement, trainCallout, trainElement, updateTrainElement, userElement, type Preview } from '../mapkit'
 import { decodePolyline } from '../polyline'
@@ -208,12 +208,14 @@ export default function MapPage() {
     const close = () => previews.hide(true)
     const onKey = (event: KeyboardEvent) => event.key === 'Escape' && close()
     const onTap = (event: PointerEvent) => !(event.target as Element).closest?.('.station-dot, .train') && close()
-    map.addEventListener('region-change-start', close)
+    // MapKit also reports a move when a button on the card is pressed with a mouse; that one mustn't close the card.
+    const onMove = () => !overCard.current && close()
+    map.addEventListener('region-change-start', onMove)
     document.addEventListener('keydown', onKey)
     container.current?.addEventListener('pointerdown', onTap)
     const element = container.current
     return () => {
-      map.removeEventListener('region-change-start', close)
+      map.removeEventListener('region-change-start', onMove)
       document.removeEventListener('keydown', onKey)
       element?.removeEventListener('pointerdown', onTap)
     }
@@ -388,7 +390,7 @@ export default function MapPage() {
             onSelect={() => setParams(l ? { line: l.id } : {}, { replace: true })}
           />
         ))}
-        <Chip label="Bus" name="Buses" color={BUS_YELLOW} ink="#000000" selected={busMode} onSelect={() => setParams({ line: 'bus' }, { replace: true })} />
+        <Chip label="Bus" name="Buses" icon={<BusIcon />} color={BUS_YELLOW} ink="#000000" selected={busMode} onSelect={() => setParams({ line: 'bus' }, { replace: true })} />
       </div>
       {busMode && (
         <BusPicker
@@ -426,7 +428,15 @@ export default function MapPage() {
           </p>
         )}
         {preview && 'station' in preview && (
-          <StationPreview key={preview.station.mbtaStopId} {...preview} routes={routes.data} bus={busMode} onPointerEnter={previews.enterCard} onPointerLeave={previews.leaveCard} />
+          <StationPreview
+            key={preview.station.mbtaStopId}
+            {...preview}
+            routes={routes.data}
+            bus={busMode}
+            shown={shown}
+            onPointerEnter={previews.enterCard}
+            onPointerLeave={previews.leaveCard}
+          />
         )}
         {preview && 'trainId' in preview && trainCard && (
           <TrainPreview vehicle={trainCard} at={preview} routes={routes.data} onPointerEnter={previews.enterCard} onPointerLeave={previews.leaveCard} />
@@ -479,9 +489,10 @@ const BUS_YELLOW = '#FFC72C'
  * A filter chip. `label` is what it shows ("B"); `name` is what screen readers hear ("Green Line B"). `ink` is the text
  * color when selected: white on the subway's colors, black on bus yellow.
  */
-function Chip({ label, name, color, ink = '#FFFFFF', selected, small, onSelect }: {
+function Chip({ label, name, icon, color, ink = '#FFFFFF', selected, small, onSelect }: {
   label: string
   name: string
+  icon?: ReactNode
   color: string | undefined
   ink?: string
   selected: boolean
@@ -497,41 +508,86 @@ function Chip({ label, name, color, ink = '#FFFFFF', selected, small, onSelect }
       className={`flex shrink-0 items-center gap-1.5 rounded-full font-semibold shadow-sm ${small ? 'min-h-8 px-3 text-xs' : 'min-h-9 px-3.5 text-sm'} ${selected ? 'text-white' : 'bg-white dark:bg-neutral-900'} ${selected && !color ? 'bg-neutral-900 dark:bg-white dark:text-neutral-900' : ''}`}
       style={selected && color ? { backgroundColor: color, color: ink } : undefined}
     >
-      {color && !selected && <span className="size-2.5 rounded-full" style={{ backgroundColor: color }} />}
+      {color && !selected && !icon && <span className="size-2.5 rounded-full" style={{ backgroundColor: color }} />}
+      {icon}
       {label}
     </button>
   )
 }
 
-// Bus mode's route picker: type a number ("66", "sl1") or a place, then pick from the matching routes. Before typing,
-// the chosen route and the first routes in MBTA's order (Silver Line first).
+// Bus mode's route picker. Every route, grouped (Silver Line, Crosstown, the rest) in a panel that scrolls by itself so
+// the map stays on screen; type a number ("66", "sl1") or a place to narrow it. Once a route is picked, it folds down to
+// that route and Change route.
 function BusPicker({ routes, selected, onSelect }: { routes: Route[] | undefined; selected: string | undefined; onSelect: (id: string) => void }) {
   const [query, setQuery] = useState('')
-  const buses = routes?.filter((r) => r.type === 'bus') ?? []
-  const matches = query.trim() ? searchRoutes(buses, query, 12) : buses.slice(0, 12)
+  const [changing, setChanging] = useState(false)
   const chosen = selected ? findRoute(routes, selected) : undefined
-  const shown = chosen && !matches.includes(chosen) ? [chosen, ...matches] : matches
+  const pick = (id: string) => {
+    setChanging(false)
+    setQuery('')
+    onSelect(id)
+  }
+  const chip = (r: Route) => (
+    <Chip
+      key={r.id}
+      small
+      label={r.shortName || r.id}
+      name={`Route ${r.shortName || r.id}, ${r.name}`}
+      color={r.color}
+      ink={r.textColor}
+      selected={selected === r.id}
+      onSelect={() => pick(r.id)}
+    />
+  )
+  if (chosen && !changing) {
+    return (
+      <div className="flex items-center gap-2">
+        <div role="radiogroup" aria-label="Show bus route">{chip(chosen)}</div>
+        <span className="min-w-0 flex-1 truncate text-sm text-neutral-500">{chosen.name}</span>
+        <button onClick={() => setChanging(true)} className={linkButton}>
+          Change route
+        </button>
+      </div>
+    )
+  }
+  const matches = query.trim() ? searchRoutes(routes ?? [], query, 200) : undefined
+  const groups = matches ? [['Matching routes', matches] as const] : busGroups(routes ?? [])
   return (
     <div className="space-y-2">
-      <SearchInput value={query} onChange={setQuery} placeholder="Bus route number, e.g. 66 or SL1" onSubmit={() => matches[0] && onSelect(matches[0].id)} />
-      <div role="radiogroup" aria-label="Show bus route" className="-mx-4 flex gap-2 overflow-x-auto px-4 [scrollbar-width:none]">
-        {shown.map((r) => (
-          <Chip
-            key={r.id}
-            small
-            label={r.shortName || r.id}
-            name={`Route ${r.shortName || r.id}, ${r.name}`}
-            color={r.color}
-            ink={r.textColor}
-            selected={selected === r.id}
-            onSelect={() => onSelect(r.id)}
-          />
+      <SearchInput value={query} onChange={setQuery} placeholder="Bus route number, e.g. 66 or SL1" onSubmit={() => matches?.[0] && pick(matches[0].id)} />
+      <div className="max-h-64 space-y-3 overflow-y-auto rounded-xl bg-white p-3 shadow-sm dark:bg-neutral-900">
+        {!routes && <Status loading rows={1} />}
+        {matches?.length === 0 && <p className="text-sm text-neutral-500">No bus route matches “{query.trim()}”.</p>}
+        {groups.map(([title, list]) => list.length > 0 && (
+          <section key={title} className="space-y-1.5">
+            <h2 id={`bus-group-${title}`} className="text-xs font-semibold tracking-wide text-neutral-500 uppercase">{title}</h2>
+            <div role="radiogroup" aria-labelledby={`bus-group-${title}`} className="flex flex-wrap gap-2">
+              {list.map(chip)}
+            </div>
+          </section>
         ))}
-        {query.trim() && matches.length === 0 && <p className="py-1 text-sm text-neutral-500">No bus route matches “{query.trim()}”.</p>}
       </div>
     </div>
   )
 }
+
+// A bus, for the Bus chip. Drawn in the chip's text color.
+function BusIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="size-4 fill-none stroke-current stroke-2" aria-hidden>
+      <rect x="5" y="3" width="14" height="15" rx="3" />
+      <path d="M5 11h14M8 18v3M16 18v3" />
+      <circle cx="8.5" cy="14.5" r="0.5" className="fill-current" />
+      <circle cx="15.5" cy="14.5" r="0.5" className="fill-current" />
+    </svg>
+  )
+}
+
+// A bus stop narrowed to one route's "route:direction" pairs, for its "toward" label on that route's map.
+const onlyRoute = (stop: Station, routeId: string | undefined): Station =>
+  routeId && stop.busRoutes?.split(',').some((p) => p.startsWith(`${routeId}:`))
+    ? { ...stop, busRoutes: stop.busRoutes.split(',').filter((p) => p.startsWith(`${routeId}:`)).join(',') }
+    : stop
 
 const CARD_WIDTH = 288 // px; w-72
 
@@ -544,8 +600,10 @@ function cardAt(marker: Element, frame: HTMLElement | null): CardAt | undefined 
 }
 
 /** A card over the map beside a marker: centered on it, nudged in from the sides, above it unless that runs off the top. */
-function MarkerCard({ id, x, y, width, onPointerEnter, onPointerLeave, children }: CardAt & {
+function MarkerCard({ id, role = 'tooltip', label, x, y, width, onPointerEnter, onPointerLeave, children }: CardAt & {
   id: string
+  role?: 'tooltip' | 'dialog' // a dialog when it has buttons
+  label?: string
   onPointerEnter: () => void
   onPointerLeave: () => void
   children: ReactNode
@@ -555,7 +613,8 @@ function MarkerCard({ id, x, y, width, onPointerEnter, onPointerLeave, children 
   return (
     <div
       id={id}
-      role="tooltip"
+      role={role}
+      aria-label={label}
       onPointerEnter={onPointerEnter}
       onPointerLeave={onPointerLeave}
       className="absolute z-20 w-72 space-y-2 rounded-xl bg-white p-3 text-sm shadow-lg ring-1 ring-black/5 dark:bg-neutral-900 dark:ring-white/10"
@@ -570,13 +629,14 @@ function MarkerCard({ id, x, y, width, onPointerEnter, onPointerLeave, children 
  * A station's next trains, over the map beside its dot: on mouse hover or keyboard focus. Each direction's next two
  * departures, refreshed every 10 seconds while it's open. Select the station for all of them.
  */
-function StationPreview({ station, x, y, width, routes, bus, onPointerEnter, onPointerLeave }: {
+function StationPreview({ station, x, y, width, routes, bus, shown, onPointerEnter, onPointerLeave }: {
   station: Station
   x: number
   y: number
   width: number
   routes: Route[] | undefined
   bus: boolean // on a bus route's map: include the station's buses
+  shown: string[] | undefined // the routes on the map (undefined: all)
   onPointerEnter: () => void
   onPointerLeave: () => void
 }) {
@@ -585,10 +645,18 @@ function StationPreview({ station, x, y, width, routes, bus, onPointerEnter, onP
   const what = bus || !station.routeId ? 'Bus' : 'Train'
   const predictions = usePolling(() => api<Prediction[]>(path), path, REFRESH_MS)
   const groups = predictions.data ? groupDepartures(predictions.data, now, 2) : []
+  // Add commute picks the route when exactly one of the map's routes stops here: Red at Davis, but nothing at Ashmont
+  // (Red and Mattapan) or at a Green Line stop several branches share, where the form asks.
+  const served = shown?.filter((id) => [...stationRouteIds(station), ...busRouteIds(station)].includes(id))
+  const routeId = served?.length === 1 ? served[0] : undefined
 
   return (
-    <MarkerCard id="station-preview" x={x} y={y} width={width} onPointerEnter={onPointerEnter} onPointerLeave={onPointerLeave}>
-      <p className="font-semibold">{station.name}</p>
+    <MarkerCard id="station-preview" role="dialog" label={station.name} x={x} y={y} width={width} onPointerEnter={onPointerEnter} onPointerLeave={onPointerLeave}>
+      <div>
+        <p className="font-semibold">{station.name}</p>
+        {/* Each side of a street is its own stop: say which way this one goes (on a route's map, just that route). */}
+        {!station.routeId && <p className="text-xs text-neutral-500">{towardLabel(onlyRoute(station, routeId), routes)}</p>}
+      </div>
       {predictions.error ? (
         <p className="text-neutral-500">{what} times aren't available right now.</p>
       ) : !predictions.data ? (
@@ -609,7 +677,14 @@ function StationPreview({ station, x, y, width, routes, bus, onPointerEnter, onP
           ))}
         </ul>
       )}
-      <p className="text-xs text-neutral-500">Select the {station.routeId ? 'station' : 'stop'} for all departures.</p>
+      <div className="flex gap-2">
+        <Link to={`/commutes/new?station=${encodeURIComponent(station.mbtaStopId)}${routeId ? `&route=${encodeURIComponent(routeId)}` : ''}`} className={`${primaryButton} min-h-11 flex-1 text-sm`}>
+          Add commute
+        </Link>
+        <Link to={`/stations/${encodeURIComponent(station.mbtaStopId)}`} className={`${secondaryButton} flex-1 ring-1 ring-black/10 dark:ring-white/15`}>
+          All departures
+        </Link>
+      </div>
     </MarkerCard>
   )
 }

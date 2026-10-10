@@ -133,8 +133,13 @@ export function stationElement(name: string, open: () => void, preview: Preview,
     return { target, actions: stationActions.get(target) ?? { open, preview } }
   }
 
-  // detail 0 is a click from the keyboard or a script, with no pointer position: this dot, as is.
-  dot.addEventListener('click', (event) => (event.detail === 0 ? open() : nearest(event).actions.open()))
+  // A tap or click shows the card (next departures, Add commute, All departures); its target is the nearest dot.
+  // detail 0 is a click from the keyboard or a script, with no pointer position: open this stop's page, as before.
+  dot.addEventListener('click', (event) => {
+    if (event.detail === 0) return open()
+    const { target, actions } = nearest(event)
+    actions.preview.show(target)
+  })
   dot.addEventListener('keydown', (event) => {
     if (event.key === 'Enter' || event.key === ' ') {
       event.preventDefault()
@@ -142,7 +147,7 @@ export function stationElement(name: string, open: () => void, preview: Preview,
     }
     if (event.key === 'Escape') preview.hide(true)
   })
-  // Mouse only: on a touchscreen a tap opens the station, and a hover card would just flash first.
+  // Mouse only: on a touchscreen the tap above shows the card.
   const hover = (event: PointerEvent) => {
     if (event.pointerType !== 'mouse') return
     const { target, actions } = nearest(event)
