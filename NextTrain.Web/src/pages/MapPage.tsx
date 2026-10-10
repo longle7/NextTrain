@@ -7,6 +7,7 @@ import {
 import { LineBadge, linkButton, primaryButton, SearchInput, secondaryButton, Status } from '../components'
 import { boundsOf, locationErrorMessage, nearestStations, OUT_OF_AREA_MILES } from '../geo'
 import { loadMapKit, stationElement, trainCallout, trainElement, updateTrainElement, userElement, type Preview } from '../mapkit'
+import { lastMapView, rememberMapView } from '../mapSession'
 import { decodePolyline } from '../polyline'
 import { trackSnapper } from '../snap'
 import { countdown, groupDepartures, noTrainsMessage } from '../time'
@@ -65,6 +66,9 @@ export default function MapPage() {
   const busRoute = (busMode && params.get('route')) || undefined
   const shown = useMemo(() => (busMode ? (busRoute ? [busRoute] : []) : routesFor(line, branch)), [busMode, busRoute, line, branch])
   const routes = usePolling(getRoutes, ROUTES)
+  // The Map tab and the Subway | Bus switch come back to this view (this session only).
+  const search = params.toString()
+  useEffect(() => rememberMapView(search ? `?${search}` : ''), [search])
   const bus = busMode ? `?route=${encodeURIComponent(busRoute ?? '')}` : '' // a query string, or nothing for the subway
   const stationsPath = busMode ? `/stations${bus}` : 'stations'
   const stations = usePolling(busMode ? () => (busRoute ? api<Station[]>(stationsPath) : Promise.resolve([])) : getStations, stationsPath)
@@ -405,19 +409,22 @@ export default function MapPage() {
     <>
       <h1 className="text-2xl font-bold">Live map</h1>
       <Status error={mapError ?? vehicles.error ?? shapes.error ?? stations.error} />
-      <div role="radiogroup" aria-label="Show line" className="-mx-4 flex gap-2 overflow-x-auto px-4 [scrollbar-width:none]">
-        {[undefined, ...LINES].map((l) => (
-          <Chip
-            key={l?.id ?? 'all'}
-            label={l?.id ?? 'All'}
-            name={l ? `${l.id} Line` : 'All lines'}
-            color={l && routes.data?.find((r) => r.id.startsWith(l.id))?.color}
-            selected={!busMode && line === l}
-            onSelect={() => setParams(l ? { line: l.id } : {}, { replace: true })}
-          />
-        ))}
-        <Chip label="Bus" name="Buses" icon={<BusIcon />} color={BUS_YELLOW} ink="#000000" selected={busMode} onSelect={() => setParams({ line: 'bus' }, { replace: true })} />
-      </div>
+      <ModeSwitch bus={busMode} onSelect={(toBus) => setParams(new URLSearchParams(lastMapView(toBus ? 'bus' : 'subway')), { replace: true })} />
+      {!busMode && (
+        // Five chips that share the row, so all of them fit on a phone (it still scrolls on the narrowest).
+        <div role="radiogroup" aria-label="Show line" className="-mx-4 flex gap-1.5 overflow-x-auto px-4 [scrollbar-width:none]">
+          {[undefined, ...LINES].map((l) => (
+            <Chip
+              key={l?.id ?? 'all'}
+              label={l?.id ?? 'All'}
+              name={l ? `${l.id} Line` : 'All lines'}
+              color={l && routes.data?.find((r) => r.id.startsWith(l.id))?.color}
+              selected={line === l}
+              onSelect={() => setParams(l ? { line: l.id } : {}, { replace: true })}
+            />
+          ))}
+        </div>
+      )}
       {busMode && (
         <BusPicker
           routes={routes.data}
@@ -447,7 +454,7 @@ export default function MapPage() {
         <div
           ref={container}
           data-testid="map"
-          className={`${showNames ? 'show-names ' : ''}${drawn ? '' : '*:opacity-0 '}touch-none h-[calc(100dvh-19rem-env(safe-area-inset-top)-env(safe-area-inset-bottom))] min-h-80 overflow-hidden rounded-xl bg-neutral-200 shadow-sm dark:bg-neutral-800`}
+          className={`${showNames ? 'show-names ' : ''}${drawn ? '' : '*:opacity-0 '}touch-none h-[calc(100dvh-22rem-env(safe-area-inset-top)-env(safe-area-inset-bottom))] min-h-80 overflow-hidden rounded-xl bg-neutral-200 shadow-sm dark:bg-neutral-800`}
         />
         {!drawn && !mapError && (
           <p role="status" className="absolute inset-0 grid place-items-center text-sm font-semibold text-neutral-500 motion-safe:animate-pulse">
@@ -494,11 +501,7 @@ export default function MapPage() {
           {locateMessage}
         </p>
       )}
-      <p className="text-center text-xs text-neutral-500">
-        {busMode
-          ? "Buses update every 10 seconds. Zoom in to see which way each one is going; tap a bus for where it's headed, or a stop for departures."
-          : "Trains update every 10 seconds. Zoom in to see which way each one is going; tap a train for where it's headed, or a station for departures."}
-      </p>
+      <MapKey bus={busMode} />
     </>
   )
 }
@@ -572,7 +575,7 @@ function Chip({ label, name, icon, color, ink = '#FFFFFF', selected, small, onSe
       aria-checked={selected}
       aria-label={name}
       onClick={onSelect}
-      className={`flex shrink-0 items-center gap-1.5 rounded-full font-semibold shadow-sm ${small ? 'min-h-8 px-3 text-xs' : 'min-h-9 px-3.5 text-sm'} ${selected ? 'text-white' : 'bg-white dark:bg-neutral-900'} ${selected && !color ? 'bg-neutral-900 dark:bg-white dark:text-neutral-900' : ''}`}
+      className={`flex shrink-0 items-center gap-1.5 rounded-full font-semibold shadow-sm ${small ? 'min-h-8 px-3 text-xs' : 'min-h-9 grow justify-center px-2 text-sm'} ${selected ? 'text-white' : 'bg-white dark:bg-neutral-900'} ${selected && !color ? 'bg-neutral-900 dark:bg-white dark:text-neutral-900' : ''}`}
       style={selected && color ? { backgroundColor: color, color: ink } : undefined}
     >
       {color && !selected && !icon && <span className="size-2.5 rounded-full" style={{ backgroundColor: color }} />}
@@ -638,7 +641,63 @@ function BusPicker({ routes, selected, onSelect }: { routes: Route[] | undefined
   )
 }
 
-// A bus, for the Bus chip. Drawn in the chip's text color.
+// Subway or buses: two big buttons at the top, so buses aren't hidden past the end of the line chips.
+function ModeSwitch({ bus, onSelect }: { bus: boolean; onSelect: (bus: boolean) => void }) {
+  const option = (isBus: boolean, label: string, icon: ReactNode) => (
+    <button
+      role="radio"
+      aria-checked={bus === isBus}
+      onClick={() => bus !== isBus && onSelect(isBus)}
+      className={`flex min-h-11 items-center justify-center gap-2 rounded-lg font-semibold ${bus !== isBus ? 'text-neutral-600 dark:text-neutral-300' : isBus ? 'text-black shadow-sm' : 'bg-white shadow-sm dark:bg-neutral-950'}`}
+      style={bus === isBus && isBus ? { backgroundColor: BUS_YELLOW } : undefined}
+    >
+      {icon}
+      {label}
+    </button>
+  )
+  return (
+    <div role="radiogroup" aria-label="Map" className="grid grid-cols-2 gap-1 rounded-xl bg-neutral-200 p-1 dark:bg-neutral-800">
+      {option(false, 'Subway', <TrainIcon />)}
+      {option(true, 'Bus', <BusIcon />)}
+    </div>
+  )
+}
+
+// What the map's markers mean, drawn like them; then how live it is.
+function MapKey({ bus }: { bus: boolean }) {
+  const item = (marker: ReactNode, label: string) => (
+    <li className="flex items-center gap-1.5">
+      {marker}
+      {label}
+    </li>
+  )
+  return (
+    <div className="space-y-1 text-center text-xs text-neutral-500">
+      <ul aria-label="Map key" className="flex flex-wrap justify-center gap-x-4 gap-y-1">
+        {item(<span aria-hidden className="size-3 rounded-full border-2 border-neutral-800 bg-white" />, bus ? 'Stop' : 'Station')}
+        {item(
+          <span aria-hidden className="size-3 rounded-full border-2 border-white shadow-sm" style={{ backgroundColor: bus ? BUS_YELLOW : '#DA291C' }} />,
+          `${bus ? 'Bus' : 'Train'}: zoom in for its direction`,
+        )}
+        {item(<span aria-hidden className="size-3 rounded-full border-2 border-white bg-blue-600 shadow-sm" />, 'You')}
+      </ul>
+      <p>Updates every 10 seconds. Tap {bus ? 'a bus or a stop' : 'a train or a station'} for more.</p>
+    </div>
+  )
+}
+
+function TrainIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="size-4 fill-none stroke-current stroke-2" aria-hidden>
+      <rect x="5" y="3" width="14" height="14" rx="3" />
+      <path d="M5 10h14M9 21l1.5-4M15 21l-1.5-4" />
+      <circle cx="9" cy="13.5" r="0.5" className="fill-current" />
+      <circle cx="15" cy="13.5" r="0.5" className="fill-current" />
+    </svg>
+  )
+}
+
+// A bus, for the Bus switch. Drawn in the text color.
 function BusIcon() {
   return (
     <svg viewBox="0 0 24 24" className="size-4 fill-none stroke-current stroke-2" aria-hidden>

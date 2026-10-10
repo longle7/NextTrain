@@ -15,6 +15,7 @@ import SettingsPage from './pages/SettingsPage'
 import StationPage from './pages/StationPage'
 import SupportPage from './pages/SupportPage'
 import TermsPage from './pages/TermsPage'
+import { lastMapView } from './mapSession'
 
 // The map loads Apple's MapKit JS (about 240 KB), so it loads only when opened: a faster first launch.
 const MapPage = lazy(() => import('./pages/MapPage'))
@@ -125,12 +126,13 @@ function Header() {
 }
 
 function TabBar() {
+  useLocation() // re-render on every navigation, so the Map tab's link is the latest map view
   return (
     <nav className="fixed inset-x-0 bottom-0 z-10 border-t border-neutral-200 bg-white/90 pb-[env(safe-area-inset-bottom)] backdrop-blur dark:border-neutral-800 dark:bg-neutral-900/90">
       <div className="mx-auto grid max-w-xl grid-cols-3">
         <Tab to="/" label="Home" icon={<path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z" />} />
         <Tab to="/lines" label="Lines" icon={<path d="M5 6h14M5 12h14M5 18h14" />} />
-        <Tab to="/map" label="Map" icon={<path d="m9 4-6 2v14l6-2 6 2 6-2V4l-6 2-6-2zm0 0v14m6-12v14" />} />
+        <Tab to={`/map${lastMapView()}`} label="Map" icon={<path d="m9 4-6 2v14l6-2 6 2 6-2V4l-6 2-6-2zm0 0v14m6-12v14" />} />
       </div>
     </nav>
   )
