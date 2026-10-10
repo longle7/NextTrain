@@ -40,5 +40,11 @@
 
         // Gets alerts in effect right now for the given routes (comma-separated route IDs), e.g. bus detours.
         Task<IReadOnlyList<MbtaAlertDto>> GetRouteAlertsAsync(string routeIds);
+
+        // Gets planned changes that haven't started yet (or start again later): the subway's, or the given routes'.
+        Task<IReadOnlyList<MbtaAlertDto>> GetUpcomingAlertsAsync(string? routeIds);
+
+        // Gets elevator, escalator, and other accessibility alerts in effect right now at a station.
+        Task<IReadOnlyList<MbtaAlertDto>> GetAccessAlertsAsync(string mbtaStopId);
     }
 }

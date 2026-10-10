@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { Prediction } from './api'
-import { agoLabel, countdown, groupDepartures, noTrainsMessage, secondsAgo } from './time'
+import { agoLabel, countdown, dateRange, groupDepartures, noTrainsMessage, secondsAgo } from './time'
 
 const now = new Date('2026-09-29T08:00:00-04:00')
 const at = (secondsFromNow: number) => new Date(now.getTime() + secondsFromNow * 1000).toISOString()
@@ -76,5 +76,15 @@ describe('noTrainsMessage', () => {
     expect(noTrainsMessage(false, at(2))).toMatch(/closed overnight/)
     expect(noTrainsMessage(false, at(15))).toMatch(/Check back in a minute/)
     expect(noTrainsMessage(false, at(0))).toMatch(/Check back in a minute/) // last trains run past midnight
+  })
+})
+
+describe('dateRange', () => {
+  const day = (iso: string) => new Date(iso).toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric', timeZone: 'America/New_York' })
+
+  it('ends a period that runs to 3 AM on the day before, and says one day once', () => {
+    expect(dateRange('2026-10-17T03:00:00-04:00', '2026-10-19T03:00:00-04:00')).toBe(`${day('2026-10-17T12:00:00-04:00')} – ${day('2026-10-18T12:00:00-04:00')}`)
+    expect(dateRange('2026-10-13T03:00:00-04:00', '2026-10-14T03:00:00-04:00')).toBe(day('2026-10-13T12:00:00-04:00'))
+    expect(dateRange('2026-10-25T03:00:00-04:00', null)).toBe(`From ${day('2026-10-25T12:00:00-04:00')}`)
   })
 })

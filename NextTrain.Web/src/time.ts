@@ -43,6 +43,19 @@ export const agoLabel = (seconds: number) => (seconds < 60 ? `${seconds}s ago` :
 /** "7:45 AM" in the device's locale. */
 export const clock = (time: Date | string) => new Date(time).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
 
+/**
+ * When a planned change applies: "Sat, Oct 17 – Sun, Oct 18". MBTA's periods end at 3 AM, the end of a service day,
+ * so a period ending then ends the day before.
+ */
+export function dateRange(start: string, end: string | null | undefined): string {
+  // In Boston time: MBTA's days are Boston days, wherever the phone is set.
+  const day = (time: number) => new Date(time).toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric', timeZone: 'America/New_York' })
+  const from = day(Date.parse(start))
+  if (!end) return `From ${from}`
+  const to = day(Date.parse(end) - 4 * 3_600_000)
+  return to === from ? from : `${from} – ${to}`
+}
+
 /** Why a station shows no departures: a service alert, the overnight closure (about 1 to 5 AM), or nothing predicted yet. */
 export function noTrainsMessage(hasMajorAlert: boolean, now: Date): string {
   if (hasMajorAlert) return 'No trains are predicted here right now. See the service alert above.'

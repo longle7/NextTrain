@@ -63,6 +63,9 @@ export interface Alert {
   timeframe: string | null // "through Sunday", "ongoing"
   url: string | null
   entities: AlertEntity[]
+  // Planned changes only (/alerts/upcoming): when it next applies. No end: until further notice.
+  start?: string
+  end?: string | null
 }
 
 // null means "all": every route, the whole route, or both directions.
@@ -181,6 +184,9 @@ function fetchOnce<T, R = T>(path: string, shape?: (data: R) => T): () => Promis
 // Alerts change within minutes; pages poll them once a minute.
 export const ALERTS_REFRESH_MS = 60_000
 export const getAlerts = () => api<Alert[]>('/alerts')
+// Planned changes (the next two weeks): the subway's, or some bus routes'. They change slowly.
+export const UPCOMING_REFRESH_MS = 10 * 60_000
+export const upcomingAlertsPath = (busRoutes?: string) => (busRoutes ? `/alerts/upcoming?routes=${encodeURIComponent(busRoutes)}` : '/alerts/upcoming')
 
 // Routes and stations almost never change. ROUTES is subway lines then bus routes; `usePolling(getRoutes, ROUTES)`.
 export const ROUTES = '/routes?type=all'

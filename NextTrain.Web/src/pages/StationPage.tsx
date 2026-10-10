@@ -26,6 +26,9 @@ export default function StationPage() {
   const busAlertsPath = `/alerts?routes=${encodeURIComponent(busIds.join(','))}`
   const busAlerts = usePolling(() => (busIds.length ? api<Alert[]>(busAlertsPath) : Promise.resolve([])), busAlertsPath, ALERTS_REFRESH_MS)
   const busOnly = station.data?.routeId === ''
+  // Elevator and escalator outages (MBTA leaves them out of the usual alerts). A bus stop has none.
+  const accessPath = `${stationPath}/access`
+  const access = usePolling(() => (station.data?.routeId ? api<Alert[]>(accessPath) : Promise.resolve<Alert[]>([])), `${accessPath}|${!!station.data?.routeId}`, ALERTS_REFRESH_MS)
   const notFound = station.error instanceof ApiError && station.error.status === 404
   useTitle(notFound ? 'Stop not found' : station.data?.name)
 
@@ -59,12 +62,15 @@ export default function StationPage() {
         {station.data && busOnly && (
           <p className="mt-1 text-sm text-neutral-600 dark:text-neutral-300">Bus stop · {towardLabel(station.data, routes.data, 4)}</p>
         )}
-        {/* Wheelchair users need to know before they go; MBTA elevator outages show as alerts below. */}
+        {/* Wheelchair users need to know before they go; elevator and escalator outages are listed below. */}
         {station.data?.isAccessible != null && (
           <p className={`mt-2 flex items-center gap-1.5 text-sm font-semibold ${station.data.isAccessible ? 'text-blue-700 dark:text-blue-300' : 'text-neutral-500'}`}>
             <AccessibleIcon className="size-5" />
             {station.data.isAccessible ? 'Wheelchair accessible' : 'Not wheelchair accessible'}
           </p>
+        )}
+        {station.data?.isAccessible && access.data?.length === 0 && (
+          <p className="mt-0.5 pl-6.5 text-sm text-neutral-500">No elevator or escalator outages reported</p>
         )}
       </div>
 
@@ -94,6 +100,15 @@ export default function StationPage() {
       {stationAlerts.map((alert) => (
         <AlertBanner key={alert.id} alert={alert} />
       ))}
+
+      {!!access.data?.length && (
+        <section className="space-y-2">
+          <h2 className="px-1 text-lg font-bold">Elevators & escalators</h2>
+          {access.data.map((alert) => (
+            <AlertBanner key={alert.id} alert={alert} />
+          ))}
+        </section>
+      )}
 
       <Status error={failure(station) ?? failure(predictions)} loading={!predictions.data && !predictions.error} />
 

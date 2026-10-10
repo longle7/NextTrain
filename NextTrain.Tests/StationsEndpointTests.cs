@@ -242,6 +242,63 @@ public class StationsEndpointTests : IDisposable
         Assert.Equal(new AlertEntity("Red", null, null), Assert.Single(alerts[0].Entities));
     }
 
+    private static MbtaAlertDto Alert(string id, string effect, params MbtaActivePeriodDto[] periods) => new()
+    {
+        Id = id,
+        Attributes = new()
+        {
+            Effect = effect, Severity = 5, Header = $"Header {id}",
+            InformedEntity = [new MbtaInformedEntityDto { Route = "Red" }], ActivePeriod = periods.ToList()
+        }
+    };
+
+    [Fact]
+    public async Task GetUpcoming_NextPeriodWithinTwoWeeks_SoonestFirst()
+    {
+        var now = DateTimeOffset.UtcNow;
+        MbtaActivePeriodDto Days(double from, double? to) => new() { Start = now.AddDays(from), End = to is null ? null : now.AddDays(to.Value) };
+        _mbta.UpcomingAlerts[""] = new()
+        {
+            Alert("later", "SHUTTLE", Days(9, 11)),
+            Alert("weekends", "SUSPENSION", Days(-1, 0.5), Days(6, 8), Days(13, 15)), // on now, and again in 6 days
+            Alert("too-far", "SHUTTLE", Days(20, 22)),
+            Alert("open-ended", "STATION_CLOSURE", Days(2, null)),
+        };
+
+        var upcoming = (await _client.GetFromJsonAsync<List<AlertResponse>>("/alerts/upcoming"))!;
+
+        Assert.Equal(new[] { "open-ended", "weekends", "later" }, upcoming.Select(a => a.Id));
+        Assert.Equal(now.AddDays(6), upcoming[1].Start!.Value, TimeSpan.FromSeconds(1)); // the next weekend, not the current one
+        Assert.Null(upcoming[0].End);
+    }
+
+    [Fact]
+    public async Task GetAlerts_LeavesOutStartAndEnd_SoOlderAppsSeeTheSameAnswer()
+    {
+        _mbta.Alerts.Add(Alert("now", "DELAY", new MbtaActivePeriodDto { Start = DateTimeOffset.UtcNow.AddHours(-1) }));
+
+        var json = await _client.GetStringAsync("/alerts");
+
+        Assert.DoesNotContain("\"start\"", json);
+        Assert.DoesNotContain("\"end\"", json);
+    }
+
+    [Fact]
+    public async Task GetAccess_ElevatorAndEscalatorOutagesOnly_ElevatorsFirst()
+    {
+        _mbta.AccessAlerts["place-pktrm"] = new()
+        {
+            Alert("escalator", "ESCALATOR_CLOSURE"),
+            Alert("elevator", "ELEVATOR_CLOSURE"),
+            Alert("closure", "STATION_CLOSURE"), // a whole-station alert: already on the station's alerts
+        };
+
+        var access = (await _client.GetFromJsonAsync<List<AlertResponse>>("/stations/place-pktrm/access"))!;
+
+        Assert.Equal(new[] { "elevator", "escalator" }, access.Select(a => a.Id));
+        Assert.Equal(HttpStatusCode.NotFound, (await _client.GetAsync("/stations/place-nowhere/access")).StatusCode);
+    }
+
     [Fact]
     public async Task GetAlerts_MbtaDown_Returns503()
     {

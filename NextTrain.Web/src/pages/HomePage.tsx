@@ -1,16 +1,16 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { Link, useNavigate } from 'react-router'
-import { alertsFor, majorAlert } from '../alerts'
+import { alertsFor, majorAlert, plannedFor } from '../alerts'
 import {
   ALERTS_REFRESH_MS, api, commutePredictionsPath, getAlerts, getBusStops, getRoutes, getStations, isSubwayRoute, ROUTES,
-  searchRoutes, searchStations, stationRouteIds, towardLabel,
+  searchRoutes, searchStations, stationRouteIds, towardLabel, UPCOMING_REFRESH_MS, upcomingAlertsPath,
   type Alert, type Commute, type Prediction, type Route, type Station,
 } from '../api'
 import { commuteTiming, daysLabel, liveActivityEnd, sortCommutes, timingLabel, windowLabel } from '../commutes'
 import { Card, LineBadge, linkButton, primaryButton, SearchInput, StationLink, Status, WarningIcon } from '../components'
 import { locationErrorMessage, nearestStations, OUT_OF_AREA_MILES, walkLabel } from '../geo'
 import { endLiveActivities, liveActivityDetails, showLiveActivity } from '../liveActivity'
-import { clock, countdown, groupDepartures, secondsAgo, STALE_AFTER_SECONDS } from '../time'
+import { clock, countdown, dateRange, groupDepartures, secondsAgo, STALE_AFTER_SECONDS } from '../time'
 import { failure, useNow, usePolling, useTitle } from '../usePolling'
 
 export default function HomePage() {
@@ -317,6 +317,13 @@ function MyCommutes({ routes, alerts: subwayAlerts }: { routes: Route[] | undefi
   const busAlertsPath = `/alerts?routes=${encodeURIComponent(busRoutes)}`
   const busAlerts = usePolling(() => (busRoutes ? api<Alert[]>(busAlertsPath) : Promise.resolve([])), busAlertsPath, ALERTS_REFRESH_MS)
   const alerts = subwayAlerts && [...subwayAlerts, ...(busAlerts.data ?? [])]
+  // Planned changes in the next week (subway, plus your bus commutes' routes), once there are commutes.
+  const hasCommutes = !!commutes.data?.length
+  const upcomingPath = upcomingAlertsPath()
+  const upcomingSubway = usePolling(() => (hasCommutes ? api<Alert[]>(upcomingPath) : Promise.resolve([])), `${upcomingPath}|${hasCommutes}`, UPCOMING_REFRESH_MS)
+  const upcomingBusPath = upcomingAlertsPath(busRoutes)
+  const upcomingBus = usePolling(() => (busRoutes ? api<Alert[]>(upcomingBusPath) : Promise.resolve([])), upcomingBusPath, UPCOMING_REFRESH_MS)
+  const upcoming = [...(upcomingSubway.data ?? []), ...(upcomingBus.data ?? [])]
   const sorted = commutes.data && sortCommutes(commutes.data, now)
   // The iPhone Live Activity follows the soonest commute that's on, or starts within 15 minutes.
   const liveId = sorted?.find((c) => liveActivityEnd(c, now))?.id
@@ -352,6 +359,12 @@ function MyCommutes({ routes, alerts: subwayAlerts }: { routes: Route[] | undefi
                 alerts &&
                 majorAlert(alertsFor(alerts, { routeIds: [commute.routeId], stopId: commute.mbtaStopId, directionId: commute.directionId }))
               }
+              planned={plannedFor(
+                upcoming,
+                { routeIds: [commute.routeId], stopId: commute.mbtaStopId, directionId: commute.directionId },
+                commute.activeDays,
+                now,
+              )}
             />
           </li>
         ))}
@@ -360,13 +373,14 @@ function MyCommutes({ routes, alerts: subwayAlerts }: { routes: Route[] | undefi
   )
 }
 
-function CommuteCard({ commute, route, routes, now, liveActivity, alert }: {
+function CommuteCard({ commute, route, routes, now, liveActivity, alert, planned }: {
   commute: Commute
   route: Route | undefined
   routes: Route[] | undefined
   now: Date
   liveActivity: boolean // this commute drives the iPhone Live Activity
   alert: Alert | undefined // the worst service alert on this commute's line, station, and direction
+  planned: Alert | undefined // the soonest planned change that will hit this commute within a week
 }) {
   const timing = commuteTiming(commute, now)
   const live = timing.state === 'now' || timing.state === 'soon'
@@ -391,6 +405,14 @@ function CommuteCard({ commute, route, routes, now, liveActivity, alert }: {
             {alert.summary}
           </p>
         )}
+        {planned && (
+          <p className="mt-2 flex items-start gap-1.5 text-sm text-neutral-600 dark:text-neutral-300">
+            <CalendarIcon className="mt-0.5 size-4 shrink-0" />
+            <span>
+              <span className="font-semibold">Planned:</span> {planned.summary} · {dateRange(planned.start!, planned.end)}
+            </span>
+          </p>
+        )}
       </Link>
       <div className="flex items-center justify-between gap-2 text-sm text-neutral-500">
         <span>
@@ -406,6 +428,15 @@ function CommuteCard({ commute, route, routes, now, liveActivity, alert }: {
       </div>
       {live && <CommuteDepartures commute={commute} route={route} alert={alert} liveActivity={liveActivity} />}
     </Card>
+  )
+}
+
+function CalendarIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" className={`fill-none stroke-current stroke-2 ${className ?? ''}`} aria-hidden>
+      <rect x="4" y="5" width="16" height="15" rx="2" />
+      <path d="M4 10h16M9 3v4M15 3v4" />
+    </svg>
   )
 }
 
