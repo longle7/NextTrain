@@ -1,6 +1,6 @@
 import { ContactEmail, ExternalLink, InternalLink, LegalPage, Section } from './LegalLayout'
 
-// List every cookie and storage item NextTrain uses; keep in step with analytics.ts, api.ts, and recent.ts.
+// List every cookie and storage item NextTrain uses; keep in step with analytics.ts, api.ts, Welcome.tsx, and MapPage.tsx.
 // Not legal advice: have a lawyer review it. Bump EFFECTIVE_DATE in legal.ts when it changes.
 export default function CookiesPage() {
   return (
@@ -15,9 +15,9 @@ export default function CookiesPage() {
         <StorageTable
           rows={[
             ['nexttrain.userId', 'A random ID that your saved commutes are stored under', 'Until you use Delete my data'],
-            ['nexttrain.recentStations', 'The stations you viewed last, for Home (never sent to us)', 'Until you use Delete my data'],
             ['nexttrain.analyticsConsent', 'Remembers your analytics choice, so we don\'t ask again', 'Until you use Delete my data'],
             ['nexttrain.cache.*', 'The last train times, stations, alerts, and commutes NextTrain loaded, so it can show them (with their age) when you open it offline, e.g. in a tunnel', 'Until newer data replaces it, or you use Delete my data'],
+            ['nexttrain.mapTipSeen', 'Remembers that you closed the map\'s tip, so it doesn\'t show again', 'Until you delete the app or clear site data'],
             ['nexttrain.termsAccepted', 'Remembers which version of the Terms you agreed to, so we only ask again when they change', 'Until you delete the app or clear site data'],
           ]}
         />

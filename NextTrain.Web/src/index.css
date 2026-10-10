@@ -89,6 +89,20 @@ html:has(#consent-title) {
   outline: 3px solid #2563eb;
   outline-offset: 2px;
 }
+/* Trains (and buses) on the map: a small dot when zoomed out, so downtown isn't a pile of arrows; zoomed in (MapPage
+   adds .show-names) the full marker with the arrow for its direction. The tap area stays 24 px either way. */
+.train circle {
+  r: 6px;
+}
+.train path {
+  display: none;
+}
+.show-names .train circle {
+  r: 10px;
+}
+.show-names .train path {
+  display: inline;
+}
 .user-dot {
   width: 20px;
   height: 20px;

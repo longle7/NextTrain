@@ -5,8 +5,7 @@ import {
   stationRouteIds, towardLabel,
   type Commute, type CommuteInput, type Route, type Station,
 } from '../api'
-import { WEEK } from '../commutes'
-import { recentStationIds } from '../recent'
+import { stepNumbers, WEEK } from '../commutes'
 import { Card, dangerButton, LineBadge, linkButton, NotFound, primaryButton, SearchInput, Status } from '../components'
 import { usePolling, useTitle } from '../usePolling'
 
@@ -86,12 +85,15 @@ function CommuteForm({ existing, initialStopId, initialRouteId }: { existing: Co
     }
   }
 
+  // Steps are numbered as shown: "Which line?" and "Which way?" are skipped when there's only one choice.
+  const [lineStep, wayStep, whenStep] = stepNumbers([!!station && stationRoutes.length > 1, !!route, true])
+
   return (
     <>
       <h1 className="text-2xl font-bold">{existing ? 'Edit commute' : 'New commute'}</h1>
       <Status error={stations.error ?? routes.error} />
 
-      <Step title="Where do you get on?">
+      <Step n={1} title="Where do you get on?" hint="Search for your station or bus stop.">
         {station ? (
           <Card>
             <div className="flex items-center justify-between gap-2">
@@ -107,7 +109,7 @@ function CommuteForm({ existing, initialStopId, initialRouteId }: { existing: Co
       </Step>
 
       {station && stationRoutes.length > 1 && (
-        <Step title="Which line?">
+        <Step n={lineStep} title="Which line?">
           <div className="flex flex-wrap gap-2">
             {stationRoutes.map((id) => (
               <Choice key={id} selected={chosenRouteId === id} onClick={() => {
@@ -126,7 +128,7 @@ function CommuteForm({ existing, initialStopId, initialRouteId }: { existing: Co
       )}
 
       {route && (
-        <Step title="Which way?">
+        <Step n={wayStep} title="Which way?" hint="Pick where you're headed.">
           <div className="grid grid-cols-2 gap-2">
             {route.directionDestinations.map((destination, i) => directions.includes(i) && (
               <Choice key={i} selected={chosenDirection === i} onClick={() => setDirectionId(i)}>
@@ -140,7 +142,7 @@ function CommuteForm({ existing, initialStopId, initialRouteId }: { existing: Co
         </Step>
       )}
 
-      <Step title="When do you usually leave?">
+      <Step n={whenStep} title="When do you usually leave?" hint="NextTrain shows this trip on Home during this time.">
         <Card>
           <div className="flex items-center gap-2">
             <TimeInput label="From" value={start} onChange={setStart} />
@@ -187,14 +189,10 @@ function CommuteForm({ existing, initialStopId, initialRouteId }: { existing: Co
 
 function StationPicker({ stations, routes, onPick }: { stations: Station[] | undefined; routes: Route[] | undefined; onPick: (id: string) => void }) {
   const [query, setQuery] = useState('')
-  const [recentIds] = useState(recentStationIds)
-  // Before typing, offer the stations you looked at last: often the one you're about to save.
-  const recent = recentIds.flatMap((id) => stations?.find((s) => s.mbtaStopId === id) ?? [])
-  const results = stations ? (query.trim() ? searchStations(stations, query, 6) : recent) : []
+  const results = stations && query.trim() ? searchStations(stations, query, 6) : []
   return (
     <div className="space-y-2">
       <SearchInput value={query} onChange={setQuery} placeholder="Search stations or bus stops" onSubmit={() => results[0] && onPick(results[0].mbtaStopId)} />
-      {!query.trim() && results.length > 0 && <p className="px-1 text-sm font-semibold text-neutral-500">Recent</p>}
       {results.map((s) => (
         <button key={s.mbtaStopId} onClick={() => onPick(s.mbtaStopId)} className="w-full text-left">
           <Card>
@@ -217,10 +215,15 @@ function StationPicker({ stations, routes, onPick }: { stations: Station[] | und
   )
 }
 
-function Step({ title, children }: { title: string; children: ReactNode }) {
+function Step({ n, title, hint, children }: { n: number | undefined; title: string; hint?: string; children: ReactNode }) {
   return (
     <section className="space-y-2">
-      <h2 className="px-1 font-bold">{title}</h2>
+      <div className="px-1">
+        <h2 className="font-bold">
+          {n}. {title}
+        </h2>
+        {hint && <p className="text-sm text-neutral-500">{hint}</p>}
+      </div>
       {children}
     </section>
   )

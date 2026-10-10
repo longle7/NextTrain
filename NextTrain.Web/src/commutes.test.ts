@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { commuteTiming, daysLabel, liveActivityEnd, sortCommutes, timingLabel } from './commutes'
+import { commuteTiming, daysLabel, liveActivityEnd, sortCommutes, stepNumbers, timingLabel } from './commutes'
 
 // Tuesday 29 Sep 2026, 7:50 AM device time.
 const now = new Date(2026, 8, 29, 7, 50)
@@ -64,5 +64,13 @@ describe('liveActivityEnd (the iPhone Live Activity shows from 15 min before a c
   it('covers a window that starts just after midnight', () => {
     const lateNight = new Date(2026, 8, 29, 23, 50)
     expect(liveActivityEnd(commute('00:05:00', '00:35:00', 'Wed'), lateNight)).toEqual(new Date(2026, 8, 30, 0, 35))
+  })
+})
+
+describe('stepNumbers', () => {
+  it('numbers the commute form steps as shown, skipping hidden ones', () => {
+    expect(stepNumbers([true, true, true])).toEqual([2, 3, 4])
+    expect(stepNumbers([false, true, true])).toEqual([undefined, 2, 3]) // one line: no "Which line?"
+    expect(stepNumbers([false, false, true])).toEqual([undefined, undefined, 2]) // no stop picked yet
   })
 })
