@@ -78,4 +78,16 @@ public class FakeMbtaClient : IMbtaClient
 
     public Task<IReadOnlyList<MbtaAlertDto>> GetRouteAlertsAsync(string routeIds) =>
         Task.FromResult<IReadOnlyList<MbtaAlertDto>>(RouteAlerts.GetValueOrDefault(routeIds) ?? new());
+
+    // Keyed by the route IDs asked for; "" is the subway's (no routes given).
+    public Dictionary<string, List<MbtaAlertDto>> UpcomingAlerts { get; } = new();
+
+    // Keyed by MBTA stop ID.
+    public Dictionary<string, List<MbtaAlertDto>> AccessAlerts { get; } = new();
+
+    public Task<IReadOnlyList<MbtaAlertDto>> GetUpcomingAlertsAsync(string? routeIds) =>
+        Task.FromResult<IReadOnlyList<MbtaAlertDto>>(UpcomingAlerts.GetValueOrDefault(routeIds ?? "") ?? new());
+
+    public Task<IReadOnlyList<MbtaAlertDto>> GetAccessAlertsAsync(string mbtaStopId) =>
+        Task.FromResult<IReadOnlyList<MbtaAlertDto>>(AccessAlerts.GetValueOrDefault(mbtaStopId) ?? new());
 }

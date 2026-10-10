@@ -66,6 +66,24 @@ namespace NextTrain.Api.Controllers
             return station is null ? NotFound() : station;
         }
 
+        // The effects that mean a station is harder to get through without stairs.
+        private static readonly HashSet<string> AccessEffects = ["ELEVATOR_CLOSURE", "ESCALATOR_CLOSURE", "ACCESS_ISSUE"];
+
+        // GET /stations/place-dwnxg/access: the station's elevator and escalator outages in effect now, elevators first.
+        // A bus stop has none (it's at street level), so it's answered without asking MBTA.
+        [HttpGet("{mbtaStopId}/access")]
+        public async Task<ActionResult<IEnumerable<AlertResponse>>> GetAccessAlerts(string mbtaStopId, [FromServices] IMbtaClient mbta)
+        {
+            var station = await _lookup.GetByMbtaStopIdAsync(mbtaStopId);
+            if (station is null) return NotFound();
+            if (station.RouteId == "") return Ok(Array.Empty<AlertResponse>());
+
+            return Ok((await mbta.GetAccessAlertsAsync(station.MbtaStopId))
+                .Where(a => AccessEffects.Contains(a.Attributes.Effect))
+                .OrderBy(a => a.Attributes.Effect != "ELEVATOR_CLOSURE")
+                .Select(a => AlertResponse.From(a)));
+        }
+
         // GET /stations/place-pktrm/predictions?route=Red&direction=0, and ?bus=true to include its buses.
         // Flow: find the station in our database (404 if unknown) -> ask MBTA for its upcoming trains (cached
         // 10 seconds) -> reshape, filter, and sort them for the app.

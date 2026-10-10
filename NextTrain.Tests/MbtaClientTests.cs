@@ -50,6 +50,22 @@ public class MbtaClientTests
     }
 
     [Fact]
+    public async Task GetAccessAlertsAsync_NamesTheElevatorOrEscalator()
+    {
+        const string json = """
+            {"data":[{"id":"1","attributes":{"effect":"ESCALATOR_CLOSURE","severity":3,"header":"Alewife Escalator 351 is unavailable.",
+              "service_effect":"Alewife escalator unavailable","informed_entity":[{"stop":"place-alfcl","facility":"351"}]}}],
+             "included":[{"id":"351","type":"facility","attributes":{"short_name":"Main concourse to platform","type":"ESCALATOR"}}]}
+            """;
+        var client = new MbtaClient(new HttpClient(new StubHandler(json)), new ConfigurationBuilder().Build(),
+            new MemoryCache(new MemoryCacheOptions()));
+
+        var alert = Assert.Single(await client.GetAccessAlertsAsync("place-alfcl"));
+
+        Assert.Equal("Escalator 351: Main concourse to platform", alert.Attributes.ServiceEffect);
+    }
+
+    [Fact]
     public async Task GetSubwayRoutesAsync_ParsesSnakeCase_SortedBySortOrder()
     {
         const string json = """

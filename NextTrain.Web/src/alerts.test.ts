@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { alertsFor, effectLabel, majorAlert } from './alerts'
+import { alertsFor, effectLabel, majorAlert, plannedFor } from './alerts'
 import type { Alert, AlertEntity } from './api'
 
 const entity = (routeId: string | null, stopId: string | null = null, directionId: number | null = null): AlertEntity => ({
@@ -51,4 +51,28 @@ it('majorAlert ignores minor station issues', () => {
 it('effectLabel has a fallback for effects it does not know', () => {
   expect(effectLabel('SHUTTLE')).toBe('Shuttle buses')
   expect(effectLabel('SNOW_ROUTE')).toBe('Service alert')
+})
+
+describe('plannedFor', () => {
+  // Saturday, October 10, 2026, noon in Boston.
+  const now = new Date('2026-10-10T12:00:00-04:00')
+  const planned = (id: string, start: string, end: string | null, ...entities: AlertEntity[]): Alert => ({
+    ...alert(id, 4, 'SHUTTLE', ...entities), start, end,
+  })
+  // MBTA periods run 3 AM to 3 AM: this covers Saturday and Sunday the 17th-18th.
+  const blueWeekend = planned('blue-weekend', '2026-10-17T03:00:00-04:00', '2026-10-19T03:00:00-04:00', entity('Blue'))
+  const redTuesday = planned('red-tuesday', '2026-10-13T03:00:00-04:00', '2026-10-14T03:00:00-04:00', entity('Red', 'place-pktrm'))
+  const redNextMonth = planned('red-later', '2026-10-25T03:00:00-04:00', null, entity('Red'))
+  const upcoming = [blueWeekend, redTuesday, redNextMonth]
+
+  it('finds the soonest change on the commute\'s line and station, on one of its days, within a week', () => {
+    expect(plannedFor(upcoming, { routeIds: ['Red'], stopId: 'place-pktrm' }, 'Mon,Tue,Wed,Thu,Fri', now)?.id).toBe('red-tuesday')
+    expect(plannedFor(upcoming, { routeIds: ['Blue'] }, 'Sat,Sun', now)?.id).toBe('blue-weekend')
+  })
+
+  it('skips changes on days the commute doesn\'t run, at other stations, or more than a week away', () => {
+    expect(plannedFor(upcoming, { routeIds: ['Blue'] }, 'Mon,Tue,Wed,Thu,Fri', now)).toBeUndefined() // weekend only
+    expect(plannedFor(upcoming, { routeIds: ['Red'], stopId: 'place-alfcl' }, 'Tue', now)).toBeUndefined() // Park Street only
+    expect(plannedFor([redNextMonth], { routeIds: ['Red'] }, 'Mon,Tue,Wed,Thu,Fri,Sat,Sun', now)).toBeUndefined()
+  })
 })

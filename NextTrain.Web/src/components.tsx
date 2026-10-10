@@ -169,8 +169,9 @@ export function SearchInput({ value, onChange, placeholder, onSubmit }: {
 }
 
 /** A service alert: its short summary and timeframe, tap to read the details. Major ones are amber. */
-export function AlertBanner({ alert }: { alert: Alert }) {
-  const major = alert.severity >= MAJOR_SEVERITY
+export function AlertBanner({ alert, when }: { alert: Alert; when?: string }) {
+  // A planned change (with `when`) isn't happening yet: no warning colors.
+  const major = !when && alert.severity >= MAJOR_SEVERITY
   return (
     <details
       className={`group rounded-xl p-4 ${major ? 'bg-amber-50 text-amber-950 dark:bg-amber-950/50 dark:text-amber-50' : 'bg-white shadow-sm dark:bg-neutral-900'}`}
@@ -179,7 +180,7 @@ export function AlertBanner({ alert }: { alert: Alert }) {
         <WarningIcon className={`mt-0.5 size-5 shrink-0 ${major ? 'text-amber-600 dark:text-amber-400' : 'text-neutral-500'}`} />
         <span className="min-w-0 flex-1">
           <span className="block font-semibold">{alert.summary}</span>
-          {alert.timeframe && <span className="block text-sm opacity-75">{capitalize(alert.timeframe)}</span>}
+          {(when ?? alert.timeframe) && <span className="block text-sm opacity-75">{when ?? capitalize(alert.timeframe!)}</span>}
         </span>
         <svg viewBox="0 0 24 24" className="mt-0.5 size-5 shrink-0 fill-none stroke-current stroke-2 opacity-60 transition group-open:rotate-180" aria-hidden>
           <path d="m6 9 6 6 6-6" />

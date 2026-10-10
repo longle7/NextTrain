@@ -171,6 +171,39 @@ namespace NextTrain.Api.Services
             return payload?.Data ?? new List<MbtaAlertDto>();
         }
 
+        public async Task<IReadOnlyList<MbtaAlertDto>> GetUpcomingAlertsAsync(string? routeIds)
+        {
+            var scope = routeIds is null ? "filter[route_type]=0,1" : $"filter[route]={Uri.EscapeDataString(routeIds)}";
+            var payload = await GetCachedAsync<MbtaAlertsResponseDto>(
+                $"https://api-v3.mbta.com/alerts?{scope}&filter[lifecycle]=UPCOMING,ONGOING_UPCOMING", AlertCacheDuration);
+            return payload?.Data ?? new List<MbtaAlertDto>();
+        }
+
+        public async Task<IReadOnlyList<MbtaAlertDto>> GetAccessAlertsAsync(string mbtaStopId)
+        {
+            // Only these activities' alerts: the default (board, exit, ride) is what leaves elevators out elsewhere.
+            var payload = await GetCachedAsync<MbtaAlertsResponseDto>(
+                $"https://api-v3.mbta.com/alerts?filter[stop]={Uri.EscapeDataString(mbtaStopId)}" +
+                "&filter[activity]=USING_WHEELCHAIR,USING_ESCALATOR&filter[datetime]=NOW&include=facilities", AlertCacheDuration);
+            if (payload is null) return new List<MbtaAlertDto>();
+
+            // MBTA's summary ("Alewife escalator unavailable") doesn't say which one; the facility does:
+            // "Escalator 351: Main concourse to platform". (Same answer every time, so the cached copy can keep it.)
+            var facilities = payload.Included.ToDictionary(f => f.Id);
+            foreach (var alert in payload.Data)
+            {
+                var facility = alert.Attributes.InformedEntity
+                    .Select(e => e.Facility is null ? null : facilities.GetValueOrDefault(e.Facility))
+                    .FirstOrDefault(f => f?.Attributes.ShortName is not null);
+                if (facility is not null)
+                {
+                    var type = facility.Attributes.Type.Replace('_', ' ').ToLowerInvariant();
+                    alert.Attributes.ServiceEffect = $"{char.ToUpperInvariant(type[0])}{type[1..]} {facility.Id}: {facility.Attributes.ShortName}";
+                }
+            }
+            return payload.Data;
+        }
+
         public async Task<IReadOnlyList<MbtaAlertDto>> GetSubwayAlertsAsync()
         {
             // MBTA's default activity filter (board, exit, ride) leaves out elevator and escalator outages.
