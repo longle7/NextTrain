@@ -27,6 +27,8 @@ export interface Prediction {
   routeId: string
   directionId: number
   departureTime: string // the API only sends trains you can board
+  // A timetable time, sent (with ?schedules=true) only for a route one way that has no live prediction.
+  scheduled?: boolean
 }
 
 export interface Vehicle {

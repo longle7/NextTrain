@@ -68,4 +68,7 @@ namespace NextTrain.Core.Services
 
     // The track a route runs on, as a Google encoded polyline. Red has two (Ashmont and Braintree branches).
     public record MbtaShape(string RouteId, string Polyline);
+
+    // A departure in the timetable, for when there's no live prediction (late at night, an infrequent bus).
+    public record MbtaScheduledDeparture(string RouteId, int DirectionId, DateTimeOffset DepartureTime);
 }

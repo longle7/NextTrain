@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { Prediction } from './api'
-import { agoLabel, countdown, groupDepartures, noTrainsMessage, secondsAgo } from './time'
+import { agoLabel, clock, countdown, departureLabel, groupDepartures, noTrainsMessage, secondsAgo } from './time'
 
 const now = new Date('2026-09-29T08:00:00-04:00')
 const at = (secondsFromNow: number) => new Date(now.getTime() + secondsFromNow * 1000).toISOString()
@@ -43,6 +43,21 @@ describe('groupDepartures', () => {
     const groups = groupDepartures([p('Red', 0, 100), p('Red', 0, 200), p('Red', 0, 300)], now, 2)
 
     expect(groups[0].departures).toEqual([at(100), at(200)])
+  })
+  it('marks a group from the timetable as scheduled, and live groups as not', () => {
+    const groups = groupDepartures([p('Red', 0, 120), { ...p('Green-B', 1, 900), scheduled: true }, { ...p('Green-B', 1, 1500), scheduled: true }], now)
+
+    expect(groups.map((g) => [g.routeId, g.scheduled, g.departures.length])).toEqual([
+      ['Green-B', true, 2],
+      ['Red', false, 1],
+    ])
+  })
+})
+
+describe('departureLabel', () => {
+  it('counts down to a live departure, and gives a scheduled one as its clock time', () => {
+    expect(departureLabel(at(150), false, now)).toBe('3 min')
+    expect(departureLabel(at(150), true, now)).toBe(clock(at(150)))
   })
 })
 

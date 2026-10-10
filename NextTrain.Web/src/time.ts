@@ -12,14 +12,17 @@ export function countdown(departureIso: string, now: Date): string | undefined {
   return `${Math.round(seconds / 60)} min`
 }
 
-/** Upcoming departures grouped by route and direction, soonest first. Trains that already left are dropped. */
+/**
+ * Upcoming departures grouped by route and direction, soonest first. Trains that already left are dropped. A group is
+ * `scheduled` when its times come from the timetable (the API never mixes them with live ones for a route one way).
+ */
 export function groupDepartures(predictions: Prediction[], now: Date, perGroup = 3) {
-  const groups = new Map<string, { routeId: string; directionId: number; departures: string[] }>()
+  const groups = new Map<string, { routeId: string; directionId: number; scheduled: boolean; departures: string[] }>()
 
   for (const p of predictions) {
     if (countdown(p.departureTime, now) === undefined) continue
     const key = `${p.routeId}|${p.directionId}`
-    const group = groups.get(key) ?? { routeId: p.routeId, directionId: p.directionId, departures: [] }
+    const group = groups.get(key) ?? { routeId: p.routeId, directionId: p.directionId, scheduled: !!p.scheduled, departures: [] }
     group.departures.push(p.departureTime)
     groups.set(key, group)
   }
@@ -42,6 +45,9 @@ export const agoLabel = (seconds: number) => (seconds < 60 ? `${seconds}s ago` :
 
 /** "7:45 AM" in the device's locale. */
 export const clock = (time: Date | string) => new Date(time).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
+
+/** A departure as shown: a live countdown ("5 min"), or a timetable time as the clock time ("5:32 AM"). */
+export const departureLabel = (time: string, scheduled: boolean, now: Date) => (scheduled ? clock(time) : countdown(time, now))
 
 /** Why a station shows no departures: a service alert, the overnight closure (about 1 to 5 AM), or nothing predicted yet. */
 export function noTrainsMessage(hasMajorAlert: boolean, now: Date): string {
