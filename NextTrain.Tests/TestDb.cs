@@ -24,6 +24,8 @@ public static class TestDb
         var db = Open();
         db.Database.Migrate();
         db.UserCommutes.ExecuteDelete(); // FK to Stations, delete first
+        db.PushDevices.ExecuteDelete();
+        db.SentNotifications.ExecuteDelete();
         db.Stations.ExecuteDelete();
         return db;
     }

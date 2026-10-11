@@ -133,10 +133,58 @@ public class CommutesEndpointTests : IDisposable
         using var bob = ClientFor("bob");
         await alice.PostAsJsonAsync("/commutes", Request());
         await bob.PostAsJsonAsync("/commutes", Request());
+        await alice.PutAsJsonAsync("/me/push-token", PushToken('a'));
+        await bob.PutAsJsonAsync("/me/push-token", PushToken('b'));
+        using (var db = TestDb.Open())
+        {
+            db.SentNotifications.AddRange(new SentNotification { UserId = "alice", AlertId = "1" }, new SentNotification { UserId = "bob", AlertId = "1" });
+            db.SaveChanges();
+        }
 
         Assert.Equal(HttpStatusCode.NoContent, (await alice.DeleteAsync("/me")).StatusCode);
 
         Assert.Empty((await alice.GetFromJsonAsync<List<CommuteResponse>>("/commutes"))!);
         Assert.Single((await bob.GetFromJsonAsync<List<CommuteResponse>>("/commutes"))!);
+        Assert.Equal(["bob:b"], PushDevices());
+        using var after = TestDb.Open();
+        Assert.Equal(["bob"], after.SentNotifications.Select(n => n.UserId));
+    }
+
+    private static PushTokenRequest PushToken(char hex) => new(new string(hex, 64));
+
+    // "user:first character of the token", by user.
+    private static List<string> PushDevices()
+    {
+        using var db = TestDb.Open();
+        return db.PushDevices.OrderBy(d => d.UserId).Select(d => d.UserId + ":" + d.Token.Substring(0, 1)).ToList();
+    }
+
+    [Fact]
+    public async Task PushToken_OnePhonePerUser_AndATokenMovesToTheLatestUser()
+    {
+        using var alice = ClientFor("alice");
+        using var bob = ClientFor("bob");
+
+        Assert.Equal(HttpStatusCode.NoContent, (await alice.PutAsJsonAsync("/me/push-token", PushToken('a'))).StatusCode);
+        await alice.PutAsJsonAsync("/me/push-token", PushToken('b')); // iOS gave the phone a new token
+        Assert.Equal(["alice:b"], PushDevices());
+
+        await bob.PutAsJsonAsync("/me/push-token", PushToken('b')); // same phone, new user ID (iOS cleared the app's storage)
+        Assert.Equal(["bob:b"], PushDevices());
+
+        Assert.Equal(HttpStatusCode.NoContent, (await bob.DeleteAsync("/me/push-token")).StatusCode);
+        Assert.Empty(PushDevices());
+    }
+
+    [Fact]
+    public async Task PushToken_NotAnAppleToken_Returns400()
+    {
+        using var alice = ClientFor("alice");
+
+        foreach (var token in new[] { "", "abc123", new string('z', 64), new string('a', 201) })
+        {
+            Assert.Equal(HttpStatusCode.BadRequest, (await alice.PutAsJsonAsync("/me/push-token", new PushTokenRequest(token))).StatusCode);
+        }
+        Assert.Empty(PushDevices());
     }
 }
