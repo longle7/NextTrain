@@ -20,6 +20,9 @@ namespace NextTrain.Core.Services
 
     public class MbtaPredictionAttributesDto
     {
+        // Null where the trip starts (nothing arrives); a transfer uses it to know when a train reaches the station.
+        public DateTimeOffset? ArrivalTime { get; set; }
+
         // Null at the last stop (nothing departs) and at skipped stops.
         public DateTimeOffset? DepartureTime { get; set; }
 
@@ -29,6 +32,9 @@ namespace NextTrain.Core.Services
     public class MbtaPredictionRelationshipsDto
     {
         public MbtaRelationshipDto Route { get; set; } = new();
+
+        // The trip (one run of one train): the same trip's prediction at a later stop says when it gets there.
+        public MbtaRelationshipDto Trip { get; set; } = new();
     }
 
     public class MbtaRelationshipDto

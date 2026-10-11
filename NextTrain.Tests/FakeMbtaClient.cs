@@ -26,6 +26,11 @@ public class FakeMbtaClient : IMbtaClient
         Task.FromResult<IReadOnlyList<MbtaStopDto>>(
             (directionId is null ? StopsByRoute.GetValueOrDefault(routeId) : StopsByRouteDirection.GetValueOrDefault((routeId, directionId.Value))) ?? new());
 
+    // The predictions at a stop (PredictionsByStop) for the given trips.
+    public Task<IReadOnlyList<MbtaPredictionDto>> GetTripPredictionsAsync(string mbtaStopId, string tripIds) =>
+        Task.FromResult<IReadOnlyList<MbtaPredictionDto>>(
+            (PredictionsByStop.GetValueOrDefault(mbtaStopId) ?? new()).Where(p => tripIds.Split(',').Contains(p.Relationships.Trip.Data.Id)).ToList());
+
     public Task<IReadOnlyList<MbtaPredictionDto>> GetPredictionsAsync(string mbtaStopId, string routeIds)
     {
         PredictionRouteRequests.Add(routeIds);

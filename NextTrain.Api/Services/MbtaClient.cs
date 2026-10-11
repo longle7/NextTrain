@@ -69,6 +69,14 @@ namespace NextTrain.Api.Services
             return payload?.Data ?? new List<MbtaPredictionDto>();
         }
 
+        public async Task<IReadOnlyList<MbtaPredictionDto>> GetTripPredictionsAsync(string mbtaStopId, string tripIds)
+        {
+            var payload = await GetCachedAsync<MbtaPredictionsResponseDto>(
+                $"https://api-v3.mbta.com/predictions?filter[stop]={Uri.EscapeDataString(mbtaStopId)}&filter[trip]={Uri.EscapeDataString(tripIds)}",
+                PredictionCacheDuration);
+            return payload?.Data ?? new List<MbtaPredictionDto>();
+        }
+
         public async Task<IReadOnlyList<MbtaRouteDto>> GetSubwayRoutesAsync()
         {
             var payload = await GetCachedAsync<MbtaRoutesResponseDto>(
