@@ -3,11 +3,13 @@ import SwiftUI
 import WidgetKit
 
 // The Live Activity's look: Lock Screen and Dynamic Island. The app decides when it shows (see LiveActivityPlugin).
+// The same extension holds the Home Screen widget (NextCommuteWidget.swift).
 
 @main
 struct LiveActivityBundle: WidgetBundle {
     var body: some Widget {
         CommuteLiveActivity()
+        NextCommuteWidget()
     }
 }
 
@@ -125,15 +127,27 @@ struct AlertLine: View {
 }
 
 struct LineBadge: View {
-    let attributes: CommuteActivityAttributes
+    let name: String
+    let color: String
+    let textColor: String
+
+    init(name: String, color: String, textColor: String) {
+        self.name = name
+        self.color = color
+        self.textColor = textColor
+    }
+
+    init(attributes: CommuteActivityAttributes) {
+        self.init(name: attributes.lineName, color: attributes.lineColor, textColor: attributes.lineTextColor)
+    }
 
     var body: some View {
-        Text(attributes.lineName)
+        Text(name)
             .font(.caption.bold())
             .padding(.horizontal, 8)
             .padding(.vertical, 3)
-            .background(Capsule().fill(Color(hex: attributes.lineColor)))
-            .foregroundStyle(Color(hex: attributes.lineTextColor))
+            .background(Capsule().fill(Color(hex: color)))
+            .foregroundStyle(Color(hex: textColor))
     }
 }
 

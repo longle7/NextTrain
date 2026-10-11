@@ -99,7 +99,7 @@ export class ApiError extends Error {
 
 // The web app is served next to the API at /api (Vite in dev, nginx in Docker). The iPhone app bundles the web app,
 // so its build points at the hosted API instead: VITE_API_URL=https://api.example.com npm run build
-const API_URL = import.meta.env.VITE_API_URL ?? '/api'
+export const API_URL = import.meta.env.VITE_API_URL ?? '/api'
 
 /** Give up on a request after this long, so a stalled connection (a tunnel, weak signal) shows an error, not a spinner forever. */
 export const REQUEST_TIMEOUT_MS = 15_000

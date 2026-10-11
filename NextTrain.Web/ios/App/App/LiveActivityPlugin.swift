@@ -1,6 +1,7 @@
 import ActivityKit
 import Capacitor
 import Foundation
+import WidgetKit
 
 /// The web app's bridge to Live Activities (see src/liveActivity.ts). One commute shows at a time: showing a commute
 /// updates its Live Activity if it's already up, starts it if not, and ends any other commute's.
@@ -12,6 +13,7 @@ public class LiveActivityPlugin: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "isAvailable", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "show", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "endAll", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "setWidgetCommutes", returnType: CAPPluginReturnPromise),
     ]
 
     /// False before iOS 16.2, or when the user turned Live Activities off for NextTrain in iOS Settings.
@@ -60,6 +62,17 @@ public class LiveActivityPlugin: CAPPlugin, CAPBridgedPlugin {
                 call.reject(error.localizedDescription)
             }
         }
+    }
+
+    /// Saves the commutes for the Home Screen widget, with the API's address so it can fetch live times itself, and
+    /// redraws it. Home calls it whenever your commutes change; Delete my data calls it with none.
+    @objc func setWidgetCommutes(_ call: CAPPluginCall) {
+        let saved: [String: Any] = ["apiUrl": call.getString("apiUrl") ?? "", "commutes": call.getArray("commutes") ?? []]
+        if let data = try? JSONSerialization.data(withJSONObject: saved) {
+            SharedCommutes.save(data)
+        }
+        WidgetCenter.shared.reloadAllTimelines()
+        call.resolve()
     }
 
     @objc func endAll(_ call: CAPPluginCall) {

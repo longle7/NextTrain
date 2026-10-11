@@ -9,7 +9,7 @@ import {
 import { commuteTiming, daysLabel, liveActivityEnd, sortCommutes, timingLabel, windowLabel } from '../commutes'
 import { Card, LineBadge, linkButton, primaryButton, SearchInput, StationLink, Status, WarningIcon } from '../components'
 import { locationErrorMessage, nearestStations, OUT_OF_AREA_MILES, walkLabel } from '../geo'
-import { endLiveActivities, liveActivityDetails, showLiveActivity } from '../liveActivity'
+import { endLiveActivities, liveActivityDetails, showLiveActivity, updateWidget, widgetCommutes } from '../liveActivity'
 import { clock, countdown, groupDepartures, secondsAgo, STALE_AFTER_SECONDS } from '../time'
 import { failure, useNow, usePolling, useTitle } from '../usePolling'
 
@@ -324,6 +324,11 @@ function MyCommutes({ routes, alerts: subwayAlerts }: { routes: Route[] | undefi
   useEffect(() => {
     if (loaded && liveId === undefined) void endLiveActivities()
   }, [loaded, liveId])
+  // The Home Screen widget shows these commutes too (iPhone app only), sent again only when they change.
+  const widget = commutes.data && routes && JSON.stringify(widgetCommutes(commutes.data, routes))
+  useEffect(() => {
+    if (widget) void updateWidget(JSON.parse(widget))
+  }, [widget])
 
   return (
     <section className="space-y-2">
