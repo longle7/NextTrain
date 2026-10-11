@@ -104,11 +104,12 @@ What the app does today (see `/privacy`). You submit the final answers in App St
 | Identifiers → User ID (the random ID created on the device) | Yes | App Functionality | Yes, it's what ties commutes to the device | No |
 | User Content → Other User Content (saved commutes) | Yes | App Functionality | Yes | No |
 | Location | **No**: only used on the device, never sent | – | – | – |
-| Everything else (contact info, usage data, diagnostics, …) | No: no analytics, ads, or crash reporting | – | – | – |
+| Diagnostics → Crash Data (error reports: what went wrong, the page path, app version), from **1.3** | Yes | App Functionality | **No** | No |
+| Everything else (contact info, usage data, …) | No: no analytics or ads | – | – | – |
 
-The app's privacy manifest (`ios/App/App/PrivacyInfo.xcprivacy`) declares the same two types, no tracking, and the one "required reason" API it uses (UserDefaults, reason `CA92.1`, via Capacitor's storage). Keep it and these answers in step; Apple checks the manifest at upload.
+The app's privacy manifest (`ios/App/App/PrivacyInfo.xcprivacy`) declares the same types (Crash Data from 1.3), no tracking, and the one "required reason" API it uses (UserDefaults, reason `CA92.1`, via Capacitor's storage). Keep it and these answers in step; Apple checks the manifest at upload.
 
-Recently viewed stations stay on the device and aren't "collected". The website's optional Google Analytics (after consent) is off in the app, both by build (the iPhone build has no `VITE_GA_ID`) and in code (`analytics.ts` refuses to run inside Capacitor), so these answers don't change. If you add crash reporting or analytics to the app later, update these answers and the privacy policy.
+The website's optional Google Analytics (after consent) is off in the app, both by build (the iPhone build has no `VITE_GA_ID`) and in code (`analytics.ts` refuses to run inside Capacitor), so these answers don't change. Version 1.3 adds error reports (`src/errors.ts`): answer **Crash Data** when you submit 1.3. If you add analytics to the app later, update these answers and the privacy policy.
 
 ## Review notes
 

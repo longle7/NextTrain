@@ -102,6 +102,10 @@ builder.Services.AddRateLimiter(options =>
             ? RateLimitPartition.GetNoLimiter("health")
             : RateLimitPartition.GetFixedWindowLimiter(context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
                 _ => new FixedWindowRateLimiterOptions { PermitLimit = perMinute, Window = TimeSpan.FromMinutes(1) }));
+    // Error reports (POST /client-errors): a few per device is plenty, and a flood would only bury real ones.
+    options.AddPolicy("client-errors", context => RateLimitPartition.GetFixedWindowLimiter(
+        context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+        _ => new FixedWindowRateLimiterOptions { PermitLimit = 10, Window = TimeSpan.FromMinutes(1) }));
     options.OnRejected = async (rejected, _) =>
     {
         if (rejected.Lease.TryGetMetadata(MetadataName.RetryAfter, out var retryAfter))

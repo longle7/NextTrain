@@ -3,6 +3,7 @@ import { Link } from 'react-router'
 import { useOnline, useTitle } from './usePolling'
 import { MAJOR_SEVERITY } from './alerts'
 import { ApiError, busRouteIds, findRoute, lineLabel, stationRouteIds, type Alert, type Route, type Station } from './api'
+import { reportError } from './errors'
 
 /** Full-width main action ("Save commute"). Works on <button> and <Link>. */
 export const primaryButton =
@@ -224,6 +225,10 @@ export class ErrorBoundary extends Component<{ children: ReactNode }, { crashed:
 
   static getDerivedStateFromError() {
     return { crashed: true }
+  }
+
+  componentDidCatch(error: Error) {
+    reportError(error)
   }
 
   // Going Home clears it: App keys this boundary by page.

@@ -3,6 +3,7 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import App from './App'
 import { startAnalyticsIfAllowed } from './analytics'
+import { startErrorReports } from './errors'
 import './index.css'
 
 // In the iPhone app, act like native UI (see index.css). The website is unaffected.
@@ -14,6 +15,9 @@ try {
 } catch {
   // storage blocked: nothing stored
 }
+
+// Errors are reported (production builds only; see errors.ts and the Privacy Policy).
+startErrorReports()
 
 // Only if this visitor already chose Allow (see analytics.ts); otherwise nothing loads.
 startAnalyticsIfAllowed()

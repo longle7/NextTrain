@@ -1,0 +1,34 @@
+name: Uptime
+
+# Every 15 minutes: is NextTrain up for riders? Checks that the API is healthy (its database answers), that it answers
+# with routes (so MBTA is reachable through it), and that the website loads. A failed check fails the run, and GitHub
+# emails the repository owner about failed scheduled runs. Free for public repositories.
+# GitHub may start a scheduled run a few minutes late, and pauses schedules after 60 days without commits.
+
+on:
+  schedule:
+    - cron: '*/15 * * * *'
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      API: ${{ vars.API_URL }}
+      SITE: https://nexttrain.longledev.com
+    steps:
+      # Retries ride out a blip (a container restarting, a slow cold start) so one hiccup doesn't page you.
+      - name: API is healthy
+        run: curl --fail --silent --show-error --max-time 20 --retry 3 --retry-delay 20 --retry-all-errors "$API/health"
+
+      - name: API answers with routes
+        run: |
+          count=$(curl --fail --silent --show-error --max-time 30 --retry 3 --retry-delay 20 --retry-all-errors "$API/routes?type=all" | jq length)
+          echo "$count routes"
+          test "$count" -gt 100 || { echo "::error::The API answered with $count routes; expected 150+ (subway and bus)."; exit 1; }
+
+      - name: Website loads
+        run: curl --fail --silent --show-error --max-time 20 --retry 3 --retry-delay 20 --retry-all-errors --output /dev/null "$SITE/"
