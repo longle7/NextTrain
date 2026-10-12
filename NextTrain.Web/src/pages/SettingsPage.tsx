@@ -8,6 +8,7 @@ import { api, commutePredictionsPath, forgetUserId, getRoutes, type Commute, typ
 import { sortCommutes } from '../commutes'
 import { Card, dangerButton, primaryButton } from '../components'
 import { endLiveActivities, liveActivitiesAvailable, liveActivityDetails, showLiveActivity, updateWidget } from '../liveActivity'
+import { forgetNotificationChoice, notificationChoice, notificationsAvailable, notificationsBlocked, turnOffNotifications, turnOnNotifications } from '../notifications'
 import { groupDepartures } from '../time'
 import { useTitle } from '../usePolling'
 
@@ -28,6 +29,7 @@ export default function SettingsPage() {
       forgetUserId()
       forgetRemembered()
       forgetAnalyticsChoice()
+      forgetNotificationChoice()
       void endLiveActivities()
       void updateWidget([]) // the Home Screen widget forgets them too
       setDeletion('done')
@@ -56,6 +58,8 @@ export default function SettingsPage() {
           </p>
         </Card>
       </Section>
+
+      <DelayNotifications />
 
       <LiveActivities />
 
@@ -99,6 +103,53 @@ export default function SettingsPage() {
         here only to describe the service. Maps by Apple.
       </p>
     </>
+  )
+}
+
+// iPhone app only: the delay notifications switch (notifications.ts).
+function DelayNotifications() {
+  const [on, setOn] = useState(() => notificationChoice() === 'on')
+  const [busy, setBusy] = useState(false)
+  const [blocked, setBlocked] = useState(false)
+  useEffect(() => {
+    if (notificationsAvailable()) void notificationsBlocked().then(setBlocked, () => {})
+  }, [])
+  if (!notificationsAvailable()) return null
+
+  const toggle = async () => {
+    setBusy(true)
+    try {
+      if (on) {
+        await turnOffNotifications()
+        setOn(false)
+      } else {
+        const granted = await turnOnNotifications()
+        setOn(granted)
+        setBlocked(!granted)
+      }
+    } catch {
+      // offline: the switch stays as it was
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <Section title="Notifications">
+      <Card>
+        <div className="flex items-center justify-between gap-3">
+          <span id="notifications-label" className="font-semibold">
+            Delay alerts
+          </span>
+          <Switch on={on && !blocked} disabled={busy} labelledBy="notifications-label" describedBy="notifications-help" onClick={toggle} />
+        </div>
+        <p id="notifications-help" className="mt-2 text-sm text-neutral-500">
+          {blocked
+            ? 'Notifications are off for NextTrain in iPhone Settings → NextTrain → Notifications. Turn them on there first.'
+            : 'A notification when a suspension, closure, or long delay hits one of your commutes, from 30 minutes before it starts.'}
+        </p>
+      </Card>
+    </Section>
   )
 }
 
@@ -161,17 +212,13 @@ function AnalyticsChoice() {
           <span id="analytics-label" className="font-semibold">
             Analytics cookies
           </span>
-          <button
-            role="switch"
-            aria-checked={on}
-            aria-labelledby="analytics-label"
-            aria-describedby="analytics-help"
+          <Switch
+            on={on}
             disabled={!!blocked}
+            labelledBy="analytics-label"
+            describedBy="analytics-help"
             onClick={() => setAnalyticsChoice(on ? 'denied' : 'granted')}
-            className={`relative h-8 w-13 shrink-0 rounded-full transition disabled:opacity-50 ${on ? 'bg-green-600' : 'bg-neutral-300 dark:bg-neutral-700'}`}
-          >
-            <span className={`absolute top-1 left-1 size-6 rounded-full bg-white shadow transition ${on ? 'translate-x-5' : ''}`} />
-          </button>
+          />
         </div>
         <p id="analytics-help" className="mt-2 text-sm text-neutral-500">
           {blocked === 'privacy-signal'
@@ -189,6 +236,28 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
       <h2 className="px-1 text-sm font-semibold text-neutral-500 uppercase">{title}</h2>
       {children}
     </section>
+  )
+}
+
+function Switch({ on, disabled, labelledBy, describedBy, onClick }: {
+  on: boolean
+  disabled: boolean
+  labelledBy: string
+  describedBy: string
+  onClick: () => void
+}) {
+  return (
+    <button
+      role="switch"
+      aria-checked={on}
+      aria-labelledby={labelledBy}
+      aria-describedby={describedBy}
+      disabled={disabled}
+      onClick={onClick}
+      className={`relative h-8 w-13 shrink-0 rounded-full transition disabled:opacity-50 ${on ? 'bg-green-600' : 'bg-neutral-300 dark:bg-neutral-700'}`}
+    >
+      <span className={`absolute top-1 left-1 size-6 rounded-full bg-white shadow transition ${on ? 'translate-x-5' : ''}`} />
+    </button>
   )
 }
 

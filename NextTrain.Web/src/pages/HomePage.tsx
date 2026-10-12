@@ -7,9 +7,10 @@ import {
   type Alert, type Commute, type ConnectionPlan, type Prediction, type Route, type Station,
 } from '../api'
 import { commuteTiming, daysLabel, liveActivityEnd, sortCommutes, timingLabel, windowLabel } from '../commutes'
-import { Card, LineBadge, linkButton, primaryButton, SearchInput, StationLink, Status, WarningIcon } from '../components'
+import { Card, LineBadge, linkButton, primaryButton, SearchInput, secondaryButton, StationLink, Status, WarningIcon } from '../components'
 import { locationErrorMessage, nearestStations, OUT_OF_AREA_MILES, walkLabel } from '../geo'
 import { endLiveActivities, liveActivityDetails, showLiveActivity, updateWidget, widgetCommutes } from '../liveActivity'
+import { declineNotifications, notificationChoice, notificationsAvailable, turnOnNotifications } from '../notifications'
 import { clock, dateRange, departureLabel, groupDepartures, secondsAgo, STALE_AFTER_SECONDS } from '../time'
 import { adviceText } from '../transfers'
 import { failure, useNow, usePolling, useTitle } from '../usePolling'
@@ -127,6 +128,37 @@ type Located = { state: 'idle' | 'locating' } | { state: 'error'; message: strin
 const BUS_STOP_MILES = 0.5
 
 // New here (no commutes yet): the three things NextTrain does, each one tap away. Gone once a commute is saved.
+// iPhone app, once there's a commute: offer delay notifications, until the rider answers (Settings can change it).
+function NotificationsPrompt() {
+  const [asked, setAsked] = useState(() => !notificationsAvailable() || notificationChoice() !== null)
+  if (asked) return null
+  const turnOn = async () => {
+    await turnOnNotifications().catch(() => false)
+    setAsked(true) // iOS asked once; turned down there, Settings explains how to turn them on
+  }
+  const notNow = () => {
+    declineNotifications()
+    setAsked(true)
+  }
+  return (
+    <Card>
+      <p className="font-bold">Get delay alerts?</p>
+      <p className="mt-1 text-sm text-neutral-500">
+        NextTrain can notify you when a suspension, closure, or long delay hits one of your commutes, from 30 minutes before
+        it starts. Change this anytime in Settings.
+      </p>
+      <div className="mt-2 grid grid-cols-2 gap-2">
+        <button onClick={notNow} className={secondaryButton}>
+          Not now
+        </button>
+        <button onClick={turnOn} className={primaryButton}>
+          Turn on
+        </button>
+      </div>
+    </Card>
+  )
+}
+
 function GetStarted() {
   const search = () => document.querySelector<HTMLInputElement>('input[type="search"]')?.focus()
   // Lands on "Use my location", so the location prompt comes from the rider's own tap on it.
@@ -355,6 +387,7 @@ function MyCommutes({ routes, alerts: subwayAlerts }: { routes: Route[] | undefi
       {/* One placeholder card, the size of a commute, so Home doesn't jump when they arrive. */}
       <Status error={failure(commutes)} loading={!commutes.data && !commutes.error} rows={1} />
       {commutes.data?.length === 0 && <GetStarted />}
+      {hasCommutes && <NotificationsPrompt />}
       <ul className="space-y-2">
         {sorted?.map((commute) => (
           <li key={commute.id}>
