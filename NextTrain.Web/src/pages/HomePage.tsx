@@ -1,16 +1,16 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { Link, useNavigate } from 'react-router'
-import { alertsFor, majorAlert } from '../alerts'
+import { alertsFor, majorAlert, plannedFor } from '../alerts'
 import {
   ALERTS_REFRESH_MS, api, commutePredictionsPath, getAlerts, getBusStops, getRoutes, getStations, isSubwayRoute, ROUTES,
-  searchRoutes, searchStations, stationRouteIds, towardLabel,
+  searchRoutes, searchStations, stationRouteIds, towardLabel, UPCOMING_REFRESH_MS, upcomingAlertsPath,
   type Alert, type Commute, type Prediction, type Route, type Station,
 } from '../api'
 import { commuteTiming, daysLabel, liveActivityEnd, sortCommutes, timingLabel, windowLabel } from '../commutes'
 import { Card, LineBadge, linkButton, primaryButton, SearchInput, StationLink, Status, WarningIcon } from '../components'
 import { locationErrorMessage, nearestStations, OUT_OF_AREA_MILES, walkLabel } from '../geo'
 import { endLiveActivities, liveActivityDetails, showLiveActivity } from '../liveActivity'
-import { clock, countdown, groupDepartures, secondsAgo, STALE_AFTER_SECONDS } from '../time'
+import { clock, dateRange, departureLabel, groupDepartures, secondsAgo, STALE_AFTER_SECONDS } from '../time'
 import { failure, useNow, usePolling, useTitle } from '../usePolling'
 
 export default function HomePage() {
@@ -269,7 +269,7 @@ const NEARBY_ROWS = 6
 
 function NextTrains({ station, routes, alerts }: { station: Station; routes: Route[] | undefined; alerts: Alert[] | undefined }) {
   const now = useNow()
-  const path = `/stations/${encodeURIComponent(station.mbtaStopId)}/predictions`
+  const path = `/stations/${encodeURIComponent(station.mbtaStopId)}/predictions?schedules=true`
   const predictions = usePolling(() => api<Prediction[]>(path), path, 10_000)
   const groups = predictions.data ? groupDepartures(predictions.data, now, 1) : []
   const alert = alerts && majorAlert(alertsFor(alerts, { routeIds: stationRouteIds(station), stopId: station.mbtaStopId }))
@@ -298,7 +298,10 @@ function NextTrains({ station, routes, alerts }: { station: Station; routes: Rou
                 <LineBadge routeId={g.routeId} routes={routes} />
                 <span className="truncate">to {routes?.find((r) => r.id === g.routeId)?.directionDestinations[g.directionId] ?? '…'}</span>
               </span>
-              <span className="shrink-0 font-bold tabular-nums">{countdown(g.departures[0], now)}</span>
+              <span className="shrink-0 text-right">
+                <span className="font-bold tabular-nums">{departureLabel(g.departures[0], g.scheduled, now)}</span>
+                {g.scheduled && <span className="block text-xs text-neutral-500">Scheduled</span>}
+              </span>
             </li>
           ))}
           {groups.length > NEARBY_ROWS && <li className="pt-1 text-sm font-semibold text-blue-600 dark:text-blue-400">All departures ›</li>}
@@ -317,6 +320,13 @@ function MyCommutes({ routes, alerts: subwayAlerts }: { routes: Route[] | undefi
   const busAlertsPath = `/alerts?routes=${encodeURIComponent(busRoutes)}`
   const busAlerts = usePolling(() => (busRoutes ? api<Alert[]>(busAlertsPath) : Promise.resolve([])), busAlertsPath, ALERTS_REFRESH_MS)
   const alerts = subwayAlerts && [...subwayAlerts, ...(busAlerts.data ?? [])]
+  // Planned changes in the next week (subway, plus your bus commutes' routes), once there are commutes.
+  const hasCommutes = !!commutes.data?.length
+  const upcomingPath = upcomingAlertsPath()
+  const upcomingSubway = usePolling(() => (hasCommutes ? api<Alert[]>(upcomingPath) : Promise.resolve([])), `${upcomingPath}|${hasCommutes}`, UPCOMING_REFRESH_MS)
+  const upcomingBusPath = upcomingAlertsPath(busRoutes)
+  const upcomingBus = usePolling(() => (busRoutes ? api<Alert[]>(upcomingBusPath) : Promise.resolve([])), upcomingBusPath, UPCOMING_REFRESH_MS)
+  const upcoming = [...(upcomingSubway.data ?? []), ...(upcomingBus.data ?? [])]
   const sorted = commutes.data && sortCommutes(commutes.data, now)
   // The iPhone Live Activity follows the soonest commute that's on, or starts within 15 minutes.
   const liveId = sorted?.find((c) => liveActivityEnd(c, now))?.id
@@ -352,6 +362,12 @@ function MyCommutes({ routes, alerts: subwayAlerts }: { routes: Route[] | undefi
                 alerts &&
                 majorAlert(alertsFor(alerts, { routeIds: [commute.routeId], stopId: commute.mbtaStopId, directionId: commute.directionId }))
               }
+              planned={plannedFor(
+                upcoming,
+                { routeIds: [commute.routeId], stopId: commute.mbtaStopId, directionId: commute.directionId },
+                commute.activeDays,
+                now,
+              )}
             />
           </li>
         ))}
@@ -360,13 +376,14 @@ function MyCommutes({ routes, alerts: subwayAlerts }: { routes: Route[] | undefi
   )
 }
 
-function CommuteCard({ commute, route, routes, now, liveActivity, alert }: {
+function CommuteCard({ commute, route, routes, now, liveActivity, alert, planned }: {
   commute: Commute
   route: Route | undefined
   routes: Route[] | undefined
   now: Date
   liveActivity: boolean // this commute drives the iPhone Live Activity
   alert: Alert | undefined // the worst service alert on this commute's line, station, and direction
+  planned: Alert | undefined // the soonest planned change that will hit this commute within a week
 }) {
   const timing = commuteTiming(commute, now)
   const live = timing.state === 'now' || timing.state === 'soon'
@@ -391,6 +408,14 @@ function CommuteCard({ commute, route, routes, now, liveActivity, alert }: {
             {alert.summary}
           </p>
         )}
+        {planned && (
+          <p className="mt-2 flex items-start gap-1.5 text-sm text-neutral-600 dark:text-neutral-300">
+            <CalendarIcon className="mt-0.5 size-4 shrink-0" />
+            <span>
+              <span className="font-semibold">Planned:</span> {planned.summary} · {dateRange(planned.start!, planned.end)}
+            </span>
+          </p>
+        )}
       </Link>
       <div className="flex items-center justify-between gap-2 text-sm text-neutral-500">
         <span>
@@ -409,6 +434,15 @@ function CommuteCard({ commute, route, routes, now, liveActivity, alert }: {
   )
 }
 
+function CalendarIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" className={`fill-none stroke-current stroke-2 ${className ?? ''}`} aria-hidden>
+      <rect x="4" y="5" width="16" height="15" rx="2" />
+      <path d="M4 10h16M9 3v4M15 3v4" />
+    </svg>
+  )
+}
+
 // Live only while the commute is on or about to be, so idle commutes don't spend MBTA requests.
 function CommuteDepartures({ commute, route, alert, liveActivity }: {
   commute: Commute
@@ -417,13 +451,17 @@ function CommuteDepartures({ commute, route, alert, liveActivity }: {
   liveActivity: boolean
 }) {
   const now = useNow()
-  const path = commutePredictionsPath(commute)
+  const path = `${commutePredictionsPath(commute)}&schedules=true`
   const predictions = usePolling(() => api<Prediction[]>(path), path, 10_000)
-  const departures = predictions.data ? (groupDepartures(predictions.data, now)[0]?.departures ?? []) : []
+  const next = predictions.data ? groupDepartures(predictions.data, now)[0] : undefined
+  const departures = next?.departures ?? []
+  const scheduled = !!next?.scheduled
+  const bus = route?.type === 'bus'
 
   // Send the Live Activity the same trains as this card, only when they change (a train left, or new predictions).
+  // Live times only: a Lock Screen countdown to a timetable time would look live.
   const endsAt = liveActivity ? liveActivityEnd(commute, now) : undefined
-  const details = endsAt && predictions.data ? liveActivityDetails(commute, route, departures, endsAt, alert) : undefined
+  const details = endsAt && predictions.data ? liveActivityDetails(commute, route, scheduled ? [] : departures, endsAt, alert) : undefined
   const detailsKey = details && JSON.stringify(details)
   useEffect(() => {
     if (detailsKey) void showLiveActivity(JSON.parse(detailsKey))
@@ -432,7 +470,7 @@ function CommuteDepartures({ commute, route, alert, liveActivity }: {
   return (
     <>
       <div className="flex min-h-12 items-center justify-between gap-3 border-t border-neutral-100 pt-3 dark:border-neutral-800">
-        <span className="text-sm font-semibold text-neutral-500">Next train</span>
+        <span className="text-sm font-semibold text-neutral-500">{bus ? 'Next bus' : 'Next train'}</span>
         {!predictions.data ? (
           predictions.error ? (
             <span className="text-sm text-neutral-500">Live times unavailable</span>
@@ -440,12 +478,16 @@ function CommuteDepartures({ commute, route, alert, liveActivity }: {
             <span className="h-7 w-24 rounded bg-neutral-200 motion-safe:animate-pulse dark:bg-neutral-800" aria-label="Loading" />
           )
         ) : departures.length === 0 ? (
-          <span className="text-sm text-neutral-500">No trains predicted right now</span>
+          <span className="text-sm text-neutral-500">{bus ? 'No buses' : 'No trains'} predicted right now</span>
         ) : (
           <span className="text-right">
-            <span className="text-2xl font-bold tabular-nums">{countdown(departures[0], now)}</span>
-            {departures.length > 1 && (
-              <span className="block text-sm text-neutral-500">then {departures.slice(1).map((t) => countdown(t, now)).join(', ')}</span>
+            <span className="text-2xl font-bold tabular-nums">{departureLabel(departures[0], scheduled, now)}</span>
+            {(scheduled || departures.length > 1) && (
+              <span className="block text-sm text-neutral-500">
+                {[scheduled && 'Scheduled', departures.length > 1 && `then ${departures.slice(1).map((t) => departureLabel(t, scheduled, now)).join(', ')}`]
+                  .filter(Boolean)
+                  .join(' · ')}
+              </span>
             )}
           </span>
         )}
