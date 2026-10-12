@@ -37,6 +37,29 @@ export function alertsFor(alerts: Alert[], { routeIds, stopId, directionId }: Sc
     .sort((a, b) => b.severity - a.severity || effectRank(a) - effectRank(b))
 }
 
+// "Mon", "Tue", ... in Boston time, like a commute's days.
+const bostonWeekday = new Intl.DateTimeFormat('en-US', { weekday: 'short', timeZone: 'America/New_York' })
+
+// The days of the week a planned change covers (all seven when it's a week or more, or open-ended).
+function weekdaysOf(alert: Alert): string[] {
+  const days = new Set<string>()
+  const last = alert.end ? Date.parse(alert.end) - 4 * 3_600_000 : Infinity // ending at 3 AM: the day before
+  for (let time = Date.parse(alert.start!); days.size < 7 && time <= last; time += 86_400_000) days.add(bostonWeekday.format(time))
+  return [...days]
+}
+
+/**
+ * The soonest planned change (from /alerts/upcoming) that hits a commute: its route, station, and direction, on one of
+ * its days ("Mon,Tue,..."), starting within a week.
+ */
+export function plannedFor(upcoming: Alert[], scope: Scope, activeDays: string, now: Date): Alert | undefined {
+  const days = activeDays.split(',')
+  const weekAway = now.getTime() + 7 * 86_400_000
+  return alertsFor(upcoming, scope)
+    .filter((a) => a.start && Date.parse(a.start) <= weekAway && weekdaysOf(a).some((d) => days.includes(d)))
+    .sort((a, b) => Date.parse(a.start!) - Date.parse(b.start!))[0]
+}
+
 /** The worst alert that changes service, if any. */
 export const majorAlert = (alerts: Alert[]) => alerts.find((a) => a.severity >= MAJOR_SEVERITY)
 

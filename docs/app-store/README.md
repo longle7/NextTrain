@@ -4,7 +4,7 @@ Everything App Store Connect asks for, drafted from what the app does today. Edi
 
 ## Screenshots
 
-Captured in dark mode from the iPhone app build (native mode) with live MBTA data on October 1, 2026, at both sizes App Store Connect asks for:
+For **version 1.2**: captured in dark mode from the iPhone app as built for TestFlight build 6 (native mode), with live MBTA data on Saturday, October 10, 2026, at both sizes App Store Connect asks for:
 
 - `screenshots/`: 1290 × 2796, the **6.9" iPhone** slot
 - `screenshots/6.5-inch/`: 1284 × 2778, the **6.5" iPhone** slot
@@ -12,13 +12,14 @@ Captured in dark mode from the iPhone app build (native mode) with live MBTA dat
 | File | Shows |
 |---|---|
 | `1-home.png` | Home: a commute happening now with its next train, and live departures at the nearest station |
-| `2-map.png` | The live map on Apple Maps: every line, station, and train, with direction arrows |
-| `3-map-train.png` | Zoomed in with station names, and a train's card: destination, next stop, and how crowded each car is |
-| `4-station.png` | A station's live departures by line and direction |
-| `5-line-live-trains.png` | The Red Line diagram with live trains and direction arrows |
-| `6-lines.png` | Every line's service status |
+| `2-map.png` | The live map on Apple Maps: every line, station, and train |
+| `3-map-train.png` | Zoomed in with station names and direction arrows, and a train's card: destination, next stop, and how crowded each car is |
+| `4-map-bus.png` | Bus mode: route 66's streets, stops, and buses, and a stop's card with its next buses, **Add commute**, and **All departures** |
+| `5-station.png` | Harvard: its trains and its buses, each under its own heading |
+| `6-line-live-trains.png` | The Red Line diagram with live trains and direction arrows |
+| `7-lines.png` | Every subway line's service status (the bus routes follow below) |
 
-To retake them, run the app locally (API on 5112, Vite on 5173) and capture at 430 × 932 and 428 × 926 CSS pixels at 3×, dark color scheme, with a commute saved. Map shots need the MapKit key in user-secrets.
+To retake them, run the app locally (API on 5112, Vite on 5173) and capture at 430 × 932 and 428 × 926 CSS pixels at 3×, dark color scheme, with a commute saved that's on at the time (pick every day, since new commutes default to weekdays). Map shots need the MapKit key in user-secrets.
 
 Make the app **iPhone-only** in Xcode (Supported Destinations: iPhone). Otherwise Apple also requires iPad screenshots and reviews the iPad layout.
 
@@ -91,9 +92,16 @@ Buses are here. All 150 MBTA bus routes, Silver Line included:
 - Search for a route by number ("66", "SL1") or a stop by street
 - Bus stops near you, with the next buses at the closest one
 - Every route's stops in order, with its buses moving along them
-- A route's streets and live buses on the map, with how crowded each bus is
+- On the map, tap Bus to see every route, then tap any stop for its next buses, or to save it as your commute
 - Save a bus commute, with Live Activities on your Lock Screen
+
+Also new:
+- A calmer map: trains are simple dots until you zoom in, and the map appears all at once
+- Your location stays visible when you pick a line on the map
+- Getting started is easier: a short welcome, a Get started card, and a step-by-step commute form
 ```
+
+What's New only shows for updates. If 1.2 ends up being the first version released (see below), App Store Connect doesn't ask for it.
 
 ## App Privacy answers
 
@@ -180,6 +188,22 @@ Upload the .mov as an attachment to the reply in App Store Connect.
    ```
    For the Simulator against your local API, use `VITE_API_URL=http://localhost:5112` instead (the app allows local-network HTTP for this).
 4. **Ship to TestFlight first** and try it on the subway, including the offline banner in a tunnel.
+
+## Submitting version 1.2
+
+Version 1.2 is **TestFlight build 6** (uploaded October 10, 2026): buses, the rider-feedback fixes, and the map's bus routes and stop cards. Submit it once your testers are happy. Everything built after build 6 is 1.3.
+
+**While 1.0 is still in review,** App Store Connect won't take a second version. Choose one:
+
+- **Let 1.0 finish (simplest).** When it's approved, follow the steps below for an update.
+- **Or replace it with 1.2.** If 1.0 has been waiting more than about a week, open version 1.0 in App Store Connect and choose **Remove from Review**. Until the app's first release, you can then change that version's number to **1.2** and follow steps 2–5 below. You give up 1.0's place in the queue, but riders get buses on day one.
+
+**Steps:**
+1. App Store Connect → **Apps → NextTrain → +** (next to iOS App) → **1.2**.
+2. **Build:** choose **1.2 (6)**.
+3. **Text:** paste the 1.2 name, subtitle, promotional text, description, keywords, and What's New from *Listing text* above. The name and subtitle can change with any version.
+4. **Screenshots:** in **iPhone 6.9" Display**, remove the old ones and drag in the 7 files from `screenshots/` in order. Do the same for **6.5" Display** with `screenshots/6.5-inch/`.
+5. **App Review Information:** the notes below already cover buses. Then **Add for Review → Submit**. Choose **Manually release** if you want to pick the moment it goes live.
 
 ## Protecting yourself
 

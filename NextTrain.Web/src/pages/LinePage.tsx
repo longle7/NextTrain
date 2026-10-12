@@ -1,8 +1,12 @@
 import { Link, useParams, useSearchParams } from 'react-router'
 import { alertsFor } from '../alerts'
-import { ALERTS_REFRESH_MS, api, findRoute, getAlerts, getRoutes, isSubwayRoute, ROUTES, type Alert, type Station, type Vehicle } from '../api'
+import {
+  ALERTS_REFRESH_MS, api, findRoute, getAlerts, getRoutes, isSubwayRoute, ROUTES, UPCOMING_REFRESH_MS, upcomingAlertsPath,
+  type Alert, type Station, type Vehicle,
+} from '../api'
 import { AlertBanner, Card, LineBadge, LoadingText, NotFound, secondaryButton, Status, StationLink } from '../components'
 import { directionsDown, trainsByStation, type LineTrain } from '../lineTrains'
+import { dateRange } from '../time'
 import { failure, usePolling, useTitle } from '../usePolling'
 
 const SORTS = [
@@ -30,6 +34,9 @@ export default function LinePage() {
   // Bus alerts only come per route; the subway's are one shared list.
   const alertsPath = bus ? `/alerts?routes=${id}` : 'alerts'
   const alerts = usePolling(bus ? () => api<Alert[]>(alertsPath) : getAlerts, alertsPath, ALERTS_REFRESH_MS)
+  const upcomingPath = upcomingAlertsPath(bus ? routeId : undefined)
+  const upcoming = usePolling(() => api<Alert[]>(upcomingPath), upcomingPath, UPCOMING_REFRESH_MS)
+  const planned = upcoming.data ? alertsFor(upcoming.data, { routeIds: [routeId] }).sort((a, b) => Date.parse(a.start!) - Date.parse(b.start!)) : []
   // Live trains only show on the line-order strip, so only poll for them there.
   const lineOrder = bus || sort === 'line'
   const vehiclesPath = bus ? `/vehicles?route=${id}` : '/vehicles'
@@ -77,6 +84,15 @@ export default function LinePage() {
 
       {alerts.data &&
         alertsFor(alerts.data, { routeIds: [routeId] }).map((alert) => <AlertBanner key={alert.id} alert={alert} />)}
+
+      {planned.length > 0 && (
+        <section className="space-y-2">
+          <h2 className="px-1 text-lg font-bold">Planned changes</h2>
+          {planned.map((alert) => (
+            <AlertBanner key={alert.id} alert={alert} when={dateRange(alert.start!, alert.end)} />
+          ))}
+        </section>
+      )}
 
       {bus && route && (
         <>
