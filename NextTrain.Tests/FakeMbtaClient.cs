@@ -19,12 +19,24 @@ public class FakeMbtaClient : IMbtaClient
     // The routes each predictions request asked MBTA about, e.g. "Red" or "Red,741".
     public List<string> PredictionRouteRequests { get; } = new();
 
+    // Keyed by MBTA stop ID: the timetable, soonest first.
+    public Dictionary<string, List<MbtaScheduledDeparture>> SchedulesByStop { get; } = new();
+
+    public Task<IReadOnlyList<MbtaScheduledDeparture>> GetSchedulesAsync(string mbtaStopId, string routeIds) =>
+        Task.FromResult<IReadOnlyList<MbtaScheduledDeparture>>(
+            (SchedulesByStop.GetValueOrDefault(mbtaStopId) ?? new()).Where(s => routeIds.Split(',').Contains(s.RouteId)).ToList());
+
     public List<MbtaRouteDto> Routes { get; } = new();
     public List<MbtaRouteDto> BusRoutes { get; } = new();
 
     public Task<IReadOnlyList<MbtaStopDto>> GetStopDtosAsync(string routeId, int? directionId = null) =>
         Task.FromResult<IReadOnlyList<MbtaStopDto>>(
             (directionId is null ? StopsByRoute.GetValueOrDefault(routeId) : StopsByRouteDirection.GetValueOrDefault((routeId, directionId.Value))) ?? new());
+
+    // The predictions at a stop (PredictionsByStop) for the given trips.
+    public Task<IReadOnlyList<MbtaPredictionDto>> GetTripPredictionsAsync(string mbtaStopId, string tripIds) =>
+        Task.FromResult<IReadOnlyList<MbtaPredictionDto>>(
+            (PredictionsByStop.GetValueOrDefault(mbtaStopId) ?? new()).Where(p => tripIds.Split(',').Contains(p.Relationships.Trip.Data.Id)).ToList());
 
     public Task<IReadOnlyList<MbtaPredictionDto>> GetPredictionsAsync(string mbtaStopId, string routeIds)
     {
@@ -78,4 +90,16 @@ public class FakeMbtaClient : IMbtaClient
 
     public Task<IReadOnlyList<MbtaAlertDto>> GetRouteAlertsAsync(string routeIds) =>
         Task.FromResult<IReadOnlyList<MbtaAlertDto>>(RouteAlerts.GetValueOrDefault(routeIds) ?? new());
+
+    // Keyed by the route IDs asked for; "" is the subway's (no routes given).
+    public Dictionary<string, List<MbtaAlertDto>> UpcomingAlerts { get; } = new();
+
+    // Keyed by MBTA stop ID.
+    public Dictionary<string, List<MbtaAlertDto>> AccessAlerts { get; } = new();
+
+    public Task<IReadOnlyList<MbtaAlertDto>> GetUpcomingAlertsAsync(string? routeIds) =>
+        Task.FromResult<IReadOnlyList<MbtaAlertDto>>(UpcomingAlerts.GetValueOrDefault(routeIds ?? "") ?? new());
+
+    public Task<IReadOnlyList<MbtaAlertDto>> GetAccessAlertsAsync(string mbtaStopId) =>
+        Task.FromResult<IReadOnlyList<MbtaAlertDto>>(AccessAlerts.GetValueOrDefault(mbtaStopId) ?? new());
 }

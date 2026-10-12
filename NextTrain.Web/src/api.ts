@@ -27,6 +27,8 @@ export interface Prediction {
   routeId: string
   directionId: number
   departureTime: string // the API only sends trains you can board
+  // A timetable time, sent (with ?schedules=true) only for a route one way that has no live prediction.
+  scheduled?: boolean
 }
 
 export interface Vehicle {
@@ -63,6 +65,9 @@ export interface Alert {
   timeframe: string | null // "through Sunday", "ongoing"
   url: string | null
   entities: AlertEntity[]
+  // Planned changes only (/alerts/upcoming): when it next applies. No end: until further notice.
+  start?: string
+  end?: string | null
 }
 
 // null means "all": every route, the whole route, or both directions.
@@ -81,9 +86,32 @@ export interface Commute {
   windowStart: string // "07:45:00", Boston local time
   windowEnd: string
   activeDays: string // "Mon,Tue,Wed,Thu,Fri"
+  // A change of line partway (e.g. onto the Blue Line at Government Center); absent for one ride.
+  transferStopId?: string
+  transferStationName?: string
+  transferRouteId?: string
+  transferDirectionId?: number
+  transferMinutes?: number // to get from one platform to the other
 }
 
-export type CommuteInput = Pick<Commute, 'mbtaStopId' | 'routeId' | 'directionId' | 'windowStart' | 'windowEnd' | 'activeDays'>
+export type CommuteInput = Pick<
+  Commute,
+  'mbtaStopId' | 'routeId' | 'directionId' | 'windowStart' | 'windowEnd' | 'activeDays' | 'transferStopId' | 'transferRouteId' | 'transferDirectionId' | 'transferMinutes'
+>
+
+/** Which second-line train each of the next first-line trains makes (GET /connections), and what that means. */
+export interface ConnectionPlan {
+  advice: 'Unknown' | 'NoRush' | 'Hurry' | 'Normal'
+  trains: { departure: string; arrival: string; connection: string | null }[]
+}
+
+/** A commute with a transfer's connections, or undefined for one ride. */
+export const connectionsPath = (c: Commute) =>
+  c.transferStopId && c.transferRouteId && c.transferDirectionId !== undefined
+    ? `/connections?from=${encodeURIComponent(c.mbtaStopId)}&route=${encodeURIComponent(c.routeId)}&direction=${c.directionId}` +
+      `&via=${encodeURIComponent(c.transferStopId)}&toRoute=${encodeURIComponent(c.transferRouteId)}&toDirection=${c.transferDirectionId}` +
+      `&minutes=${c.transferMinutes ?? 3}`
+    : undefined
 
 /**
  * A failed request: an HTTP error with the API's own message (e.g. a validation error) when it sent one, or
@@ -181,6 +209,9 @@ function fetchOnce<T, R = T>(path: string, shape?: (data: R) => T): () => Promis
 // Alerts change within minutes; pages poll them once a minute.
 export const ALERTS_REFRESH_MS = 60_000
 export const getAlerts = () => api<Alert[]>('/alerts')
+// Planned changes (the next two weeks): the subway's, or some bus routes'. They change slowly.
+export const UPCOMING_REFRESH_MS = 10 * 60_000
+export const upcomingAlertsPath = (busRoutes?: string) => (busRoutes ? `/alerts/upcoming?routes=${encodeURIComponent(busRoutes)}` : '/alerts/upcoming')
 
 // Routes and stations almost never change. ROUTES is subway lines then bus routes; `usePolling(getRoutes, ROUTES)`.
 export const ROUTES = '/routes?type=all'

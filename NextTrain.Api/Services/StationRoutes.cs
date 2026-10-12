@@ -12,6 +12,9 @@ namespace NextTrain.Api.Services
         public const string RouteIdPattern = "^[A-Za-z0-9-]{1,20}$";
         public const string RouteIdListPattern = "^[A-Za-z0-9-]{1,20}(,[A-Za-z0-9-]{1,20}){0,19}$";
 
+        // MBTA stop IDs: "place-pktrm", "66", "door-dwnxg-101arch". Same reason.
+        public const string StopIdPattern = "^[A-Za-z0-9._-]{1,50}$";
+
         public static string[] SubwayRouteIds(this Station s) => s.RouteId.Split(',', StringSplitOptions.RemoveEmptyEntries);
 
         // "1:0,1:1,741:1" -> ["1", "741"]

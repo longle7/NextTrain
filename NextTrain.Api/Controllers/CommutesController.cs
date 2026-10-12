@@ -1,9 +1,11 @@
 using System.ComponentModel.DataAnnotations;
+using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using NextTrain.Api.Data;
 using NextTrain.Api.Services;
 using NextTrain.Core.Domain;
+using NextTrain.Core.Services;
 
 namespace NextTrain.Api.Controllers
 {
@@ -27,11 +29,16 @@ namespace NextTrain.Api.Controllers
         // Far more than anyone commutes; stops a buggy or abusive client from filling the database.
         public const int MaxCommutesPerUser = 20;
 
-        private readonly NextTrainDbContext _db;
+        // How long a transfer allows to change platforms when the rider doesn't say.
+        public const int DefaultTransferMinutes = 3;
 
-        public CommutesController(NextTrainDbContext db)
+        private readonly NextTrainDbContext _db;
+        private readonly IMbtaClient _mbta;
+
+        public CommutesController(NextTrainDbContext db, IMbtaClient mbta)
         {
             _db = db;
+            _mbta = mbta;
         }
 
         // GET /commutes
@@ -40,6 +47,7 @@ namespace NextTrain.Api.Controllers
         {
             var commutes = await _db.UserCommutes
                 .Include(c => c.Station)
+                .Include(c => c.TransferStation)
                 .Where(c => c.UserId == userId)
                 .OrderBy(c => c.WindowStartLocal)
                 .ToListAsync();
@@ -123,6 +131,7 @@ namespace NextTrain.Api.Controllers
         private Task<UserCommute?> FindAsync(int id, string userId) =>
             _db.UserCommutes
                 .Include(c => c.Station)
+                .Include(c => c.TransferStation)
                 .FirstOrDefaultAsync(c => c.Id == id && c.UserId == userId);
 
         // Validates the request against the database and copies it onto the commute.
@@ -155,6 +164,8 @@ namespace NextTrain.Api.Controllers
                 ModelState.AddModelError(nameof(request.ActiveDays), "ActiveDays must be a comma-separated list of Mon, Tue, Wed, Thu, Fri, Sat, Sun.");
             }
 
+            var transfer = await TryTransferAsync(station, request);
+
             if (!ModelState.IsValid)
             {
                 return false;
@@ -167,18 +178,69 @@ namespace NextTrain.Api.Controllers
             commute.WindowStartLocal = request.WindowStart.ToTimeSpan();
             commute.WindowEndLocal = request.WindowEnd.ToTimeSpan();
             commute.ActiveDays = string.Join(",", ValidDays.Where(days.Contains)); // normalized Mon..Sun order
+            commute.TransferStation = transfer;
+            commute.TransferStationId = transfer?.Id;
+            commute.TransferRouteId = transfer is null ? null : request.TransferRouteId;
+            commute.TransferDirectionId = transfer is null ? null : request.TransferDirectionId;
+            commute.TransferMinutes = transfer is null ? null : request.TransferMinutes ?? DefaultTransferMinutes;
             return true;
+        }
+
+        // A change of line partway: where, onto which route, and which way, all or none. The station has to come later
+        // on the first route than where the rider boards (MBTA's stop order that way), and the second route has to
+        // stop there going the chosen way. Returns the station, or null for no transfer (or an invalid one).
+        private async Task<Station?> TryTransferAsync(Station? boarding, CommuteRequest request)
+        {
+            if (request.TransferStopId is null && request.TransferRouteId is null && request.TransferDirectionId is null)
+            {
+                return null;
+            }
+            if (request.TransferStopId is null || request.TransferRouteId is null || request.TransferDirectionId is null)
+            {
+                ModelState.AddModelError(nameof(request.TransferStopId), "A transfer needs a station, a route, and a direction.");
+                return null;
+            }
+
+            var transfer = await _db.Stations.FirstOrDefaultAsync(s => s.MbtaStopId == request.TransferStopId);
+            if (transfer is null)
+            {
+                ModelState.AddModelError(nameof(request.TransferStopId), $"Unknown station '{request.TransferStopId}'.");
+            }
+            else if (request.TransferRouteId == request.RouteId)
+            {
+                ModelState.AddModelError(nameof(request.TransferRouteId), "A transfer is onto a different route.");
+            }
+            else if (!transfer.SubwayRouteIds().Contains(request.TransferRouteId) && !transfer.ServesBus(request.TransferRouteId, request.TransferDirectionId))
+            {
+                ModelState.AddModelError(nameof(request.TransferRouteId), $"Route '{request.TransferRouteId}' doesn't stop at {transfer.Name} that way.");
+            }
+            else if (boarding is not null && ModelState.IsValid)
+            {
+                var order = (await _mbta.GetStopDtosAsync(request.RouteId, request.DirectionId)).Select(s => s.Id).ToList();
+                var from = order.IndexOf(boarding.MbtaStopId);
+                if (from < 0 || order.IndexOf(transfer.MbtaStopId) <= from)
+                {
+                    ModelState.AddModelError(nameof(request.TransferStopId), $"{transfer.Name} isn't on that route after {boarding.Name}.");
+                }
+            }
+            return transfer;
         }
     }
 
+    // The Transfer* fields are optional (see TryTransferAsync); apps before 1.3 never send them.
     public record CommuteRequest(
         [Required] string MbtaStopId,
         [Required] string RouteId,
         [Range(0, 1)] int DirectionId,
         TimeOnly WindowStart,
         TimeOnly WindowEnd,
-        string ActiveDays = "Mon,Tue,Wed,Thu,Fri");
+        string ActiveDays = "Mon,Tue,Wed,Thu,Fri",
+        [MaxLength(50)] string? TransferStopId = null,
+        [RegularExpression(StationRoutes.RouteIdPattern)] string? TransferRouteId = null,
+        [Range(0, 1)] int? TransferDirectionId = null,
+        [Range(1, 10)] int? TransferMinutes = null);
 
+    // The Transfer* fields are left out of the JSON for a commute without one, so it reads exactly as before.
     public record CommuteResponse(
         int Id,
         string MbtaStopId,
@@ -187,7 +249,12 @@ namespace NextTrain.Api.Controllers
         int DirectionId,
         TimeOnly WindowStart,
         TimeOnly WindowEnd,
-        string ActiveDays)
+        string ActiveDays,
+        [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? TransferStopId = null,
+        [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? TransferStationName = null,
+        [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? TransferRouteId = null,
+        [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] int? TransferDirectionId = null,
+        [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] int? TransferMinutes = null)
     {
         public static CommuteResponse From(UserCommute c) => new(
             c.Id,
@@ -197,6 +264,11 @@ namespace NextTrain.Api.Controllers
             c.DirectionId,
             TimeOnly.FromTimeSpan(c.WindowStartLocal),
             TimeOnly.FromTimeSpan(c.WindowEndLocal),
-            c.ActiveDays);
+            c.ActiveDays,
+            c.TransferStation?.MbtaStopId,
+            c.TransferStation?.Name,
+            c.TransferRouteId,
+            c.TransferDirectionId,
+            c.TransferMinutes);
     }
 }
