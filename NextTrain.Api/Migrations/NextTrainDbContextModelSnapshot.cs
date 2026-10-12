@@ -168,6 +168,19 @@ namespace NextTrain.Api.Migrations
                     b.Property<int>("StationId")
                         .HasColumnType("int");
 
+                    b.Property<int?>("TransferDirectionId")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("TransferMinutes")
+                        .HasColumnType("int");
+
+                    b.Property<string>("TransferRouteId")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<int?>("TransferStationId")
+                        .HasColumnType("int");
+
                     b.Property<DateTime?>("UpdatedAtUtc")
                         .HasColumnType("datetime2");
 
@@ -186,6 +199,8 @@ namespace NextTrain.Api.Migrations
 
                     b.HasIndex("StationId");
 
+                    b.HasIndex("TransferStationId");
+
                     b.HasIndex("UserId");
 
                     b.ToTable("UserCommutes");
@@ -199,7 +214,14 @@ namespace NextTrain.Api.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
+                    b.HasOne("NextTrain.Core.Domain.Station", "TransferStation")
+                        .WithMany()
+                        .HasForeignKey("TransferStationId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.Navigation("Station");
+
+                    b.Navigation("TransferStation");
                 });
 #pragma warning restore 612, 618
         }

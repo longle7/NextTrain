@@ -21,6 +21,15 @@
         // Direction ID (e.g., 0 or 1 based on MBTA API).
         public int DirectionId { get; set; }
 
+        // An optional change partway (e.g. off the Green Line onto the Blue Line at Government Center): where, onto
+        // which route and direction, and how many minutes the rider needs to get from one platform to the other.
+        // All null when the commute is one ride.
+        public int? TransferStationId { get; set; }
+        public Station? TransferStation { get; set; }
+        public string? TransferRouteId { get; set; }
+        public int? TransferDirectionId { get; set; }
+        public int? TransferMinutes { get; set; }
+
         // Commute start time (e.g., 7:45 AM local).
         public TimeSpan WindowStartLocal { get; set; }
 

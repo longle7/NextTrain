@@ -42,6 +42,11 @@ namespace NextTrain.Api.Data
                       .WithMany()
                       .HasForeignKey(uc => uc.StationId)
                       .OnDelete(DeleteBehavior.Restrict);
+                entity.Property(uc => uc.TransferRouteId).HasMaxLength(50);
+                entity.HasOne(uc => uc.TransferStation)
+                      .WithMany()
+                      .HasForeignKey(uc => uc.TransferStationId)
+                      .OnDelete(DeleteBehavior.Restrict);
             });
 
             modelBuilder.Entity<PushDevice>(entity =>
