@@ -15,6 +15,7 @@ export default function CookiesPage() {
         <StorageTable
           rows={[
             ['nexttrain.userId', 'A random ID that your saved commutes are stored under', 'Until you use Delete my data'],
+            ['nexttrain.notifications', "Remembers whether you turned delay alerts on or off (iPhone app), so we don't ask again", 'Until you use Delete my data'],
             ['nexttrain.analyticsConsent', 'Remembers your analytics choice, so we don\'t ask again', 'Until you use Delete my data'],
             ['nexttrain.cache.*', 'The last train times, stations, alerts, and commutes NextTrain loaded, so it can show them (with their age) when you open it offline, e.g. in a tunnel', 'Until newer data replaces it, or you use Delete my data'],
             ['nexttrain.mapTipSeen', 'Remembers that you closed the map\'s tip, so it doesn\'t show again', 'Until you delete the app or clear site data'],

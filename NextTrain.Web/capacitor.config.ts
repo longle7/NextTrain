@@ -7,6 +7,8 @@ const config: CapacitorConfig = {
   appName: 'NextTrain',
   webDir: 'dist',
   backgroundColor: '#171717', // matches the header, so launch and overscroll never flash white
+  // Delay notifications show as a banner even while NextTrain is open (iOS hides them by default then).
+  plugins: { PushNotifications: { presentationOptions: ['alert', 'sound'] } },
 }
 
 export default config

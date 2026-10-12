@@ -19,6 +19,12 @@ export default function PrivacyPage() {
             name, email, phone number, or Apple ID. We keep them until you delete them.
           </li>
           <li>
+            <strong>Delay alerts, only if you turn them on (iPhone app).</strong> We store the push token Apple gives your
+            iPhone for NextTrain, under the same random ID, so we can send you an alert when a major delay or closure hits one
+            of your commutes, and we note which alerts we sent you (for 7 days) so you get each one once. The alerts go
+            through Apple's push notification service. Turning them off in Settings deletes the token.
+          </li>
+          <li>
             <strong>Your location.</strong> "Near you" and the map's locate button use your location on your device only,
             to sort stations by distance and center the map. It's never sent to our servers. You can turn location access
             off at any time; the rest of NextTrain keeps working.
@@ -100,8 +106,8 @@ export default function PrivacyPage() {
       <Section title="Your choices and rights">
         <ul className="list-disc space-y-2 pl-5">
           <li>
-            <strong>Delete your data now:</strong> Settings → Delete my data removes your saved commutes from our server
-            right away, and clears your analytics choice on this device. Deleting the app removes its
+            <strong>Delete your data now:</strong> Settings → Delete my data removes your saved commutes and delay alert
+            token from our server right away, and clears your analytics choice on this device. Deleting the app removes its
             ID from your device, but not commutes already saved on our server, so use Delete my data first.
           </li>
           <li>

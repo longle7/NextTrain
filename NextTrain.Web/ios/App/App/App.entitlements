@@ -3,9 +3,13 @@
 <!--
   The keychain group the app shares with the LiveActivity extension, to pass your commutes to the Home Screen widget
   (see SharedCommutes.swift). Provisioning profiles allow the team's keychain groups by default: nothing to set up.
+  aps-environment: push notifications (delay alerts). "development" here; App Store and TestFlight exports switch it
+  to "production", the service the API sends to.
 -->
 <plist version="1.0">
 <dict>
+	<key>aps-environment</key>
+	<string>development</string>
 	<key>keychain-access-groups</key>
 	<array>
 		<string>$(AppIdentifierPrefix)com.longledev.nexttrain.shared</string>
