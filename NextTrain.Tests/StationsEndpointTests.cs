@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
 using NextTrain.Api.Controllers;
+using NextTrain.Api.Services;
 using NextTrain.Core.Domain;
 using NextTrain.Core.Services;
 
@@ -108,6 +109,50 @@ public class StationsEndpointTests : IDisposable
 
         Assert.Equal(new[] { 1, 0 }, red!.Select(p => p.DirectionId));
         Assert.Equal(DateTimeOffset.Parse("2026-09-29T08:05:00-04:00"), Assert.Single(redInbound!).DepartureTime);
+    }
+
+    [Fact]
+    public async Task GetPredictions_Schedules_FillOnlyRoutesWithNothingPredicted()
+    {
+        _mbta.PredictionsByStop["place-pktrm"] = new() { Prediction("Red", 0, "2026-09-29T23:50:00-04:00") };
+        _mbta.SchedulesByStop["place-pktrm"] = new()
+        {
+            new("Red", 0, DateTimeOffset.Parse("2026-09-29T23:52:00-04:00")), // Red one way is predicted: not added
+            new("Red", 1, DateTimeOffset.Parse("2026-09-29T23:55:00-04:00")),
+            new("Red", 1, DateTimeOffset.Parse("2026-09-30T00:07:00-04:00")),
+            new("Green-B", 0, DateTimeOffset.Parse("2026-09-29T23:58:00-04:00")),
+            new("Red", 1, DateTimeOffset.Parse("2026-09-30T00:19:00-04:00")),
+            new("Red", 1, DateTimeOffset.Parse("2026-09-30T00:31:00-04:00")), // a 4th: only the next 3
+        };
+
+        var all = await _client.GetFromJsonAsync<List<PredictionResponse>>("/stations/place-pktrm/predictions?schedules=true");
+        var json = await _client.GetStringAsync("/stations/place-pktrm/predictions?route=Red&direction=1&schedules=true");
+
+        Assert.Equal(
+            new[] { ("Red", 0, false), ("Red", 1, true), ("Green-B", 0, true), ("Red", 1, true), ("Red", 1, true) },
+            all!.Select(p => (p.RouteId, p.DirectionId, p.Scheduled)));
+        Assert.Contains("\"scheduled\":true", json);
+    }
+
+    [Fact]
+    public async Task GetPredictions_WithoutSchedules_AnswersExactlyAsBefore()
+    {
+        _mbta.PredictionsByStop["place-pktrm"] = new() { Prediction("Red", 0, "2026-09-29T08:05:00-04:00") };
+        _mbta.SchedulesByStop["place-pktrm"] = new() { new("Red", 1, DateTimeOffset.Parse("2026-09-29T08:06:00-04:00")) };
+
+        var json = await _client.GetStringAsync("/stations/place-pktrm/predictions");
+
+        Assert.Equal("[{\"routeId\":\"Red\",\"directionId\":0,\"departureTime\":\"2026-09-29T08:05:00-04:00\"}]", json);
+    }
+
+    [Theory]
+    [InlineData("2026-10-10T08:27:00Z", "2026-10-10", "04:27", "07:27")] // 4:27 AM: today, before the first trains
+    [InlineData("2026-10-10T05:30:00Z", "2026-10-09", "25:30", "28:30")] // 1:30 AM: still Friday's service day
+    [InlineData("2026-10-11T03:30:00Z", "2026-10-10", "23:30", "26:30")] // 11:30 PM: the window runs past midnight
+    [InlineData("2026-01-15T12:00:00Z", "2026-01-15", "07:00", "10:00")] // winter: Eastern Standard Time
+    public void ScheduleWindow_UsesMbtaServiceDays(string utc, string date, string from, string to)
+    {
+        Assert.Equal((date, from, to), MbtaClient.ScheduleWindow(DateTimeOffset.Parse(utc)));
     }
 
     [Fact]
