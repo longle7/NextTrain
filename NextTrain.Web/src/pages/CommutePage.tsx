@@ -1,12 +1,13 @@
 import { useState, type ReactNode } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router'
 import {
-  api, ApiError, busDirections, busRouteIds, findRoute, getBusStops, getRoutes, getStations, ROUTES, searchStations,
+  api, ApiError, busDirections, busRouteIds, findRoute, getBusStops, getRoutes, getStations, lineLabel, ROUTES, searchStations,
   stationRouteIds, towardLabel,
   type Commute, type CommuteInput, type Route, type Station,
 } from '../api'
+import { forget } from '../cache'
 import { stepNumbers, WEEK } from '../commutes'
-import { Card, dangerButton, LineBadge, linkButton, NotFound, primaryButton, SearchInput, Status } from '../components'
+import { Card, dangerButton, LineBadge, linkButton, NotFound, primaryButton, SearchInput, secondaryButton, Status } from '../components'
 import { usePolling, useTitle } from '../usePolling'
 
 // /commutes/new (optionally ?station=place-pktrm&route=Red, e.g. from the map) and /commutes/:id
@@ -41,6 +42,12 @@ function CommuteForm({ existing, initialStopId, initialRouteId }: { existing: Co
   const [days, setDays] = useState(existing?.activeDays.split(',') ?? WEEK.slice(0, 5))
   const [error, setError] = useState<string>()
   const [saving, setSaving] = useState(false)
+  // A change of line partway (e.g. onto the Blue Line at Government Center).
+  const [changes, setChanges] = useState(!!existing?.transferStopId)
+  const [transferStopId, setTransferStopId] = useState(existing?.transferStopId ?? '')
+  const [transferRouteId, setTransferRouteId] = useState(existing?.transferRouteId ?? '')
+  const [transferDirectionId, setTransferDirectionId] = useState(existing?.transferDirectionId)
+  const [transferMinutes, setTransferMinutes] = useState(existing?.transferMinutes ?? 3)
 
   const station = allStops?.find((s) => s.mbtaStopId === stopId)
   const stationRoutes = station ? [...stationRouteIds(station), ...busRouteIds(station)] : []
@@ -52,7 +59,28 @@ function CommuteForm({ existing, initialStopId, initialRouteId }: { existing: Co
   const directions = route?.type === 'bus' && station ? busDirections(station, route.id) : [0, 1]
   const chosenDirection =
     directionId !== undefined && directions.includes(directionId) ? directionId : directions.length === 1 ? directions[0] : undefined
-  const ready = station && chosenRouteId && chosenDirection !== undefined && start < end && days.length > 0
+  // Where you can change: the first ride's later stops where another line or route stops, in riding order.
+  const ridePath = chosenRouteId && chosenDirection !== undefined
+    ? `/stations?route=${encodeURIComponent(chosenRouteId)}&direction=${chosenDirection}&sort=line`
+    : ''
+  const ride = usePolling(() => (changes && ridePath ? api<Station[]>(ridePath) : Promise.resolve<Station[]>([])), `${ridePath}|${changes}`)
+  const otherRoutes = (s: Station) => [...stationRouteIds(s), ...busRouteIds(s)].filter((id) => id !== chosenRouteId)
+  const routeName = (id: string) => {
+    const r = findRoute(routes.data, id)
+    return r?.type === 'bus' ? `Route ${lineLabel(id, r)}` : (r?.name ?? id)
+  }
+  const boardingAt = ride.data?.findIndex((s) => s.mbtaStopId === station?.mbtaStopId) ?? -1
+  const changeStations = ride.data && boardingAt >= 0 ? ride.data.slice(boardingAt + 1).filter((s) => otherRoutes(s).length > 0) : []
+  const changeStation = changeStations.find((s) => s.mbtaStopId === transferStopId)
+  const changeRoutes = changeStation ? otherRoutes(changeStation) : []
+  const chosenTransferRoute = changeRoutes.includes(transferRouteId) ? transferRouteId : changeRoutes.length === 1 ? changeRoutes[0] : undefined
+  const transferRoute = findRoute(routes.data, chosenTransferRoute ?? '')
+  const transferDirections = transferRoute?.type === 'bus' && changeStation ? busDirections(changeStation, transferRoute.id) : [0, 1]
+  const chosenTransferDirection = transferDirectionId !== undefined && transferDirections.includes(transferDirectionId)
+    ? transferDirectionId
+    : transferDirections.length === 1 ? transferDirections[0] : undefined
+  const transferDone = !changes || (!!changeStation && !!chosenTransferRoute && chosenTransferDirection !== undefined)
+  const ready = station && chosenRouteId && chosenDirection !== undefined && start < end && days.length > 0 && transferDone
 
   const pickStation = (id: string) => {
     setStopId(id)
@@ -65,6 +93,10 @@ function CommuteForm({ existing, initialStopId, initialRouteId }: { existing: Co
     const body: CommuteInput = {
       mbtaStopId: station.mbtaStopId, routeId: chosenRouteId, directionId: chosenDirection,
       windowStart: start, windowEnd: end, activeDays: days.join(','),
+      ...(changes && {
+        transferStopId: changeStation!.mbtaStopId, transferRouteId: chosenTransferRoute, transferDirectionId: chosenTransferDirection,
+        transferMinutes,
+      }),
     }
     await submit(() => api(existing ? `/commutes/${existing.id}` : '/commutes', { method: existing ? 'PUT' : 'POST', body: JSON.stringify(body) }))
   }
@@ -78,6 +110,7 @@ function CommuteForm({ existing, initialStopId, initialRouteId }: { existing: Co
     setError(undefined)
     try {
       await request()
+      forget('commutes') // Home's offline copy is out of date now
       navigate('/', { replace: true })
     } catch (e) {
       setError((e as Error).message)
@@ -86,7 +119,8 @@ function CommuteForm({ existing, initialStopId, initialRouteId }: { existing: Co
   }
 
   // Steps are numbered as shown: "Which line?" and "Which way?" are skipped when there's only one choice.
-  const [lineStep, wayStep, whenStep] = stepNumbers([!!station && stationRoutes.length > 1, !!route, true])
+  const changeShown = !!route && chosenDirection !== undefined
+  const [lineStep, wayStep, changeStep, whenStep] = stepNumbers([!!station && stationRoutes.length > 1, !!route, changeShown, true])
 
   return (
     <>
@@ -139,6 +173,117 @@ function CommuteForm({ existing, initialStopId, initialRouteId }: { existing: Co
               </Choice>
             ))}
           </div>
+        </Step>
+      )}
+
+      {changeShown && (
+        <Step
+          n={changeStep}
+          title="Do you change trains?"
+          hint={changes ? 'Where you get off, and what you catch next.' : 'For example, the Green Line to the Blue Line at Government Center.'}
+        >
+          {!changes ? (
+            <button onClick={() => setChanges(true)} className={secondaryButton}>
+              <span aria-hidden>+</span> Add a change
+            </button>
+          ) : (
+            <Card>
+              <div className="space-y-4">
+                <label className="block space-y-1.5">
+                  <span className="block font-semibold">Where do you change?</span>
+                  {!ride.data ? (
+                    <Status loading rows={1} />
+                  ) : changeStations.length === 0 ? (
+                    <span className="block text-sm text-neutral-500">No other lines stop after {station?.name} going this way.</span>
+                  ) : (
+                    <select
+                      value={changeStation?.mbtaStopId ?? ''}
+                      onChange={(e) => {
+                        setTransferStopId(e.target.value)
+                        setTransferRouteId('')
+                        setTransferDirectionId(undefined)
+                      }}
+                      className="min-h-11 w-full rounded-lg bg-neutral-100 px-3 text-base dark:bg-neutral-800"
+                    >
+                      <option value="">Choose a stop</option>
+                      {changeStations.map((s) => (
+                        <option key={s.mbtaStopId} value={s.mbtaStopId}>
+                          {s.name}: {otherRoutes(s).slice(0, 3).map(routeName).join(', ')}
+                          {otherRoutes(s).length > 3 ? ` +${otherRoutes(s).length - 3} more` : ''}
+                        </option>
+                      ))}
+                    </select>
+                  )}
+                </label>
+
+                {changeStation && changeRoutes.length > 1 && (
+                  <div className="space-y-1.5">
+                    <h3 className="font-semibold">Onto which line?</h3>
+                    <div className="flex flex-wrap gap-2">
+                      {changeRoutes.map((id) => (
+                        <Choice key={id} selected={chosenTransferRoute === id} onClick={() => {
+                            setTransferRouteId(id)
+                            setTransferDirectionId(undefined)
+                          }}>
+                          <span aria-hidden>
+                            <LineBadge routeId={id} routes={routes.data} />
+                          </span>
+                          <span className="text-left">{routeName(id)}</span>
+                        </Choice>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {transferRoute && (
+                  <div className="space-y-1.5">
+                    <h3 className="font-semibold">Which way then?</h3>
+                    <div className="grid grid-cols-2 gap-2">
+                      {transferRoute.directionDestinations.map((destination, i) => transferDirections.includes(i) && (
+                        <Choice key={i} selected={chosenTransferDirection === i} onClick={() => setTransferDirectionId(i)}>
+                          <span className="text-left">{destination}</span>
+                        </Choice>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {transferRoute && (
+                  <div className="flex items-center justify-between gap-3">
+                    <span>
+                      <span className="block font-semibold">Time to change</span>
+                      <span className="block text-sm text-neutral-500">From one platform or stop to the other</span>
+                    </span>
+                    <span className="flex items-center gap-2">
+                      <button
+                        onClick={() => setTransferMinutes((m) => Math.max(1, m - 1))}
+                        disabled={transferMinutes <= 1}
+                        aria-label="Less time to change"
+                        className="grid size-11 place-items-center rounded-full bg-neutral-100 text-xl font-bold disabled:opacity-40 dark:bg-neutral-800"
+                      >
+                        −
+                      </button>
+                      <span className="w-14 text-center font-semibold tabular-nums" aria-live="polite">
+                        {transferMinutes} min
+                      </span>
+                      <button
+                        onClick={() => setTransferMinutes((m) => Math.min(10, m + 1))}
+                        disabled={transferMinutes >= 10}
+                        aria-label="More time to change"
+                        className="grid size-11 place-items-center rounded-full bg-neutral-100 text-xl font-bold disabled:opacity-40 dark:bg-neutral-800"
+                      >
+                        +
+                      </button>
+                    </span>
+                  </div>
+                )}
+
+                <button onClick={() => setChanges(false)} className={`-ml-2 ${linkButton}`}>
+                  Remove the change
+                </button>
+              </div>
+            </Card>
+          )}
         </Step>
       )}
 

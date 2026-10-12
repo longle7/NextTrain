@@ -32,6 +32,15 @@ export function remember(key: string, data: unknown) {
   }
 }
 
+/** Drop one remembered answer, e.g. your commutes after you change them, so Home doesn't open on the old list. */
+export function forget(key: string) {
+  try {
+    localStorage.removeItem(PREFIX + key)
+  } catch {
+    // storage blocked: nothing stored
+  }
+}
+
 /** Delete my data. */
 export function forgetRemembered() {
   try {
