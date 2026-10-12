@@ -86,9 +86,32 @@ export interface Commute {
   windowStart: string // "07:45:00", Boston local time
   windowEnd: string
   activeDays: string // "Mon,Tue,Wed,Thu,Fri"
+  // A change of line partway (e.g. onto the Blue Line at Government Center); absent for one ride.
+  transferStopId?: string
+  transferStationName?: string
+  transferRouteId?: string
+  transferDirectionId?: number
+  transferMinutes?: number // to get from one platform to the other
 }
 
-export type CommuteInput = Pick<Commute, 'mbtaStopId' | 'routeId' | 'directionId' | 'windowStart' | 'windowEnd' | 'activeDays'>
+export type CommuteInput = Pick<
+  Commute,
+  'mbtaStopId' | 'routeId' | 'directionId' | 'windowStart' | 'windowEnd' | 'activeDays' | 'transferStopId' | 'transferRouteId' | 'transferDirectionId' | 'transferMinutes'
+>
+
+/** Which second-line train each of the next first-line trains makes (GET /connections), and what that means. */
+export interface ConnectionPlan {
+  advice: 'Unknown' | 'NoRush' | 'Hurry' | 'Normal'
+  trains: { departure: string; arrival: string; connection: string | null }[]
+}
+
+/** A commute with a transfer's connections, or undefined for one ride. */
+export const connectionsPath = (c: Commute) =>
+  c.transferStopId && c.transferRouteId && c.transferDirectionId !== undefined
+    ? `/connections?from=${encodeURIComponent(c.mbtaStopId)}&route=${encodeURIComponent(c.routeId)}&direction=${c.directionId}` +
+      `&via=${encodeURIComponent(c.transferStopId)}&toRoute=${encodeURIComponent(c.transferRouteId)}&toDirection=${c.transferDirectionId}` +
+      `&minutes=${c.transferMinutes ?? 3}`
+    : undefined
 
 /**
  * A failed request: an HTTP error with the API's own message (e.g. a validation error) when it sent one, or

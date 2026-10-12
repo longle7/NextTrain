@@ -6,6 +6,7 @@
   - No tracking, and no tracking domains.
   - Collected, linked to the user, for app functionality only: the random device ID (User ID) and saved commutes
     (Other User Content). Location stays on the device, so it isn't "collected".
+  - Collected, not linked to the user, for app functionality: error reports (Crash Data; see src/errors.ts).
   - Required-reason API: UserDefaults (CA92.1: the app's own settings, read and written only by the app).
 -->
 <plist version="1.0">
@@ -33,6 +34,18 @@
 			<string>NSPrivacyCollectedDataTypeOtherUserContent</string>
 			<key>NSPrivacyCollectedDataTypeLinked</key>
 			<true/>
+			<key>NSPrivacyCollectedDataTypeTracking</key>
+			<false/>
+			<key>NSPrivacyCollectedDataTypePurposes</key>
+			<array>
+				<string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string>
+			</array>
+		</dict>
+		<dict>
+			<key>NSPrivacyCollectedDataType</key>
+			<string>NSPrivacyCollectedDataTypeCrashData</string>
+			<key>NSPrivacyCollectedDataTypeLinked</key>
+			<false/>
 			<key>NSPrivacyCollectedDataTypeTracking</key>
 			<false/>
 			<key>NSPrivacyCollectedDataTypePurposes</key>

@@ -2,15 +2,16 @@ import { useEffect, useState, type ReactNode } from 'react'
 import { Link, useNavigate } from 'react-router'
 import { alertsFor, majorAlert, plannedFor } from '../alerts'
 import {
-  ALERTS_REFRESH_MS, api, commutePredictionsPath, getAlerts, getBusStops, getRoutes, getStations, isSubwayRoute, ROUTES,
+  ALERTS_REFRESH_MS, api, commutePredictionsPath, connectionsPath, findRoute, getAlerts, getBusStops, getRoutes, getStations, isSubwayRoute, ROUTES,
   searchRoutes, searchStations, stationRouteIds, towardLabel, UPCOMING_REFRESH_MS, upcomingAlertsPath,
-  type Alert, type Commute, type Prediction, type Route, type Station,
+  type Alert, type Commute, type ConnectionPlan, type Prediction, type Route, type Station,
 } from '../api'
 import { commuteTiming, daysLabel, liveActivityEnd, sortCommutes, timingLabel, windowLabel } from '../commutes'
 import { Card, LineBadge, linkButton, primaryButton, SearchInput, StationLink, Status, WarningIcon } from '../components'
 import { locationErrorMessage, nearestStations, OUT_OF_AREA_MILES, walkLabel } from '../geo'
 import { endLiveActivities, liveActivityDetails, showLiveActivity, updateWidget, widgetCommutes } from '../liveActivity'
 import { clock, dateRange, departureLabel, groupDepartures, secondsAgo, STALE_AFTER_SECONDS } from '../time'
+import { adviceText } from '../transfers'
 import { failure, useNow, usePolling, useTitle } from '../usePolling'
 
 export default function HomePage() {
@@ -407,6 +408,13 @@ function CommuteCard({ commute, route, routes, now, liveActivity, alert, planned
           </span>
         </div>
         <p className="mt-1 font-medium">to {route?.directionDestinations[commute.directionId] ?? '…'}</p>
+        {commute.transferStopId && commute.transferRouteId && (
+          <p className="mt-0.5 flex flex-wrap items-center gap-1.5 text-sm text-neutral-600 dark:text-neutral-300">
+            Change at {commute.transferStationName} to
+            <LineBadge routeId={commute.transferRouteId} routes={routes} />
+            {findRoute(routes, commute.transferRouteId)?.directionDestinations[commute.transferDirectionId ?? 0] ?? '…'}
+          </p>
+        )}
         {alert && (
           <p className="mt-2 flex items-start gap-1.5 text-sm font-semibold text-amber-700 dark:text-amber-400">
             <WarningIcon className="mt-0.5 size-4 shrink-0" />
@@ -434,7 +442,7 @@ function CommuteCard({ commute, route, routes, now, liveActivity, alert, planned
           </span>
         </Link>
       </div>
-      {live && <CommuteDepartures commute={commute} route={route} alert={alert} liveActivity={liveActivity} />}
+      {live && <CommuteDepartures commute={commute} route={route} routes={routes} alert={alert} liveActivity={liveActivity} />}
     </Card>
   )
 }
@@ -449,15 +457,24 @@ function CalendarIcon({ className }: { className?: string }) {
 }
 
 // Live only while the commute is on or about to be, so idle commutes don't spend MBTA requests.
-function CommuteDepartures({ commute, route, alert, liveActivity }: {
+function CommuteDepartures({ commute, route, routes, alert, liveActivity }: {
   commute: Commute
   route: Route | undefined
+  routes: Route[] | undefined
   alert: Alert | undefined
   liveActivity: boolean
 }) {
   const now = useNow()
   const path = `${commutePredictionsPath(commute)}&schedules=true`
   const predictions = usePolling(() => api<Prediction[]>(path), path, 10_000)
+  // With a change of line: which connection the next trains make, and whether to hurry.
+  const connections = connectionsPath(commute)
+  const plan = usePolling(() => (connections ? api<ConnectionPlan>(connections) : Promise.resolve(undefined)), connections ?? 'no-transfer', 10_000, {
+    remember: false, // old advice misleads
+  })
+  const advice = plan.data && commute.transferRouteId && commute.transferStationName
+    ? adviceText(plan.data, findRoute(routes, commute.transferRouteId), commute.transferStationName, now)
+    : undefined
   const next = predictions.data ? groupDepartures(predictions.data, now)[0] : undefined
   const departures = next?.departures ?? []
   const scheduled = !!next?.scheduled
@@ -497,6 +514,13 @@ function CommuteDepartures({ commute, route, alert, liveActivity }: {
           </span>
         )}
       </div>
+      {advice && (
+        <p
+          className={`mt-2 text-sm ${advice.tone === 'hurry' ? 'font-semibold text-amber-700 dark:text-amber-400' : advice.tone === 'calm' ? 'font-semibold text-green-700 dark:text-green-400' : 'text-neutral-600 dark:text-neutral-300'}`}
+        >
+          {advice.text}
+        </p>
+      )}
       <LastUpdated at={predictions.updatedAt} now={now} />
     </>
   )

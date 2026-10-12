@@ -38,6 +38,12 @@ export default function PrivacyPage() {
             address or your commutes) for up to 30 days so we can fix it.
           </li>
           <li>
+            <strong>Error reports.</strong> When NextTrain itself hits an error, it sends us what went wrong, the page it
+            happened on (for example "/stations/place-pktrm", never what you typed), the app version, and whether it's the
+            website or the iPhone app. Reports never include your ID, location, or commutes, aren't linked to you, and are
+            kept for up to 30 days so we can fix the problem.
+          </li>
+          <li>
             <strong>Messages you send us.</strong> If you email us or report a problem on GitHub, we receive what you send,
             and use it only to reply and improve NextTrain.
           </li>
