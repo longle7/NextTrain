@@ -6,6 +6,26 @@ namespace NextTrain.Core.Services
     public class MbtaAlertsResponseDto
     {
         public List<MbtaAlertDto> Data { get; set; } = new();
+
+        // With include=facilities: the elevators and escalators the alerts name.
+        public List<MbtaFacilityDto> Included { get; set; } = new();
+    }
+
+    /// <summary>
+    /// An elevator, escalator, or other station facility, e.g. 869, "Alewife platform to Summer Street Concourse".
+    /// </summary>
+    public class MbtaFacilityDto
+    {
+        public string Id { get; set; } = string.Empty;
+
+        public MbtaFacilityAttributesDto Attributes { get; set; } = new();
+    }
+
+    public class MbtaFacilityAttributesDto
+    {
+        public string? ShortName { get; set; }   // where it goes, e.g. "Main concourse to platform"
+
+        public string Type { get; set; } = string.Empty; // "ELEVATOR", "ESCALATOR", ...
     }
 
     /// <summary>
@@ -36,6 +56,16 @@ namespace NextTrain.Core.Services
 
         // Which routes, stops (parent stations and platforms), and directions the alert covers.
         public List<MbtaInformedEntityDto> InformedEntity { get; set; } = new();
+
+        // When it applies: one period, or several (e.g. every weekend in October). End is null when open-ended.
+        public List<MbtaActivePeriodDto> ActivePeriod { get; set; } = new();
+    }
+
+    public class MbtaActivePeriodDto
+    {
+        public DateTimeOffset Start { get; set; }
+
+        public DateTimeOffset? End { get; set; }
     }
 
     public class MbtaInformedEntityDto
@@ -45,5 +75,7 @@ namespace NextTrain.Core.Services
         public string? Stop { get; set; }
 
         public int? DirectionId { get; set; }
+
+        public string? Facility { get; set; }   // an elevator or escalator alert's facility ID
     }
 }
