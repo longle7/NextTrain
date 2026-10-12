@@ -1,6 +1,6 @@
 import { expect, it } from 'vitest'
 import type { Commute, Route } from './api'
-import { liveActivityDetails } from './liveActivity'
+import { liveActivityDetails, widgetCommutes } from './liveActivity'
 
 const commute: Commute = {
   id: 7, mbtaStopId: 'place-pktrm', stationName: 'Park Street', routeId: 'Red', directionId: 1,
@@ -27,4 +27,16 @@ it('sends the Live Activity the commute, its line, the next trains, and the wors
 
 it('labels Green Line branches like the app does', () => {
   expect(liveActivityDetails({ ...commute, routeId: 'Green-B' }, undefined, [], new Date(0), undefined).lineName).toBe('GL B')
+})
+
+it('gives the Home Screen widget each commute with its window, days, badge, colors, and destination', () => {
+  expect(widgetCommutes([commute, { ...commute, id: 8, routeId: 'Green-B', directionId: 0 }], [red])).toEqual([
+    {
+      id: 7, stopId: 'place-pktrm', stationName: 'Park Street', routeId: 'Red', directionId: 1, destination: 'Alewife',
+      lineName: 'RL', lineColor: '#DA291C', lineTextColor: '#FFFFFF',
+      windowStart: '07:45:00', windowEnd: '08:15:00', activeDays: 'Mon,Tue,Wed,Thu,Fri',
+    },
+    // A route not loaded yet still gets its badge text, in gray.
+    expect.objectContaining({ id: 8, routeId: 'Green-B', lineName: 'GL B', lineColor: '#7C878E', destination: '' }),
+  ])
 })

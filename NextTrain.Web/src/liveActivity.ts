@@ -1,5 +1,5 @@
 import { Capacitor, registerPlugin } from '@capacitor/core'
-import { lineLabel, type Alert, type Commute, type Route } from './api'
+import { API_URL, lineLabel, type Alert, type Commute, type Route } from './api'
 
 // The iPhone app's Live Activity: a commute's next trains on the Lock Screen and in the Dynamic Island.
 // The native side is ios/App/App/LiveActivityPlugin.swift; on the website every call does nothing.
@@ -16,10 +16,27 @@ export interface LiveActivityDetails {
   alert?: string
 }
 
+/** What the Home Screen widget needs for each commute: when it's on, where, and how it looks (NextCommuteWidget.swift). */
+export interface WidgetCommute {
+  id: number
+  stopId: string
+  stationName: string
+  routeId: string
+  directionId: number
+  destination: string
+  lineName: string
+  lineColor: string
+  lineTextColor: string
+  windowStart: string // "07:45:00", Boston time
+  windowEnd: string
+  activeDays: string // "Mon,Tue,Wed,Thu,Fri"
+}
+
 interface LiveActivityPlugin {
   isAvailable(): Promise<{ available: boolean }>
   show(details: LiveActivityDetails): Promise<void>
   endAll(): Promise<void>
+  setWidgetCommutes(saved: { apiUrl: string; commutes: WidgetCommute[] }): Promise<void>
 }
 
 const plugin = registerPlugin<LiveActivityPlugin>('LiveActivity')
@@ -44,6 +61,23 @@ export const liveActivitiesAvailable = async () =>
 export const showLiveActivity = (details: LiveActivityDetails) => (native ? quietly(plugin.show(details)) : Promise.resolve(false))
 
 export const endLiveActivities = () => (native ? quietly(plugin.endAll()) : Promise.resolve(false))
+
+/** Gives the Home Screen widget your commutes (none after Delete my data). The widget fetches their times itself. */
+export const updateWidget = (commutes: WidgetCommute[]) =>
+  native ? quietly(plugin.setWidgetCommutes({ apiUrl: API_URL, commutes })) : Promise.resolve(false)
+
+/** Each commute as the widget shows it: the same line badge, colors, and destination as the Live Activity. */
+export function widgetCommutes(commutes: Commute[], routes: Route[]): WidgetCommute[] {
+  return commutes.map((c) => {
+    const { stationName, destination, lineName, lineColor, lineTextColor } = liveActivityDetails(
+      c, routes.find((r) => r.id === c.routeId), [], new Date(0), undefined,
+    )
+    return {
+      id: c.id, stopId: c.mbtaStopId, stationName, routeId: c.routeId, directionId: c.directionId, destination,
+      lineName, lineColor, lineTextColor, windowStart: c.windowStart, windowEnd: c.windowEnd, activeDays: c.activeDays,
+    }
+  })
+}
 
 /** What the Live Activity shows for a commute: its line, station, direction, next departures, and worst alert. */
 export function liveActivityDetails(
