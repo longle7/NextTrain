@@ -19,6 +19,13 @@ public class FakeMbtaClient : IMbtaClient
     // The routes each predictions request asked MBTA about, e.g. "Red" or "Red,741".
     public List<string> PredictionRouteRequests { get; } = new();
 
+    // Keyed by MBTA stop ID: the timetable, soonest first.
+    public Dictionary<string, List<MbtaScheduledDeparture>> SchedulesByStop { get; } = new();
+
+    public Task<IReadOnlyList<MbtaScheduledDeparture>> GetSchedulesAsync(string mbtaStopId, string routeIds) =>
+        Task.FromResult<IReadOnlyList<MbtaScheduledDeparture>>(
+            (SchedulesByStop.GetValueOrDefault(mbtaStopId) ?? new()).Where(s => routeIds.Split(',').Contains(s.RouteId)).ToList());
+
     public List<MbtaRouteDto> Routes { get; } = new();
     public List<MbtaRouteDto> BusRoutes { get; } = new();
 
