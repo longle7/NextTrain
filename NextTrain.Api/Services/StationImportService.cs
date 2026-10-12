@@ -134,14 +134,16 @@ namespace NextTrain.Api.Services
             }
 
             // Bus stops MBTA no longer lists. Skipped if MBTA listed under half the stops we have: more likely a bad
-            // answer than half the bus network closing overnight. A commute's stop stays until the commute is edited.
+            // answer than half the bus network closing overnight. A stop a commute boards or changes at stays until it's edited.
             // ponytail: a stop that moves gets a new ID, so a commute on the old one stops getting buses; tell the rider if it happens.
             var gone = existingById.Values.Where(s => s.RouteId == "" && !listed.Contains(s.MbtaStopId)).ToList();
             var busOnlyBefore = existingById.Values.Count(s => s.RouteId == "");
             if (gone.Count > 0 && listed.Count >= busOnlyBefore / 2)
             {
                 var goneIds = gone.Select(s => s.Id).ToList();
-                var inUse = await _dbContext.UserCommutes.Where(c => goneIds.Contains(c.StationId)).Select(c => c.StationId).ToListAsync();
+                var inUse = await _dbContext.UserCommutes.Where(c => goneIds.Contains(c.StationId)).Select(c => c.StationId)
+                    .Concat(_dbContext.UserCommutes.Where(c => c.TransferStationId != null && goneIds.Contains(c.TransferStationId.Value)).Select(c => c.TransferStationId!.Value))
+                    .ToListAsync();
                 _dbContext.Stations.RemoveRange(gone.Where(s => !inUse.Contains(s.Id)));
             }
 

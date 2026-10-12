@@ -22,6 +22,72 @@ namespace NextTrain.Api.Migrations
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
 
+            modelBuilder.Entity("NextTrain.Core.Domain.PushDevice", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime>("LastSeenAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Token")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<string>("UserId")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Token")
+                        .IsUnique();
+
+                    b.HasIndex("UserId")
+                        .IsUnique();
+
+                    b.ToTable("PushDevices");
+                });
+
+            modelBuilder.Entity("NextTrain.Core.Domain.SentNotification", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("AlertId")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<DateTime>("SentAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("UserId")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SentAtUtc");
+
+                    b.HasIndex("UserId", "AlertId")
+                        .IsUnique();
+
+                    b.ToTable("SentNotifications");
+                });
+
             modelBuilder.Entity("NextTrain.Core.Domain.Station", b =>
                 {
                     b.Property<int>("Id")
@@ -102,6 +168,19 @@ namespace NextTrain.Api.Migrations
                     b.Property<int>("StationId")
                         .HasColumnType("int");
 
+                    b.Property<int?>("TransferDirectionId")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("TransferMinutes")
+                        .HasColumnType("int");
+
+                    b.Property<string>("TransferRouteId")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<int?>("TransferStationId")
+                        .HasColumnType("int");
+
                     b.Property<DateTime?>("UpdatedAtUtc")
                         .HasColumnType("datetime2");
 
@@ -120,6 +199,8 @@ namespace NextTrain.Api.Migrations
 
                     b.HasIndex("StationId");
 
+                    b.HasIndex("TransferStationId");
+
                     b.HasIndex("UserId");
 
                     b.ToTable("UserCommutes");
@@ -133,7 +214,14 @@ namespace NextTrain.Api.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
+                    b.HasOne("NextTrain.Core.Domain.Station", "TransferStation")
+                        .WithMany()
+                        .HasForeignKey("TransferStationId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.Navigation("Station");
+
+                    b.Navigation("TransferStation");
                 });
 #pragma warning restore 612, 618
         }

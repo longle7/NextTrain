@@ -13,9 +13,15 @@
         // MBTA only populates the stop's route relationship when filtering by one route.
         Task<IReadOnlyList<MbtaStopDto>> GetStopDtosAsync(string routeId, int? directionId = null);
 
+        // Gets the given trips' predictions at a station (comma-separated trip IDs): when those trains get there.
+        Task<IReadOnlyList<MbtaPredictionDto>> GetTripPredictionsAsync(string mbtaStopId, string tripIds);
+
         // Gets predictions at a station (parent IDs like "place-pktrm" include all platforms)
         // for a comma-separated list of routes (e.g., "Orange,Red").
         Task<IReadOnlyList<MbtaPredictionDto>> GetPredictionsAsync(string mbtaStopId, string routeIds);
+
+        // Gets the timetable's departures at a station over the next few hours for the given routes, soonest first.
+        Task<IReadOnlyList<MbtaScheduledDeparture>> GetSchedulesAsync(string mbtaStopId, string routeIds);
 
         // Gets subway routes (types 0 and 1) with colors and direction names, in MBTA sort order.
         Task<IReadOnlyList<MbtaRouteDto>> GetSubwayRoutesAsync();
@@ -40,5 +46,11 @@
 
         // Gets alerts in effect right now for the given routes (comma-separated route IDs), e.g. bus detours.
         Task<IReadOnlyList<MbtaAlertDto>> GetRouteAlertsAsync(string routeIds);
+
+        // Gets planned changes that haven't started yet (or start again later): the subway's, or the given routes'.
+        Task<IReadOnlyList<MbtaAlertDto>> GetUpcomingAlertsAsync(string? routeIds);
+
+        // Gets elevator, escalator, and other accessibility alerts in effect right now at a station.
+        Task<IReadOnlyList<MbtaAlertDto>> GetAccessAlertsAsync(string mbtaStopId);
     }
 }

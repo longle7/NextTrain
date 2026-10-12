@@ -39,6 +39,8 @@ Commutes belong to an anonymous ID stored on the device (sent as `X-User-Id`) un
 | PUT | `/commutes/{id}` | Update a commute |
 | DELETE | `/commutes/{id}` | Delete a commute |
 | DELETE | `/me` | Delete everything stored for this user (the app's "Delete my data") |
+| PUT | `/me/push-token` | Send delay notifications for your commutes to this phone; body `{ "token": "<Apple device token>" }` |
+| DELETE | `/me/push-token` | Stop delay notifications to this phone |
 
 Routes: `Red`, `Mattapan`, `Orange`, `Blue`, `Green-B`, `Green-C`, `Green-D`, `Green-E`. Direction is `0` or `1`.
 
@@ -101,6 +103,7 @@ How the API works (station import, caching, errors, adding an endpoint) is in [d
 
 - Ridership is average weekday boardings per station from MassDOT's Fall 2024 counts (embedded snapshot, applied on import). Mattapan stops are not in the dataset.
 - `/alerts` returns every subway alert with the routes, stations, and directions it covers; the app decides what each line, station, and commute shows. A line's status counts alerts of severity 3 and up (MBTA uses 1-2 for things like a closed staircase, which still show on that station's page).
+- Delay notifications: `DelayNotifier`, a background job in the API, checks every minute for major alerts (suspensions, shuttles, closures, detours, or anything of severity 5 and up) on the line, station, and direction of each commute that's on or starts within 30 minutes, and sends each rider each alert once through Apple's push service (`ApnsSender`). Phones register with `PUT /me/push-token`. It's off until the APNs key is set (`Apns:KeyId`, `Apns:PrivateKey`; the team ID comes from `MapKit:TeamId`).
 - The live map (`/map`) is Apple Maps (MapKit JS), loaded only when the map opens. `mapkit.ts` pins Apple's script to one version with a Subresource Integrity hash, and MapKit gets its 30-minute tokens from `GET /mapkit/token`, so the signing key stays on the server. Trains are drawn on their own line, pointing the way they're going (`snap.ts`).
 
 ## Hosting (Azure)
@@ -115,9 +118,9 @@ Merging to `main` deploys automatically once CI passes (`.github/workflows/deplo
 
 A $10/month budget on the resource group emails the subscription owner at 50%, 80%, and 100% of actual spend and at 100% forecast. Azure has no hard cap on pay-as-you-go spending, so the limits above (one replica, fixed-price database) are what keep the bill small.
 
-Production settings live in Azure, never in the repo: the connection string, MBTA key, and MapKit private key are Container App secrets, and `Cors__AllowedOrigins__2` adds the web app's address to the allowed origins. GitHub signs in to Azure with OIDC (no stored password) using the `AZURE_CLIENT_ID`, `AZURE_TENANT_ID`, and `AZURE_SUBSCRIPTION_ID` repository variables; `API_URL` is the address the web app calls, and the `SWA_DEPLOY_TOKEN` secret uploads the web app. The optional `GA_MEASUREMENT_ID` repository variable (e.g. `G-ABC123`) turns on consent-gated Google Analytics for the website build; the iPhone app never has analytics.
+Production settings live in Azure, never in the repo: the connection string, MBTA key, MapKit private key, and APNs (push notification) private key are Container App secrets, and `Cors__AllowedOrigins__2` adds the web app's address to the allowed origins. GitHub signs in to Azure with OIDC (no stored password) using the `AZURE_CLIENT_ID`, `AZURE_TENANT_ID`, and `AZURE_SUBSCRIPTION_ID` repository variables; `API_URL` is the address the web app calls, and the `SWA_DEPLOY_TOKEN` secret uploads the web app. The optional `GA_MEASUREMENT_ID` repository variable (e.g. `G-ABC123`) turns on consent-gated Google Analytics for the website build; the iPhone app never has analytics.
 
-Scaling (set in Azure, not by the deploy): a `cron` rule keeps one API instance running from 4:30 AM to 2:00 AM Eastern (`America/New_York`, so daylight saving is handled), when people ride the T. Overnight it may scale to zero; the `http` rule wakes it for a visitor, which can take from seconds to minutes when Azure is short on capacity. Waking from zero during the day is what caused slow first loads before the schedule.
+Scaling (set in Azure, not by the deploy): a `cron` rule keeps one API instance running from 4:30 AM to 2:00 AM Eastern (`America/New_York`, so daylight saving is handled), when people ride the T; delay notifications go out from that instance. Overnight it may scale to zero; the `http` rule wakes it for a visitor, which can take from seconds to minutes when Azure is short on capacity. Waking from zero during the day is what caused slow first loads before the schedule.
 
 Protection: the API limits each client IP to `RateLimit:PerMinute` requests (600 by default; the app uses about 20), answering 429 with `Retry-After` beyond that, so one runaway client can't run up the bill or use up the MBTA key. The website sends security headers from `NextTrain.Web/public/staticwebapp.config.json`: a Content-Security-Policy, no framing by other sites, and location allowed only for NextTrain itself. **If the API address (`API_URL`) or a third-party service changes, update the policy's `connect-src`/`script-src`**, or the site can't reach it.
 

@@ -49,6 +49,15 @@ builder.Services.AddScoped<StationLookupService>();
 // A background job that imports stations at startup and daily (Stations:RefreshHours), so production is never empty.
 builder.Services.AddHostedService<StationRefreshService>();
 
+// Delay notifications: every minute, major alerts on riders' commutes go to their phones through Apple's push service
+// (DelayNotifier). Off until the APNs key is configured (Apns:KeyId, Apns:PrivateKey). One sender for the whole app,
+// so it reuses its Apple token as Apple asks.
+builder.Services.AddSingleton<IApnsSender>(services => new ApnsSender(
+    new HttpClient { Timeout = TimeSpan.FromSeconds(10) },
+    services.GetRequiredService<IConfiguration>(),
+    services.GetRequiredService<ILogger<ApnsSender>>()));
+builder.Services.AddHostedService<DelayNotifier>();
+
 // Controllers handle the HTTP endpoints. MbtaUnavailableFilter turns "MBTA is down" into a 503 for all of them.
 builder.Services.AddControllers(options => options.Filters.Add<MbtaUnavailableFilter>());
 
@@ -102,6 +111,10 @@ builder.Services.AddRateLimiter(options =>
             ? RateLimitPartition.GetNoLimiter("health")
             : RateLimitPartition.GetFixedWindowLimiter(context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
                 _ => new FixedWindowRateLimiterOptions { PermitLimit = perMinute, Window = TimeSpan.FromMinutes(1) }));
+    // Error reports (POST /client-errors): a few per device is plenty, and a flood would only bury real ones.
+    options.AddPolicy("client-errors", context => RateLimitPartition.GetFixedWindowLimiter(
+        context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+        _ => new FixedWindowRateLimiterOptions { PermitLimit = 10, Window = TimeSpan.FromMinutes(1) }));
     options.OnRejected = async (rejected, _) =>
     {
         if (rejected.Lease.TryGetMetadata(MetadataName.RetryAfter, out var retryAfter))

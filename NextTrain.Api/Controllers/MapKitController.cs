@@ -1,7 +1,5 @@
-using System.Security.Cryptography;
-using System.Text;
-using System.Text.Json;
 using Microsoft.AspNetCore.Mvc;
+using NextTrain.Api.Services;
 
 namespace NextTrain.Api.Controllers
 {
@@ -42,25 +40,16 @@ namespace NextTrain.Api.Controllers
             return Content(CreateToken(teamId, keyId, privateKey, origin, DateTimeOffset.UtcNow), "text/plain");
         }
 
-        // A JWT is base64url(header).base64url(payload).base64url(signature). Apple wants ES256: an ECDSA P-256
-        // signature over SHA-256, as the raw 64-byte r|s pair (.NET's default format).
         public static string CreateToken(string teamId, string keyId, string privateKeyPem, string? origin, DateTimeOffset now)
         {
-            var header = new Dictionary<string, object> { ["alg"] = "ES256", ["kid"] = keyId, ["typ"] = "JWT" };
-            var payload = new Dictionary<string, object>
+            var claims = new Dictionary<string, object>
             {
                 ["iss"] = teamId,
                 ["iat"] = now.ToUnixTimeSeconds(),
                 ["exp"] = now.Add(TokenLifetime).ToUnixTimeSeconds(),
             };
-            if (origin is not null) payload["origin"] = origin;
-
-            var unsigned = Base64Url(JsonSerializer.SerializeToUtf8Bytes(header)) + "." + Base64Url(JsonSerializer.SerializeToUtf8Bytes(payload));
-            using var key = ECDsa.Create();
-            key.ImportFromPem(privateKeyPem);
-            return unsigned + "." + Base64Url(key.SignData(Encoding.ASCII.GetBytes(unsigned), HashAlgorithmName.SHA256));
+            if (origin is not null) claims["origin"] = origin;
+            return AppleJwt.Create(keyId, privateKeyPem, claims);
         }
-
-        private static string Base64Url(byte[] bytes) => Convert.ToBase64String(bytes).TrimEnd('=').Replace('+', '-').Replace('/', '_');
     }
 }

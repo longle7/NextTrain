@@ -18,6 +18,8 @@ namespace NextTrain.Api.Data
         // DbSets = tables (named after the property: "Stations", "UserCommutes"; "Id" is each one's key).
         public DbSet<Station> Stations { get; set; } = null!;
         public DbSet<UserCommute> UserCommutes { get; set; } = null!;
+        public DbSet<PushDevice> PushDevices { get; set; } = null!;
+        public DbSet<SentNotification> SentNotifications { get; set; } = null!;
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -40,6 +42,27 @@ namespace NextTrain.Api.Data
                       .WithMany()
                       .HasForeignKey(uc => uc.StationId)
                       .OnDelete(DeleteBehavior.Restrict);
+                entity.Property(uc => uc.TransferRouteId).HasMaxLength(50);
+                entity.HasOne(uc => uc.TransferStation)
+                      .WithMany()
+                      .HasForeignKey(uc => uc.TransferStationId)
+                      .OnDelete(DeleteBehavior.Restrict);
+            });
+
+            modelBuilder.Entity<PushDevice>(entity =>
+            {
+                entity.HasIndex(d => d.Token).IsUnique();
+                entity.HasIndex(d => d.UserId).IsUnique();
+                entity.Property(d => d.UserId).IsRequired().HasMaxLength(100);
+                entity.Property(d => d.Token).IsRequired().HasMaxLength(200);
+            });
+
+            modelBuilder.Entity<SentNotification>(entity =>
+            {
+                entity.HasIndex(n => new { n.UserId, n.AlertId }).IsUnique();
+                entity.HasIndex(n => n.SentAtUtc);
+                entity.Property(n => n.UserId).IsRequired().HasMaxLength(100);
+                entity.Property(n => n.AlertId).IsRequired().HasMaxLength(50);
             });
         }
     }

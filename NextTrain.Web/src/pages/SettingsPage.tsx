@@ -7,7 +7,7 @@ import { forgetRemembered } from '../cache'
 import { api, commutePredictionsPath, forgetUserId, getRoutes, type Commute, type Prediction } from '../api'
 import { sortCommutes } from '../commutes'
 import { Card, dangerButton, primaryButton } from '../components'
-import { endLiveActivities, liveActivitiesAvailable, liveActivityDetails, showLiveActivity } from '../liveActivity'
+import { endLiveActivities, liveActivitiesAvailable, liveActivityDetails, showLiveActivity, updateWidget } from '../liveActivity'
 import { groupDepartures } from '../time'
 import { useTitle } from '../usePolling'
 
@@ -29,6 +29,7 @@ export default function SettingsPage() {
       forgetRemembered()
       forgetAnalyticsChoice()
       void endLiveActivities()
+      void updateWidget([]) // the Home Screen widget forgets them too
       setDeletion('done')
     } catch {
       setDeletion('failed')

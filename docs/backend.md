@@ -23,10 +23,10 @@ The API sits between the app (web and iPhone) and the MBTA's public API. It does
 | Project | What's in it |
 |---|---|
 | `NextTrain.Core` | Plain C# with no web or database code: domain entities (`Domain/`), the service interfaces, and the DTO classes that mirror MBTA's JSON (`Services/`). |
-| `NextTrain.Api` | The ASP.NET app: `Program.cs` (startup), `Controllers/` (endpoints), `Services/` (the MBTA client, station import, lookup, background refresh), `Data/` (EF Core `DbContext`), and `Migrations/` (generated schema changes; don't edit them by hand). |
+| `NextTrain.Api` | The ASP.NET app: `Program.cs` (startup), `Controllers/` (endpoints), `Services/` (the MBTA client, station import, lookup, background refresh, delay notifications), `Data/` (EF Core `DbContext`), and `Migrations/` (generated schema changes; don't edit them by hand). |
 | `NextTrain.Tests` | xUnit tests. Endpoint tests run the real API in memory against a real SQL Server test database, with MBTA replaced by `FakeMbtaClient`. |
 
-## Three flows to know
+## Four flows to know
 
 **1. Live data: `GET /stations/place-pktrm/predictions`**
 
@@ -48,6 +48,12 @@ Vehicles, alerts, routes, and shapes work the same way. Each is a thin controlle
 - The app sends an `X-User-Id` header (a random ID it created and stored on the device). `CommutesController` only ever reads or writes rows with that user's ID, and another user's commute is a 404.
 - `TryApplyAsync` validates a commute against the database (the station must exist and serve the line, and the time window and days must make sense) before saving.
 - `DELETE /me` (`MeController`) deletes everything stored for that ID. It's the app's "Delete my data".
+
+**4. Delay notifications**
+
+- The app registers its Apple push token with `PUT /me/push-token` (one phone per user ID); `DELETE /me/push-token` and `DELETE /me` remove it.
+- `DelayNotifier` is a background job. Every minute it finds the commutes that are on or start within 30 minutes (Boston time) of riders with a token, picks the major alerts on each one's line, station, and direction (the ones its Home card shows), and sends each rider each alert once through `ApnsSender`. `SentNotifications` remembers what went out for a week, so a restart doesn't repeat it.
+- It's off until `Apns:KeyId` and `Apns:PrivateKey` are set. A token Apple says is no longer valid (the app was deleted) is removed.
 
 ## Caching at a glance
 

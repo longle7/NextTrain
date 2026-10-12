@@ -22,6 +22,9 @@
 		7A11CE000000000000000005 /* LiveActivityPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A11CE000000000000000004 /* LiveActivityPlugin.swift */; };
 		7A11CE000000000000000007 /* MainViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A11CE000000000000000006 /* MainViewController.swift */; };
 		7A11CE000000000000000009 /* CommuteLiveActivity.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A11CE000000000000000008 /* CommuteLiveActivity.swift */; };
+		7A11CE000000000000000022 /* SharedCommutes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A11CE000000000000000020 /* SharedCommutes.swift */; };
+		7A11CE000000000000000023 /* SharedCommutes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A11CE000000000000000020 /* SharedCommutes.swift */; };
+		7A11CE000000000000000024 /* NextCommuteWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A11CE000000000000000021 /* NextCommuteWidget.swift */; };
 		7A11CE00000000000000000C /* LiveActivity.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 7A11CE00000000000000000B /* LiveActivity.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 /* End PBXBuildFile section */
 
@@ -66,6 +69,10 @@
 		7A11CE000000000000000004 /* LiveActivityPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveActivityPlugin.swift; sourceTree = "<group>"; };
 		7A11CE000000000000000006 /* MainViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainViewController.swift; sourceTree = "<group>"; };
 		7A11CE000000000000000008 /* CommuteLiveActivity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CommuteLiveActivity.swift; sourceTree = "<group>"; };
+		7A11CE000000000000000020 /* SharedCommutes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SharedCommutes.swift; sourceTree = "<group>"; };
+		7A11CE000000000000000021 /* NextCommuteWidget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NextCommuteWidget.swift; sourceTree = "<group>"; };
+		7A11CE000000000000000025 /* App.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = App.entitlements; sourceTree = "<group>"; };
+		7A11CE000000000000000026 /* LiveActivity.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = LiveActivity.entitlements; sourceTree = "<group>"; };
 		7A11CE00000000000000000A /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		7A11CE00000000000000000B /* LiveActivity.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = LiveActivity.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
@@ -115,6 +122,8 @@
 				7A11CE000000000000000006 /* MainViewController.swift */,
 				7A11CE000000000000000004 /* LiveActivityPlugin.swift */,
 				7A11CE000000000000000001 /* CommuteActivityAttributes.swift */,
+				7A11CE000000000000000020 /* SharedCommutes.swift */,
+				7A11CE000000000000000025 /* App.entitlements */,
 				50379B222058CBB4000EE86E /* capacitor.config.json */,
 				504EC3071FED79650016851F /* AppDelegate.swift */,
 				504EC30B1FED79650016851F /* Main.storyboard */,
@@ -132,6 +141,8 @@
 			isa = PBXGroup;
 			children = (
 				7A11CE000000000000000008 /* CommuteLiveActivity.swift */,
+				7A11CE000000000000000021 /* NextCommuteWidget.swift */,
+				7A11CE000000000000000026 /* LiveActivity.entitlements */,
 				7A11CE00000000000000000A /* Info.plist */,
 			);
 			path = LiveActivity;
@@ -254,6 +265,7 @@
 				7A11CE000000000000000007 /* MainViewController.swift in Sources */,
 				7A11CE000000000000000005 /* LiveActivityPlugin.swift in Sources */,
 				7A11CE000000000000000002 /* CommuteActivityAttributes.swift in Sources */,
+				7A11CE000000000000000022 /* SharedCommutes.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -263,6 +275,8 @@
 			files = (
 				7A11CE000000000000000009 /* CommuteLiveActivity.swift in Sources */,
 				7A11CE000000000000000003 /* CommuteActivityAttributes.swift in Sources */,
+				7A11CE000000000000000023 /* SharedCommutes.swift in Sources */,
+				7A11CE000000000000000024 /* NextCommuteWidget.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -410,6 +424,7 @@
 			baseConfigurationReference = 958DCC722DB07C7200EA8C5F /* debug.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = App/App.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				INFOPLIST_FILE = App/Info.plist;
@@ -418,7 +433,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.2;
+				MARKETING_VERSION = 1.3;
 				OTHER_LDFLAGS = (
 					"$(inherited)",
 					"-weak_framework",
@@ -437,6 +452,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = App/App.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				INFOPLIST_FILE = App/Info.plist;
@@ -445,7 +461,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.2;
+				MARKETING_VERSION = 1.3;
 				OTHER_LDFLAGS = (
 					"$(inherited)",
 					"-weak_framework",
@@ -463,6 +479,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				APPLICATION_EXTENSION_API_ONLY = YES;
+				CODE_SIGN_ENTITLEMENTS = LiveActivity/LiveActivity.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -474,7 +491,7 @@
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
-				MARKETING_VERSION = 1.2;
+				MARKETING_VERSION = 1.3;
 				PRODUCT_BUNDLE_IDENTIFIER = com.longledev.nexttrain.LiveActivity;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
@@ -487,6 +504,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				APPLICATION_EXTENSION_API_ONLY = YES;
+				CODE_SIGN_ENTITLEMENTS = LiveActivity/LiveActivity.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -498,7 +516,7 @@
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
-				MARKETING_VERSION = 1.2;
+				MARKETING_VERSION = 1.3;
 				PRODUCT_BUNDLE_IDENTIFIER = com.longledev.nexttrain.LiveActivity;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
