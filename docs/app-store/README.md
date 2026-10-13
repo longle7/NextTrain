@@ -42,7 +42,7 @@ Updated for **version 1.3**; 1.0 was approved with the subway-only wording. The 
 **Keywords** (100 max, comma-separated, no spaces needed). Keep "MBTA" out: App Review flags other companies' trademarks used as keywords (guideline 2.3.7).
 
 ```
-boston,subway,bus,train,transit,commute,delay,alerts,widget,red line,orange line,green line,blue line
+boston,subway,bus,train,transit,commute,delay,alerts,widget,red line,orange line,green line,metro
 ```
 
 **Promotional text** (170 max, can be changed any time without a new build):
