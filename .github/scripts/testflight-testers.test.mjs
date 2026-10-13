@@ -18,7 +18,7 @@ test('the token is an ES256 JWT for App Store Connect that verifies with the key
 })
 
 // Answers like App Store Connect: the build appears, processes, then is valid; review state changes once submitted.
-function fakeApi({ states = [undefined, 'PROCESSING', 'VALID'], localizations = [], groups, external = 'READY_FOR_BETA_SUBMISSION' }) {
+function fakeApi({ states = [undefined, 'PROCESSING', 'VALID'], localizations = [], groups, external = 'READY_FOR_BETA_SUBMISSION', reviewBusy = false }) {
   const calls = []
   let submitted = false
   const api = async (method, path, body) => {
@@ -31,7 +31,10 @@ function fakeApi({ states = [undefined, 'PROCESSING', 'VALID'], localizations = 
     if (path.endsWith('/betaBuildLocalizations')) return { data: localizations }
     if (path.includes('/betaGroups?')) return { data: groups }
     if (path.endsWith('/buildBetaDetail')) return { data: { attributes: { externalBuildState: submitted ? 'WAITING_FOR_BETA_REVIEW' : external } } }
-    if (path === '/v1/betaAppReviewSubmissions') submitted = true
+    if (path === '/v1/betaAppReviewSubmissions') {
+      if (reviewBusy) throw new Error('POST /v1/betaAppReviewSubmissions: 422 Another build in the same train is already in beta review. Please submit it again once it gets completed.')
+      submitted = true
+    }
     if (method === 'POST' && path === '/v1/betaBuildLocalizations') assert.equal(body.data.attributes.whatsNew, 'Buses are here')
     return undefined
   }
@@ -81,4 +84,11 @@ test('a build still processing after the time limit says how to finish later', a
     sendToTesters({ ...fake, bundleId: 'x', buildNumber: '6', notes: 'n', testers: 'all', log: () => {}, wait: async () => {}, timeoutMs: -1 }),
     /still PROCESSING .* run the workflow again with build=6/,
   )
+})
+
+test("while an earlier build of the version is in beta review, the groups still get this one and the run doesn't fail", async () => {
+  const fake = fakeApi({ groups, states: ['VALID'], reviewBusy: true })
+  const result = await run(fake)
+  assert.deepEqual(result.sent, ['Team (internal)', 'Family (internal)', 'Friends (external)'])
+  assert.match(result.review, /still in Apple's beta review.+build=6/)
 })
