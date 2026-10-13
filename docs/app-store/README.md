@@ -4,28 +4,29 @@ Everything App Store Connect asks for, drafted from what the app does today. Edi
 
 ## Screenshots
 
-For **version 1.2**: captured in dark mode from the iPhone app as built for TestFlight build 6 (native mode), with live MBTA data on Saturday, October 10, 2026, at both sizes App Store Connect asks for:
+For **version 1.3**: captured in dark mode from the iPhone app as built for TestFlight build 9 (native mode), with live MBTA data on Monday evening, October 12, 2026, at both sizes App Store Connect asks for:
 
 - `screenshots/`: 1290 × 2796, the **6.9" iPhone** slot
 - `screenshots/6.5-inch/`: 1284 × 2778, the **6.5" iPhone** slot
 
 | File | Shows |
 |---|---|
-| `1-home.png` | Home: a commute happening now with its next train, and live departures at the nearest station |
-| `2-map.png` | The live map on Apple Maps: every line, station, and train |
+| `1-home.png` | Home: a commute that changes from the Green Line to the Blue Line, with its next train and live transfer advice ("Hurry: this one makes the 11:29 PM Blue Line train"), and live departures at the nearest station |
+| `2-map.png` | The live map on Apple Maps: every line, station, and train, with the Subway | Bus switch |
 | `3-map-train.png` | Zoomed in with station names and direction arrows, and a train's card: destination, next stop, and how crowded each car is |
-| `4-map-bus.png` | Bus mode: route 66's streets, stops, and buses, and a stop's card with its next buses, **Add commute**, and **All departures** |
-| `5-station.png` | Harvard: its trains and its buses, each under its own heading |
-| `6-line-live-trains.png` | The Red Line diagram with live trains and direction arrows |
-| `7-lines.png` | Every subway line's service status (the bus routes follow below) |
+| `4-map-bus.png` | Bus mode: route 66's streets, stops, and buses, its Inbound/Outbound ends, and a stop's card with its next buses, **Add commute**, and **All departures** |
+| `5-map-inbound.png` | Inbound only: every train heading toward downtown |
+| `6-station.png` | Harvard: an escalator outage, then its trains and its buses, each under its own heading |
+| `7-line-live-trains.png` | The Red Line diagram with live trains and direction arrows |
+| `8-lines.png` | Every subway line's service status (the bus routes follow below) |
 
-To retake them, run the app locally (API on 5112, Vite on 5173) and capture at 430 × 932 and 428 × 926 CSS pixels at 3×, dark color scheme, with a commute saved that's on at the time (pick every day, since new commutes default to weekdays). Map shots need the MapKit key in user-secrets.
+To retake them, run the app locally (API on 5112, Vite on 5173) and capture at 430 × 932 and 428 × 926 CSS pixels at 3×, dark color scheme, while trains are running, with a commute saved that's on at the time (pick every day, since new commutes default to weekdays; a commute's window can't cross midnight). Map shots need the MapKit key in user-secrets.
 
 Make the app **iPhone-only** in Xcode (Supported Destinations: iPhone). Otherwise Apple also requires iPad screenshots and reviews the iPad layout.
 
 ## Listing text
 
-Updated for **version 1.2 (buses)**; 1.0 went out with the subway-only wording. The name and subtitle can change with any new version.
+Updated for **version 1.3**; 1.0 was approved with the subway-only wording. The name and subtitle can change with any new version.
 
 | Field | Draft |
 |---|---|
@@ -41,13 +42,13 @@ Updated for **version 1.2 (buses)**; 1.0 went out with the subway-only wording. 
 **Keywords** (100 max, comma-separated, no spaces needed). Keep "MBTA" out: App Review flags other companies' trademarks used as keywords (guideline 2.3.7).
 
 ```
-boston,subway,bus,train,transit,commute,red line,orange line,green line,blue line,silver line,metro
+boston,subway,bus,train,transit,commute,delay,alerts,widget,red line,orange line,green line,metro
 ```
 
 **Promotional text** (170 max, can be changed any time without a new build):
 
 ```
-Know when your train or bus leaves. Live departures, alerts, and your daily commute at a glance, for every subway station and bus stop in Boston.
+Know when your train or bus leaves, and whether to hurry for your transfer. Live times, delay alerts, and your commute on your Home Screen, for all of Boston's T.
 ```
 
 **Description** (4,000 max):
@@ -58,8 +59,17 @@ NextTrain shows live times for Boston's subway and buses, built for the trip you
 YOUR COMMUTE, AT A GLANCE
 Save the trips you take: your station, line, direction, and the time you usually leave. When it's time to go, the next train is waiting on the home screen, with any delay or suspension that affects it.
 
+MAKE YOUR TRANSFER
+Change lines on the way? Add the station where you change and NextTrain tells you, live, whether to hurry for this train or relax because the next one makes the same connection.
+
+DELAY ALERTS
+Turn on delay alerts and NextTrain notifies you when a suspension, closure, or long delay hits one of your commutes, from 30 minutes before you leave.
+
+YOUR COMMUTE ON YOUR HOME SCREEN
+Add the NextTrain widget to your Home Screen or Lock Screen to see your next train without opening the app, and follow it in Live Activities.
+
 LIVE DEPARTURES
-Every station and bus stop shows its next trains and buses for each route and direction, counting down in real time and refreshing every 10 seconds.
+Every station and bus stop shows its next trains and buses for each route and direction, counting down in real time and refreshing every 10 seconds. Late at night and early in the morning, when nothing is predicted yet, you see the timetable times instead.
 
 BUSES TOO
 All 150 MBTA bus routes, Silver Line included. Find a route by its number ("66", "SL1"), see its stops in order and its buses moving along them, and save a bus commute. Each side of the street is its own stop, and NextTrain tells you which way each one goes.
@@ -68,10 +78,10 @@ NEAR YOU
 See the closest stations and bus stops, how far a walk they are, and the next trains and buses at the nearest ones. Your location never leaves your phone.
 
 SERVICE ALERTS
-Delays, shuttle buses, suspensions, and station closures appear on the lines, stations, and commutes they affect.
+Delays, shuttle buses, suspensions, and station closures appear on the lines, stations, and commutes they affect. Planned changes for the next two weeks show on each line, and each station lists its elevator and escalator outages.
 
 LIVE LINE DIAGRAMS AND MAP
-Watch every train move along its line, or across the whole system on the map, with arrows showing which way each one is heading. Zoom in to see station names, filter to a single line or Green Line branch, or pick a bus route to see its streets, stops, and buses.
+Watch every train move along its line, or across the whole system on the map, with arrows showing which way each one is heading. Zoom in to see station names, filter to a single line or Green Line branch, show only inbound or outbound trains, or switch to buses to see a route's streets, stops, and buses.
 
 HOW FULL IS IT?
 Tap a train or bus on the map to see where it's headed and, where the MBTA reports it, how crowded it is (for trains, car by car).
@@ -80,28 +90,27 @@ SEARCH THAT GETS YOU
 "harvard sq", "park st", "gov ctr": type it the way you say it.
 
 PRIVATE BY DESIGN
-No account, no ads, no tracking. Your commutes are saved under a random ID, and Settings → Delete my data erases everything.
+No account, no ads, no tracking. Your commutes are saved under a random ID, delay alerts are off until you turn them on, and Settings → Delete my data erases everything.
 
 Live data comes from the MBTA. NextTrain is an independent app and isn't affiliated with or endorsed by the MBTA.
 ```
 
-**What's New in Version 1.2** (4,000 max):
+**What's New in Version 1.3** (4,000 max). Riders are updating from 1.0, so this covers 1.2's buses too:
 
 ```
-Buses are here. All 150 MBTA bus routes, Silver Line included:
-- Search for a route by number ("66", "SL1") or a stop by street
-- Bus stops near you, with the next buses at the closest one
-- Every route's stops in order, with its buses moving along them
-- On the map, tap Bus to see every route, then tap any stop for its next buses, or to save it as your commute
-- Save a bus commute, with Live Activities on your Lock Screen
+Buses are here, plus a lot more for your daily commute.
 
-Also new:
-- A calmer map: trains are simple dots until you zoom in, and the map appears all at once
-- Your location stays visible when you pick a line on the map
-- Getting started is easier: a short welcome, a Get started card, and a step-by-step commute form
+- Buses: all 150 MBTA routes, Silver Line included. Search by number ("66", "SL1"), see stops near you, and save a bus commute.
+- Transfer advice: add where you change lines, and NextTrain tells you whether to hurry for this train or take the next one.
+- Delay alerts: get notified when a suspension, closure, or long delay hits one of your commutes.
+- Widget: your next train on your Home Screen and Lock Screen.
+- Map: switch between Subway and Bus, show only inbound or outbound trains, and tap any stop to save it as a commute.
+- Scheduled times late at night and early in the morning, when nothing is predicted yet.
+- Planned changes for the next two weeks on each line, and elevator and escalator outages at each station.
+- A calmer map, an easier start, and many smaller fixes.
 ```
 
-What's New only shows for updates. If 1.2 ends up being the first version released (see below), App Store Connect doesn't ask for it.
+What's New only shows for updates, so it's asked for from 1.3 on (1.0 is the first release).
 
 ## App Privacy answers
 
@@ -126,7 +135,7 @@ App Review asked new developer accounts for this under Guideline 2.1 (October 20
 
 ```
 1. PURPOSE AND AUDIENCE
-NextTrain is a free app for people who ride Boston's subway (the MBTA Red, Orange, Blue, Green, and Mattapan lines) and, from version 1.2, its buses (all 150 routes, Silver Line included). It answers "when is my next train?" quickly: live departures for every subway station, service alerts, a live map and line diagrams showing where each train is, and saved daily commutes that show your next train on the Home screen when it's time to go. No account, no ads, no in-app purchases.
+NextTrain is a free app for people who ride Boston's subway (the MBTA Red, Orange, Blue, Green, and Mattapan lines) and, from version 1.2, its buses (all 150 routes, Silver Line included). It answers "when is my next train?" quickly: live departures for every subway station, service alerts, a live map and line diagrams showing where each train is, and saved daily commutes that show your next train on the Home screen when it's time to go, with advice on making a transfer, optional delay notifications, and a Home Screen widget. No account, no ads, no in-app purchases.
 
 2. SETUP AND HOW TO USE IT
 No login or account is needed, and there is nothing to set up.
@@ -138,12 +147,17 @@ No login or account is needed, and there is nothing to set up.
 - Commutes: Home -> Add a commute. Saved commutes are private to the device (stored under a random ID, not shared with anyone).
 - Data deletion: Settings -> Delete my data removes saved commutes from our server and clears local data. Help & support is in Settings.
 - Live Activities (version 1.1 and later): Settings -> Preview Live Activity, then lock the phone.
-- Buses (version 1.2 and later): search a route number such as "66" or "SL1", or open Lines -> Buses. On the Map, the Bus chip shows one route's streets, stops, and live buses. Tap a bus stop for its next buses.
+- Buses (version 1.2 and later): search a route number such as "66" or "SL1", or open Lines -> Buses. On the Map, the Bus switch shows one route's streets, stops, and live buses. Tap a bus stop for its next buses.
+- Map direction (1.3): under the line picker, Inbound or Outbound shows only the trains or buses going that way (toward or away from downtown Boston).
+- Transfers (1.3): Home -> Add a commute -> Park Street, Green Line, toward Medford/Tufts -> Add a transfer -> Government Center, Blue Line, toward Wonderland -> Save. While the commute is on, its card says whether to hurry for this train or take the next one.
+- Delay alerts (1.3): with a commute saved, Home asks "Get delay alerts?" once (or Settings -> Notifications -> Delay alerts). A notification arrives only when the MBTA reports a suspension, closure, or long delay on that commute's line and station, from 30 minutes before it starts, so one may not arrive during review.
+- Widget (1.3): long-press the Home Screen -> + -> NextTrain. It shows the next trains for the commute that's on or next.
 There is no user-generated content visible to others and no paid content.
 
 3. EXTERNAL SERVICES
 - MBTA V3 API (Massachusetts Bay Transportation Authority): real-time predictions, vehicle positions, alerts, and station data, used under the MassDOT Developer License Agreement.
 - Apple MapKit JS: the map. Our server issues short-lived MapKit tokens.
+- Apple Push Notification service: delay alerts, sent only to riders who turn them on.
 - Microsoft Azure: our API (Azure Container Apps), database for saved commutes (Azure SQL), and website (Azure Static Web Apps).
 - Cloudflare: DNS and email forwarding for longledev.com, and protection of the website and API from attacks and automated abuse.
 The app uses no third-party sign-in, payment, advertising, analytics, or AI services.
@@ -157,7 +171,7 @@ NextTrain is not in a regulated industry. Transit data is public MBTA data used 
 
 ### Screen recording
 
-Record on a real iPhone running the latest iOS, with the build that's in review (TestFlight), starting from the Home Screen. About 2 minutes:
+Record on a real iPhone running the latest iOS, with the build that's in review (TestFlight), starting from the Home Screen. About 3 minutes:
 
 1. Tap the NextTrain icon (the recording must show the launch).
 2. Welcome screen → **Agree and continue**.
@@ -166,7 +180,11 @@ Record on a real iPhone running the latest iOS, with the build that's in review 
 5. **Lines** → Red Line → trains moving on the diagram.
 6. **Map** → zoom in (station names) → tap a train (destination, crowding) → a Green Line branch.
 7. Home → **Add a commute** (e.g. Park Street, Red Line, toward Alewife, weekdays) → Save → the commute card with its next train.
-8. Settings → Help & support → back → **Delete my data** → confirm.
+8. Edit that commute → **Add a transfer** (Government Center, Blue Line, toward Wonderland) → Save → the transfer advice on its card.
+9. **Get delay alerts?** → **Turn on** → Allow.
+10. **Map** → **Inbound**.
+11. Home Screen: long-press → **+** → NextTrain → add the widget.
+12. Settings → Help & support → back → **Delete my data** → confirm.
 
 Upload the .mov as an attachment to the reply in App Store Connect.
 
@@ -191,21 +209,23 @@ Upload the .mov as an attachment to the reply in App Store Connect.
    For the Simulator against your local API, use `VITE_API_URL=http://localhost:5112` instead (the app allows local-network HTTP for this).
 4. **Ship to TestFlight first** and try it on the subway, including the offline banner in a tunnel.
 
-## Submitting version 1.2
+## Releasing 1.0, then submitting 1.3
 
-Version 1.2 is **TestFlight build 6** (uploaded October 10, 2026): buses, the rider-feedback fixes, and the map's bus routes and stop cards. Submit it once your testers are happy. Everything built after build 6 is 1.3.
+**1.0 is approved.** Its status, **Pending Developer Release**, means Apple approved it and is waiting for you, because it was set to release manually. Click **Release This Version** and it's on the App Store within about 24 hours, subway-only, as approved.
 
-**While 1.0 is still in review,** App Store Connect won't take a second version. Choose one:
-
-- **Let 1.0 finish (simplest).** When it's approved, follow the steps below for an update.
-- **Or replace it with 1.2.** If 1.0 has been waiting more than about a week, open version 1.0 in App Store Connect and choose **Remove from Review**. Until the app's first release, you can then change that version's number to **1.2** and follow steps 2–5 below. You give up 1.0's place in the queue, but riders get buses on day one.
+**Then 1.3 is the first update.** It includes everything from 1.2 (buses), so 1.2 is skipped. Before you submit:
+1. **Turn on delay alerts on the server:** set the APNs key in Azure (the commands are in PR #83, "Your steps"). Without it, a reviewer can turn alerts on and never get one.
+2. **Try the latest TestFlight build on your phone:** a transfer commute, the map's Inbound/Outbound switch, delay alerts on, and the widget.
 
 **Steps:**
-1. App Store Connect → **Apps → NextTrain → +** (next to iOS App) → **1.2**.
-2. **Build:** choose **1.2 (6)**.
-3. **Text:** paste the 1.2 name, subtitle, promotional text, description, keywords, and What's New from *Listing text* above. The name and subtitle can change with any version.
-4. **Screenshots:** in **iPhone 6.9" Display**, remove the old ones and drag in the 7 files from `screenshots/` in order. Do the same for **6.5" Display** with `screenshots/6.5-inch/`.
-5. **App Review Information:** the notes below already cover buses. Then **Add for Review → Submit**. Choose **Manually release** if you want to pick the moment it goes live.
+1. App Store Connect → **Apps → NextTrain → +** (next to iOS App) → **1.3**.
+2. **Build:** choose the newest **1.3** build (build 9 or later).
+3. **Text:** paste the promotional text, description, keywords, and **What's New in Version 1.3** from *Listing text* above.
+4. **Screenshots:** in **iPhone 6.9" Display**, remove the old ones and drag in the 8 files from `screenshots/` in order. Do the same for **6.5" Display** with `screenshots/6.5-inch/`.
+5. **App Privacy** (Apps → NextTrain → App Privacy → Edit): add **Identifiers → Device ID** and **Diagnostics → Crash Data**, as in *App Privacy answers* above, then **Publish**.
+6. **App Review Information:** paste the review notes above, which cover 1.3. Then **Add for Review → Submit**. Choose **Manually release** if you want to pick the moment it goes live.
+
+An update's review usually takes 1 to 3 days.
 
 ## Protecting yourself
 
