@@ -48,6 +48,8 @@ function CommuteForm({ existing, initialStopId, initialRouteId }: { existing: Co
   const [transferRouteId, setTransferRouteId] = useState(existing?.transferRouteId ?? '')
   const [transferDirectionId, setTransferDirectionId] = useState(existing?.transferDirectionId)
   const [transferMinutes, setTransferMinutes] = useState(existing?.transferMinutes ?? 3)
+  // Done tapped: the change shows as a one-line summary. A saved change opens that way.
+  const [confirmed, setConfirmed] = useState(!!existing?.transferStopId)
 
   const station = allStops?.find((s) => s.mbtaStopId === stopId)
   const stationRoutes = station ? [...stationRouteIds(station), ...busRouteIds(station)] : []
@@ -80,7 +82,7 @@ function CommuteForm({ existing, initialStopId, initialRouteId }: { existing: Co
     ? transferDirectionId
     : transferDirections.length === 1 ? transferDirections[0] : undefined
   const transferDone = !changes || (!!changeStation && !!chosenTransferRoute && chosenTransferDirection !== undefined)
-  const ready = station && chosenRouteId && chosenDirection !== undefined && start < end && days.length > 0 && transferDone
+  const ready = station && chosenRouteId && chosenDirection !== undefined && start < end && days.length > 0 && transferDone && (!changes || confirmed)
 
   const pickStation = (id: string) => {
     setStopId(id)
@@ -186,39 +188,76 @@ function CommuteForm({ existing, initialStopId, initialRouteId }: { existing: Co
             <button onClick={() => setChanges(true)} className={secondaryButton}>
               <span aria-hidden>+</span> Add a change
             </button>
+          ) : confirmed && changeStation && transferRoute && chosenTransferDirection !== undefined ? (
+            <Card>
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0 space-y-1">
+                  <p className="flex flex-wrap items-center gap-x-1.5 gap-y-1">
+                    Change at <strong>{changeStation.name}</strong> to
+                    <span aria-hidden>
+                      <LineBadge routeId={transferRoute.id} routes={routes.data} />
+                    </span>
+                    <span className="sr-only">{routeName(transferRoute.id)} toward</span>
+                    <strong>{transferRoute.directionDestinations[chosenTransferDirection]}</strong>
+                  </p>
+                  <p className="text-sm text-neutral-500">{transferMinutes} min to change</p>
+                </div>
+                <div className="flex shrink-0 flex-col items-end">
+                  <button onClick={() => setConfirmed(false)} className={linkButton}>
+                    Edit<span className="sr-only"> the change</span>
+                  </button>
+                  <button onClick={() => setChanges(false)} className={linkButton}>
+                    Remove<span className="sr-only"> the change</span>
+                  </button>
+                </div>
+              </div>
+            </Card>
           ) : (
             <Card>
-              <div className="space-y-4">
-                <label className="block space-y-1.5">
-                  <span className="block font-semibold">Where do you change?</span>
+              <div className="space-y-5">
+                <div className="space-y-2">
+                  <h3 className="text-sm font-semibold text-neutral-500 uppercase">Where do you change?</h3>
                   {!ride.data ? (
                     <Status loading rows={1} />
                   ) : changeStations.length === 0 ? (
-                    <span className="block text-sm text-neutral-500">No other lines stop after {station?.name} going this way.</span>
+                    <p className="text-sm text-neutral-500">No other lines stop after {station?.name} going this way.</p>
+                  ) : changeStation ? (
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="font-semibold">{changeStation.name}</span>
+                      <button onClick={() => setTransferStopId('')} className={linkButton}>
+                        Change<span className="sr-only"> where you change</span>
+                      </button>
+                    </div>
                   ) : (
-                    <select
-                      value={changeStation?.mbtaStopId ?? ''}
-                      onChange={(e) => {
-                        setTransferStopId(e.target.value)
-                        setTransferRouteId('')
-                        setTransferDirectionId(undefined)
-                      }}
-                      className="min-h-11 w-full rounded-lg bg-neutral-100 px-3 text-base dark:bg-neutral-800"
-                    >
-                      <option value="">Choose a stop</option>
+                    <ul className="-mx-1 divide-y divide-neutral-100 dark:divide-neutral-800">
                       {changeStations.map((s) => (
-                        <option key={s.mbtaStopId} value={s.mbtaStopId}>
-                          {s.name}: {otherRoutes(s).slice(0, 3).map(routeName).join(', ')}
-                          {otherRoutes(s).length > 3 ? ` +${otherRoutes(s).length - 3} more` : ''}
-                        </option>
+                        <li key={s.mbtaStopId}>
+                          <button
+                            onClick={() => {
+                              setTransferStopId(s.mbtaStopId)
+                              setTransferRouteId('')
+                              setTransferDirectionId(undefined)
+                            }}
+                            className="flex min-h-12 w-full items-center justify-between gap-3 rounded-lg px-1 text-left active:bg-neutral-100 dark:active:bg-neutral-800"
+                          >
+                            <span className="min-w-0 font-semibold">{s.name}</span>
+                            <span aria-hidden className="flex shrink-0 items-center gap-1">
+                              {otherRoutes(s).slice(0, 3).map((id) => (
+                                <LineBadge key={id} routeId={id} routes={routes.data} />
+                              ))}
+                              {otherRoutes(s).length > 3 && <span className="text-xs font-semibold text-neutral-500">+{otherRoutes(s).length - 3}</span>}
+                            </span>
+                            <span className="sr-only">: {otherRoutes(s).map(routeName).join(', ')}</span>
+                          </button>
+                        </li>
                       ))}
-                    </select>
+                    </ul>
                   )}
-                </label>
+                </div>
 
                 {changeStation && changeRoutes.length > 1 && (
-                  <div className="space-y-1.5">
-                    <h3 className="font-semibold">Onto which line?</h3>
+                  <div className="space-y-2">
+                    <h3 className="text-sm font-semibold text-neutral-500 uppercase">Onto which line?</h3>
                     <div className="flex flex-wrap gap-2">
                       {changeRoutes.map((id) => (
                         <Choice key={id} selected={chosenTransferRoute === id} onClick={() => {
@@ -236,8 +275,8 @@ function CommuteForm({ existing, initialStopId, initialRouteId }: { existing: Co
                 )}
 
                 {transferRoute && (
-                  <div className="space-y-1.5">
-                    <h3 className="font-semibold">Which way then?</h3>
+                  <div className="space-y-2">
+                    <h3 className="text-sm font-semibold text-neutral-500 uppercase">Which way then?</h3>
                     <div className="grid grid-cols-2 gap-2">
                       {transferRoute.directionDestinations.map((destination, i) => transferDirections.includes(i) && (
                         <Choice key={i} selected={chosenTransferDirection === i} onClick={() => setTransferDirectionId(i)}>
@@ -248,11 +287,11 @@ function CommuteForm({ existing, initialStopId, initialRouteId }: { existing: Co
                   </div>
                 )}
 
-                {transferRoute && (
+                {transferRoute && chosenTransferDirection !== undefined && (
                   <div className="flex items-center justify-between gap-3">
                     <span>
-                      <span className="block font-semibold">Time to change</span>
-                      <span className="block text-sm text-neutral-500">From one platform or stop to the other</span>
+                      <span className="block text-sm font-semibold text-neutral-500 uppercase">Time to change</span>
+                      <span className="block text-sm text-neutral-500">Platform to platform</span>
                     </span>
                     <span className="flex items-center gap-2">
                       <button
@@ -278,9 +317,14 @@ function CommuteForm({ existing, initialStopId, initialRouteId }: { existing: Co
                   </div>
                 )}
 
-                <button onClick={() => setChanges(false)} className={`-ml-2 ${linkButton}`}>
-                  Remove the change
-                </button>
+                <div className="space-y-1">
+                  <button onClick={() => setConfirmed(true)} disabled={!transferDone} className={`w-full ${primaryButton}`}>
+                    Done
+                  </button>
+                  <button onClick={() => setChanges(false)} className={`w-full justify-center ${linkButton}`}>
+                    Remove the change
+                  </button>
+                </div>
               </div>
             </Card>
           )}
@@ -323,6 +367,7 @@ function CommuteForm({ existing, initialStopId, initialRouteId }: { existing: Co
       >
         {saving ? 'Saving…' : existing ? 'Save changes' : 'Save commute'}
       </button>
+      {changes && !confirmed && <p className="text-center text-sm text-neutral-500">Tap Done to finish your change first.</p>}
       {existing && (
         <button onClick={remove} disabled={saving} className={dangerButton}>
           Delete commute
