@@ -4,6 +4,7 @@ import {
   api, busGroups, busRouteIds, findRoute, getRoutes, getStations, ROUTES, searchRoutes, stationRouteIds, towardLabel,
   type Car, type Prediction, type Route, type RouteShape, type Station, type Vehicle,
 } from '../api'
+import { directionOf, showsDirection, type Direction } from '../direction'
 import { LineBadge, linkButton, primaryButton, SearchInput, secondaryButton, Status } from '../components'
 import { boundsOf, locationErrorMessage, nearestStations, OUT_OF_AREA_MILES } from '../geo'
 import { loadMapKit, stationElement, trainCallout, trainElement, updateTrainElement, userElement, type Preview } from '../mapkit'
@@ -64,6 +65,13 @@ export default function MapPage() {
   // hundreds of buses; all at once would bury the map.
   const busMode = params.get('line') === 'bus'
   const busRoute = (busMode && params.get('route')) || undefined
+  // ?dir=inbound or ?dir=outbound: only the trains and buses going that way (direction.ts). Kept when the line changes.
+  const dir = (['inbound', 'outbound'] as const).find((d) => d === params.get('dir'))
+  const go = (view: Record<string, string> | URLSearchParams) => {
+    const next = new URLSearchParams(view)
+    if (dir) next.set('dir', dir)
+    setParams(next, { replace: true })
+  }
   const shown = useMemo(() => (busMode ? (busRoute ? [busRoute] : []) : routesFor(line, branch)), [busMode, busRoute, line, branch])
   const routes = usePolling(getRoutes, ROUTES)
   // The Map tab and the Subway | Bus switch come back to this view (this session only).
@@ -250,21 +258,32 @@ export default function MapPage() {
     }
   }, [map, cardOpen, previews])
 
+  // The trains (or buses) to draw: the shown lines', each placed on its track, going the chosen way.
+  const onMap = useMemo(
+    () =>
+      vehicles.data
+        ?.filter((v) => onLine(shown, v.routeId))
+        .map((v) => {
+          const route = findRoute(routes.data, v.routeId)
+          // Until the tracks load, the raw GPS position and compass bearing.
+          const destination = route?.directionDestinations[v.directionId] ?? null
+          return { v, route, ...(place?.({ ...v, destination }) ?? { ...v, heading: v.bearing }) }
+        })
+        .filter(({ v, route, latitude, longitude, heading }) => showsDirection(dir, directionOf(route, v.directionId, latitude, longitude, heading))),
+    [vehicles.data, routes.data, shown, place, dir],
+  )
+
   // Trains: move existing markers instead of recreating them, so an open card follows its train through a refresh.
   useEffect(() => {
-    if (!ready || !map || !vehicles.data) return
+    if (!ready || !map || !onMap) return
     const live = new Set<string>()
     let added = false
-    for (const v of vehicles.data.filter((v) => onLine(shown, v.routeId))) {
+    for (const { v, route, latitude, longitude, heading } of onMap) {
       live.add(v.id)
-      const route = findRoute(routes.data, v.routeId)
       const color = route?.color ?? 'gray'
       const ink = route?.textColor ?? 'white' // the arrow: white on the subway's colors, black on bus yellow
       const { title, subtitle } = trainCallout(v, route)
       const label = subtitle ? `${title}. ${subtitle}` : title
-      // Until the tracks load, the raw GPS position and compass bearing.
-      const destination = route?.directionDestinations[v.directionId] ?? null
-      const { latitude, longitude, heading } = place?.({ ...v, destination }) ?? { ...v, heading: v.bearing }
       let annotation = trains.current.get(v.id)
       if (!annotation) {
         annotation = new mapkit.Annotation(coordinate([latitude, longitude]), () => trainElement(color, heading, label, previews.forTrain(v.id), ink), {
@@ -294,7 +313,7 @@ export default function MapPage() {
       const at = element && cardAt(element, frame.current)
       return at ? { ...p, ...at } : undefined
     })
-  }, [ready, map, vehicles.data, routes.data, shown, place, previews])
+  }, [ready, map, onMap, previews])
 
   // Keep trains above stations, and your location above both: MapKit draws annotations in the order they were added,
   // and the station effect above re-adds stations whenever they or the line change.
@@ -409,7 +428,7 @@ export default function MapPage() {
     <>
       <h1 className="text-2xl font-bold">Live map</h1>
       <Status error={mapError ?? vehicles.error ?? shapes.error ?? stations.error} />
-      <ModeSwitch bus={busMode} onSelect={(toBus) => setParams(new URLSearchParams(lastMapView(toBus ? 'bus' : 'subway')), { replace: true })} />
+      <ModeSwitch bus={busMode} onSelect={(toBus) => go(new URLSearchParams(lastMapView(toBus ? 'bus' : 'subway')))} />
       {!busMode && (
         // Five chips that share the row, so all of them fit on a phone (it still scrolls on the narrowest).
         <div role="radiogroup" aria-label="Show line" className="-mx-4 flex gap-1.5 overflow-x-auto px-4 [scrollbar-width:none]">
@@ -420,7 +439,7 @@ export default function MapPage() {
               name={l ? `${l.id} Line` : 'All lines'}
               color={l && routes.data?.find((r) => r.id.startsWith(l.id))?.color}
               selected={line === l}
-              onSelect={() => setParams(l ? { line: l.id } : {}, { replace: true })}
+              onSelect={() => go(l ? { line: l.id } : {})}
             />
           ))}
         </div>
@@ -429,7 +448,7 @@ export default function MapPage() {
         <BusPicker
           routes={routes.data}
           selected={busRoute}
-          onSelect={(id) => setParams({ line: 'bus', route: id }, { replace: true })}
+          onSelect={(id) => go({ line: 'bus', route: id })}
         />
       )}
       {line?.branches && (
@@ -442,10 +461,23 @@ export default function MapPage() {
               name={b ? (routes.data?.find((r) => r.id === b[0])?.name ?? b[1]) : `All ${line.id} Line`}
               color={b && routes.data?.find((r) => r.id === b[0])?.color}
               selected={branch === b?.[0]}
-              onSelect={() => setParams(b ? { line: line.id, branch: b[0] } : { line: line.id }, { replace: true })}
+              onSelect={() => go(b ? { line: line.id, branch: b[0] } : { line: line.id })}
             />
           ))}
         </div>
+      )}
+      {(!busMode || busRoute) && (
+        <DirectionSwitch
+          selected={dir}
+          route={busRouteInfo}
+          bus={busMode}
+          onSelect={(d) => {
+            const next = new URLSearchParams(params)
+            if (d) next.set('dir', d)
+            else next.delete('dir')
+            setParams(next, { replace: true })
+          }}
+        />
       )}
       <MapTip />
       {/* isolate keeps the map's own z-indexes below the sticky header; touch-none gives every touch gesture (pan,
@@ -454,7 +486,7 @@ export default function MapPage() {
         <div
           ref={container}
           data-testid="map"
-          className={`${showNames ? 'show-names ' : ''}${drawn ? '' : '*:opacity-0 '}touch-none h-[calc(100dvh-22rem-env(safe-area-inset-top)-env(safe-area-inset-bottom))] min-h-80 overflow-hidden rounded-xl bg-neutral-200 shadow-sm dark:bg-neutral-800`}
+          className={`${showNames ? 'show-names ' : ''}${drawn ? '' : '*:opacity-0 '}touch-none h-[calc(100dvh-26rem-env(safe-area-inset-top)-env(safe-area-inset-bottom))] min-h-80 overflow-hidden rounded-xl bg-neutral-200 shadow-sm dark:bg-neutral-800`}
         />
         {!drawn && !mapError && (
           <p role="status" className="absolute inset-0 grid place-items-center text-sm font-semibold text-neutral-500 motion-safe:animate-pulse">
@@ -496,6 +528,11 @@ export default function MapPage() {
             : noTrainsRunning(branch ? routes.data?.find((r) => r.id === branch)?.name : line && `${line.id} Line`)}
         </p>
       )}
+      {dir && onMap?.length === 0 && vehicles.data?.some((v) => onLine(shown, v.routeId)) && (
+        <p role="status" className="text-center text-sm font-semibold text-neutral-500">
+          No {dir} {busMode ? 'buses' : 'trains'} right now. Choose Both ways to see the rest.
+        </p>
+      )}
       {locateMessage && (
         <p role="status" className="text-center text-sm text-neutral-500">
           {locateMessage}
@@ -503,6 +540,51 @@ export default function MapPage() {
       )}
       <MapKey bus={busMode} />
     </>
+  )
+}
+
+// All directions, or only inbound (toward downtown Boston) or outbound trains and buses. One bus route: its own ends.
+function DirectionSwitch({ selected, route, bus, onSelect }: {
+  selected: Direction | undefined
+  route: Route | undefined // the bus route shown, if one
+  bus: boolean
+  onSelect: (direction: Direction | undefined) => void
+}) {
+  // A bus route's own end that way, e.g. "to South Station"; on the subway, inbound means toward downtown.
+  const end = (d: Direction) => {
+    const i = route?.directionNames.indexOf(d === 'inbound' ? 'Inbound' : 'Outbound') ?? -1
+    return route && i >= 0 ? `to ${route.directionDestinations[i]}` : d === 'inbound' ? 'to downtown' : 'from downtown'
+  }
+  const option = (d: Direction | undefined, label: string, icon?: ReactNode) => (
+    <button
+      role="radio"
+      aria-checked={selected === d}
+      onClick={() => selected !== d && onSelect(d)}
+      className={`flex min-h-11 min-w-0 flex-col items-center justify-center rounded-lg px-1 leading-tight ${selected === d ? 'bg-white font-semibold shadow-sm dark:bg-neutral-950' : 'text-neutral-600 dark:text-neutral-300'}`}
+    >
+      <span className="flex items-center gap-1 text-sm">
+        {icon}
+        {label}
+      </span>
+      {d && <span className="w-full truncate text-xs font-normal text-neutral-500 dark:text-neutral-400">{end(d)}</span>}
+    </button>
+  )
+  return (
+    <div role="radiogroup" aria-label={`Show ${bus ? 'buses' : 'trains'} going`} className="grid grid-cols-3 gap-1 rounded-xl bg-neutral-200 p-1 dark:bg-neutral-800">
+      {option(undefined, 'Both ways')}
+      {option('inbound', 'Inbound', <ArrowIcon inward />)}
+      {option('outbound', 'Outbound', <ArrowIcon />)}
+    </div>
+  )
+}
+
+// Arrows for the direction switch: pointing in to a dot (inbound) or out from it (outbound).
+function ArrowIcon({ inward = false }: { inward?: boolean }) {
+  return (
+    <svg viewBox="0 0 24 24" className="size-4 fill-none stroke-current stroke-2" aria-hidden>
+      <circle cx={inward ? 18 : 6} cy="12" r="2.5" className="fill-current" />
+      <path d={inward ? 'M3 12h10m-4-4 4 4-4 4' : 'M10 12h11m-4-4 4 4-4 4'} />
+    </svg>
   )
 }
 
