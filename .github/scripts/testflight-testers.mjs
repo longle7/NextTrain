@@ -89,11 +89,16 @@ export async function sendToTesters({ api, bundleId, buildNumber, notes, testers
   if (!groups.some((g) => !g.attributes.isInternalGroup)) return { sent, review: 'not needed (no external testers)' }
   const externalState = async () => (await api('GET', `/v1/builds/${build.id}/buildBetaDetail`)).data.attributes.externalBuildState
   if ((await externalState()) === 'READY_FOR_BETA_SUBMISSION') {
-    await api('POST', '/v1/betaAppReviewSubmissions', {
+    const queued = await api('POST', '/v1/betaAppReviewSubmissions', {
       data: { type: 'betaAppReviewSubmissions', relationships: { build: { data: { type: 'builds', id: build.id } } } },
-    }).catch((error) => {
+    }).then(() => false, (error) => {
+      // Apple reviews one build per version at a time: this one waits for the earlier build's review to finish.
+      if (/already in beta review/.test(error.message)) return true
       throw new Error(`${error.message}\nIf Apple says test information is missing, fill in App Store Connect -> TestFlight -> Test Information, then run the workflow again with build=${buildNumber}.`)
     })
+    if (queued) {
+      return { sent, review: `not yet: an earlier build of this version is still in Apple's beta review. When it's approved, run the workflow again with build=${buildNumber}` }
+    }
   }
   const state = await externalState()
   return { sent, review: EXTERNAL[state] ?? state }
