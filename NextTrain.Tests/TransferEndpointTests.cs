@@ -40,7 +40,15 @@ public class TransferEndpointTests : IDisposable
             .WithWebHostBuilder(b => b
                 .UseSetting("ConnectionStrings:DefaultConnection", TestDb.ConnectionString)
                 .UseSetting("Stations:RefreshHours", "0")
-                .ConfigureTestServices(services => services.AddSingleton<IMbtaClient>(_mbta)));
+                .ConfigureTestServices(services => services.AddSingleton<IMbtaClient>(_mbta).AddSingleton<TimeProvider>(new FixedClock(Noon))));
+    }
+
+    // The predictions below are around noon on Saturday, October 10, 2026, in Boston.
+    private static readonly DateTimeOffset Noon = DateTimeOffset.Parse("2026-10-10T12:00:00-04:00");
+
+    private class FixedClock(DateTimeOffset now) : TimeProvider
+    {
+        public override DateTimeOffset GetUtcNow() => now.ToUniversalTime();
     }
 
     public void Dispose() => _factory.Dispose();
@@ -128,6 +136,31 @@ public class TransferEndpointTests : IDisposable
         Assert.Equal(Advice.NoRush, plan.Advice);
         Assert.Equal(new[] { "12:12", "12:12" }, plan.Trains.Select(t => t.Connection!.Value.ToOffset(TimeSpan.FromHours(-4)).ToString("HH:mm")));
         Assert.Contains("\"advice\":\"NoRush\"", json);
+    }
+
+    [Fact]
+    public async Task Connections_SkipTrainsThatAlreadyLeft()
+    {
+        _mbta.PredictionsByStop["place-pktrm"] = new()
+        {
+            Prediction("Green-B", 1, "g0", "2026-10-10T11:56:00-04:00"), // left 4 minutes ago; MBTA still lists it
+            Prediction("Green-B", 1, "g1", "2026-10-10T12:02:00-04:00"),
+        };
+        _mbta.PredictionsByStop["place-gover"] = new()
+        {
+            Prediction("Green-B", 1, "g0", null, "2026-10-10T11:58:00-04:00"),
+            Prediction("Green-B", 1, "g1", null, "2026-10-10T12:04:00-04:00"),
+            Prediction("Blue", 1, "b0", "2026-10-10T11:59:00-04:00"), // also gone
+            Prediction("Blue", 1, "b1", "2026-10-10T12:10:00-04:00"),
+        };
+        using var client = _factory.CreateClient();
+
+        var plan = (await client.GetFromJsonAsync<ConnectionPlan>(
+            "/connections?from=place-pktrm&route=Green-B&direction=1&via=place-gover&toRoute=Blue&toDirection=1"))!;
+
+        var train = Assert.Single(plan.Trains);
+        Assert.Equal(DateTimeOffset.Parse("2026-10-10T12:02:00-04:00"), train.Departure);
+        Assert.Equal(DateTimeOffset.Parse("2026-10-10T12:10:00-04:00"), train.Connection);
     }
 
     [Theory]

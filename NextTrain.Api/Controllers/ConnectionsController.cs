@@ -20,6 +20,7 @@ namespace NextTrain.Api.Controllers
         [HttpGet]
         public async Task<ConnectionPlan> Get(
             [FromServices] IMbtaClient mbta,
+            [FromServices] TimeProvider clock,
             [FromQuery, Required, RegularExpression(StationRoutes.StopIdPattern)] string from,
             [FromQuery, Required, RegularExpression(StationRoutes.RouteIdPattern)] string route,
             [FromQuery, Range(0, 1)] int direction,
@@ -28,8 +29,10 @@ namespace NextTrain.Api.Controllers
             [FromQuery, Range(0, 1)] int toDirection,
             [FromQuery, Range(1, 10)] int minutes = 3)
         {
+            // MBTA keeps listing a train for a few minutes after it leaves; advice is only about trains still to come.
+            var now = clock.GetUtcNow();
             var firstLeg = (await mbta.GetPredictionsAsync(from, route))
-                .Where(p => p.Relationships.Route.Data.Id == route && p.Attributes.DirectionId == direction && p.Attributes.DepartureTime is not null)
+                .Where(p => p.Relationships.Route.Data.Id == route && p.Attributes.DirectionId == direction && p.Attributes.DepartureTime >= now)
                 .OrderBy(p => p.Attributes.DepartureTime)
                 .Take(3)
                 .ToList();
@@ -43,7 +46,7 @@ namespace NextTrain.Api.Controllers
                     .ToDictionary(g => g.Key, g => g.Min(p => (p.Attributes.ArrivalTime ?? p.Attributes.DepartureTime)!.Value));
 
             var secondLeg = (await mbta.GetPredictionsAsync(via, toRoute))
-                .Where(p => p.Relationships.Route.Data.Id == toRoute && p.Attributes.DirectionId == toDirection && p.Attributes.DepartureTime is not null)
+                .Where(p => p.Relationships.Route.Data.Id == toRoute && p.Attributes.DirectionId == toDirection && p.Attributes.DepartureTime >= now)
                 .Select(p => p.Attributes.DepartureTime!.Value);
 
             return ConnectionAdvice.Plan(

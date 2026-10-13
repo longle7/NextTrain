@@ -49,6 +49,9 @@ builder.Services.AddScoped<StationLookupService>();
 // A background job that imports stations at startup and daily (Stations:RefreshHours), so production is never empty.
 builder.Services.AddHostedService<StationRefreshService>();
 
+// The clock, injected so tests can fix the time (ConnectionsController).
+builder.Services.AddSingleton(TimeProvider.System);
+
 // Delay notifications: every minute, major alerts on riders' commutes go to their phones through Apple's push service
 // (DelayNotifier). Off until the APNs key is configured (Apns:KeyId, Apns:PrivateKey). One sender for the whole app,
 // so it reuses its Apple token as Apple asks.
