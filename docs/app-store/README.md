@@ -26,14 +26,14 @@ Make the app **iPhone-only** in Xcode (Supported Destinations: iPhone). Otherwis
 
 ## Artwork
 
-For App Store Connect's artwork slots, drawn from the app icon (its train, background, and the line colors) with no words, since Apple writes its own text over the bottom:
+For App Store Connect's artwork (the header and search-result slots take **5244 × 2950** or **3840 × 1646**). Drawn from the app icon (its train, background, and the line colors) with no words, since Apple writes its own text over the bottom:
 
-| File | Size | Use |
+| File | Size | Shape |
 |---|---|---|
-| `artwork/search-card-1920x1080.png` | 1920 × 1080 (16:9) | The landscape card shown in search results |
-| `artwork/header-1080x1920.png` | 1080 × 1920 (9:16) | The portrait header image |
+| `artwork/artwork-5244x2950.png` | 5244 × 2950 | 16:9 |
+| `artwork/artwork-3840x1646.png` | 3840 × 1646 | 21:9, wider |
 
-To change them, edit and run `node docs/app-store/artwork/render.mjs` (needs Playwright and Edge, as for the screenshots).
+Upload whichever size the slot asks for. To change them, edit and run `node docs/app-store/artwork/render.mjs` (needs Playwright and Edge, as for the screenshots).
 
 ## Listing text
 

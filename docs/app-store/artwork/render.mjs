@@ -1,4 +1,5 @@
-// App Store artwork: the search-result card (1920x1080) and the header (1080x1920), drawn from the app icon's look.
+// App Store artwork at the two sizes App Store Connect takes: 5244x2950 (16:9) and 3840x1646 (21:9), drawn from the
+// app icon's look. Each scene is drawn in its own units and scaled to the exact pixel size.
 // No words: Apple writes its own title and text over both, near the bottom.
 import { chromium } from 'playwright-core'
 import { mkdirSync } from 'node:fs'
@@ -23,10 +24,10 @@ const line = (d, color, w = 30) => `<path d="${d}" fill="none" stroke="${color}"
 // Dots spaced along a path, drawn after the lines.
 const stops = (id, n) => `<g data-stops="${id}" data-n="${n}"></g>`
 
-function scene(w, h, hub, lines, trainAt) {
+function scene([w, h], [outW, outH], hub, lines, trainAt) {
   const paths = lines.map(([id, color, d, n]) => line(d, color) + `<path id="${id}" d="${d}" fill="none" stroke="none"/>` + stops(id, n)).join('')
   return `<!doctype html><html><head><style>html,body{margin:0;background:${BG}}svg{display:block}</style></head><body>
-<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">
+<svg xmlns="http://www.w3.org/2000/svg" width="${outW}" height="${outH}" viewBox="0 0 ${w} ${h}" preserveAspectRatio="xMidYMid slice">
   <defs>
     <linearGradient id="fade" x1="0" y1="0" x2="0" y2="1">
       <stop offset="0.62" stop-color="${BG}" stop-opacity="0"/><stop offset="1" stop-color="${BG}" stop-opacity="0.92"/>
@@ -52,9 +53,10 @@ function scene(w, h, hub, lines, trainAt) {
 </script></body></html>`
 }
 
-// Card (16:9): the hub left of center, lines running off every edge; the train upper right. Apple's text goes bottom left.
+// 16:9 (5244x2950): the hub left of center, lines running off every edge; the train upper right. Apple's text goes
+// at the bottom.
 const [cx, cy] = [760, 470]
-const card = scene(1920, 1080, [cx, cy], [
+const wide169 = scene([1920, 1080], [5244, 2950], [cx, cy], [
   ['r', RED, `M -60 120 C 300 160, 520 300, ${cx} ${cy} S 980 820, 1180 1160`, 7],
   ['o', ORANGE, `M ${cx - 40} -60 C ${cx - 20} 200, ${cx} 320, ${cx} ${cy} S ${cx - 260} 900, ${cx - 420} 1160`, 6],
   ['g', GREEN, `M -60 700 C 240 640, 520 520, ${cx} ${cy} S 1100 260, 1380 -60`, 7],
@@ -62,18 +64,18 @@ const card = scene(1920, 1080, [cx, cy], [
   ['y', BUS, `M ${cx} ${cy} C 1000 560, 1380 640, 1980 980`, 7],
 ], train(1290, 150, 520))
 
-// Header (9:16): the hub in the upper middle, the train above it; the lower part stays calm for Apple's text.
-const [hx, hy] = [540, 880]
-const header = scene(1080, 1920, [hx, hy], [
-  ['r', RED, `M -60 520 C 200 600, 380 760, ${hx} ${hy} S 760 1300, 980 1980`, 7],
-  ['o', ORANGE, `M ${hx + 60} -60 C ${hx + 40} 300, ${hx} 620, ${hx} ${hy} S ${hx - 120} 1500, ${hx - 300} 1980`, 7],
-  ['g', GREEN, `M -60 1240 C 200 1100, 380 980, ${hx} ${hy} S 860 600, 1140 420`, 6],
-  ['b', BLUE, `M ${hx} ${hy} C 760 860, 940 980, 1140 1080`, 4],
-  ['y', BUS, `M ${hx} ${hy} C 560 1180, 760 1480, 1140 1720`, 6],
-], train(330, 140, 420))
+// 21:9 (3840x1646): the same scene stretched out: lines reach further, the train sits on the Blue Line to the right.
+const [wx, wy] = [900, 420]
+const wide219 = scene([2240, 960], [3840, 1646], [wx, wy], [
+  ['r', RED, `M -60 100 C 400 140, 680 260, ${wx} ${wy} S 1160 760, 1360 1020`, 8],
+  ['o', ORANGE, `M ${wx - 40} -60 C ${wx - 20} 160, ${wx} 300, ${wx} ${wy} S ${wx - 260} 820, ${wx - 420} 1020`, 6],
+  ['g', GREEN, `M -60 640 C 300 590, 640 500, ${wx} ${wy} S 1260 240, 1540 -60`, 8],
+  ['b', BLUE, `M ${wx} ${wy} C 1140 400, 1400 340, 2300 300`, 8],
+  ['y', BUS, `M ${wx} ${wy} C 1180 520, 1600 600, 2300 900`, 9],
+], train(1640, 110, 520))
 
 const browser = await chromium.launch({ channel: 'msedge' })
-for (const [name, html, w, h] of [['search-card-1920x1080', card, 1920, 1080], ['header-1080x1920', header, 1080, 1920]]) {
+for (const [name, html, w, h] of [['artwork-5244x2950', wide169, 5244, 2950], ['artwork-3840x1646', wide219, 3840, 1646]]) {
   const page = await browser.newPage({ viewport: { width: w, height: h }, deviceScaleFactor: 1 })
   await page.setContent(html)
   await page.waitForTimeout(300)
