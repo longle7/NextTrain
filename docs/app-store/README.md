@@ -24,6 +24,17 @@ To retake them, run the app locally (API on 5112, Vite on 5173) and capture at 4
 
 Make the app **iPhone-only** in Xcode (Supported Destinations: iPhone). Otherwise Apple also requires iPad screenshots and reviews the iPad layout.
 
+## Artwork
+
+For App Store Connect's artwork slots, drawn from the app icon (its train, background, and the line colors) with no words, since Apple writes its own text over the bottom:
+
+| File | Size | Use |
+|---|---|---|
+| `artwork/search-card-1920x1080.png` | 1920 × 1080 (16:9) | The landscape card shown in search results |
+| `artwork/header-1080x1920.png` | 1080 × 1920 (9:16) | The portrait header image |
+
+To change them, edit and run `node docs/app-store/artwork/render.mjs` (needs Playwright and Edge, as for the screenshots).
+
 ## Listing text
 
 Updated for **version 1.3**; 1.0 was approved with the subway-only wording. The name and subtitle can change with any new version.
