@@ -1,8 +1,9 @@
 // App Store artwork: the search-result card (1920x1080) and the header (1080x1920), drawn from the app icon's look.
 // No words: Apple writes its own title and text over both, near the bottom.
 import { chromium } from 'playwright-core'
-import { mkdirSync, readFileSync } from 'node:fs'
-const out = new URL('.', import.meta.url).pathname.replace(/^/([A-Za-z]:)/, '$1')
+import { mkdirSync } from 'node:fs'
+import { fileURLToPath } from 'node:url'
+const out = fileURLToPath(new URL('.', import.meta.url)) // this folder
 mkdirSync(out, { recursive: true })
 const RED = '#DA291C', ORANGE = '#ED8B00', BLUE = '#003DA5', GREEN = '#00843D', BUS = '#FFC72C', BG = '#171717'
 
