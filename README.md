@@ -113,7 +113,7 @@ Merging to `main` deploys automatically once CI passes (`.github/workflows/deplo
 | Piece | Azure service | Cost |
 |---|---|---|
 | Web app | Static Web Apps (Free) | $0 |
-| API | Container Apps (Consumption, 0.25 vCPU, 1 replica from 4:30 AM to 2 AM Eastern, at most 1) running the root `Dockerfile`, image on ghcr.io | ~$4–5/month |
+| API | Container Apps (Consumption, 0.5 vCPU / 1 GiB, 1 replica from 4:30 AM to 2 AM Eastern, at most 1: the delay notifier assumes one copy) running the root `Dockerfile`, image on ghcr.io | ~$8–10/month |
 | Database | Azure SQL Database, Basic (5 DTU, 2 GB) | ~$5/month |
 
 A $10/month budget on the resource group emails the subscription owner at 50%, 80%, and 100% of actual spend and at 100% forecast. Azure has no hard cap on pay-as-you-go spending, so the limits above (one replica, fixed-price database) are what keep the bill small.
