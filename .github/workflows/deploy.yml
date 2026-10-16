@@ -20,6 +20,7 @@ env:
   RESOURCE_GROUP: nexttrain-rg
   CONTAINER_APP: nexttrain-api
   IMAGE: ghcr.io/${{ github.repository_owner }}/nexttrain-api
+  SHA: ${{ github.event.workflow_run.head_sha || github.sha }} # the commit CI passed (or main's, run by hand)
 
 jobs:
   # Deploy only the newest commit on main. When merges land close together, their CI runs can finish in either order;
@@ -34,7 +35,6 @@ jobs:
       - id: check
         env:
           GH_TOKEN: ${{ github.token }}
-          SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
         run: |
           main=$(gh api "repos/${{ github.repository }}/commits/main" --jq .sha)
           echo "current=$([ "$main" = "$SHA" ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
@@ -51,7 +51,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
-          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+          ref: ${{ env.SHA }}
 
       - uses: docker/login-action@v3
         with:
@@ -63,7 +63,7 @@ jobs:
         with:
           context: .
           push: true
-          tags: ${{ env.IMAGE }}:${{ github.event.workflow_run.head_sha || github.sha }}
+          tags: ${{ env.IMAGE }}:${{ env.SHA }}
 
       - uses: azure/login@v2
         with:
@@ -71,7 +71,7 @@ jobs:
           tenant-id: ${{ vars.AZURE_TENANT_ID }}
           subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
 
-      - run: az containerapp update -g $RESOURCE_GROUP -n $CONTAINER_APP --image $IMAGE:${{ github.event.workflow_run.head_sha || github.sha }}
+      - run: az containerapp update -g $RESOURCE_GROUP -n $CONTAINER_APP --image $IMAGE:$SHA
 
   web:
     needs: latest
@@ -80,7 +80,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
-          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+          ref: ${{ env.SHA }}
 
       - uses: actions/setup-node@v7
         with:
