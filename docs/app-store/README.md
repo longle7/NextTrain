@@ -8,6 +8,7 @@ For **version 1.3**: captured in dark mode from the iPhone app as built for Test
 
 - `screenshots/`: 1290 × 2796, the **6.9" iPhone** slot
 - `screenshots/6.5-inch/`: 1284 × 2778, the **6.5" iPhone** slot
+- `screenshots/6.3-inch/`: 1206 × 2622, the **6.1" / 6.3" iPhone** slot (taken October 13, 2026). Use this set if App Store Connect asks for 6.1" or 6.3" screenshots: it refuses the other sizes there
 
 | File | Shows |
 |---|---|
@@ -20,7 +21,7 @@ For **version 1.3**: captured in dark mode from the iPhone app as built for Test
 | `7-line-live-trains.png` | The Red Line diagram with live trains and direction arrows |
 | `8-lines.png` | Every subway line's service status (the bus routes follow below) |
 
-To retake them, run the app locally (API on 5112, Vite on 5173) and capture at 430 × 932 and 428 × 926 CSS pixels at 3×, dark color scheme, while trains are running, with a commute saved that's on at the time (pick every day, since new commutes default to weekdays; a commute's window can't cross midnight). Map shots need the MapKit key in user-secrets.
+To retake them, run the app locally (API on 5112, Vite on 5173) and capture at 430 × 932, 428 × 926, and 402 × 874 CSS pixels at 3×, dark color scheme, while trains are running, with a commute saved that's on at the time (pick every day, since new commutes default to weekdays; a commute's window can't cross midnight). Map shots need the MapKit key in user-secrets.
 
 Make the app **iPhone-only** in Xcode (Supported Destinations: iPhone). Otherwise Apple also requires iPad screenshots and reviews the iPad layout.
 
@@ -221,7 +222,7 @@ Upload the .mov as an attachment to the reply in App Store Connect.
 1. App Store Connect → **Apps → NextTrain → +** (next to iOS App) → **1.3**.
 2. **Build:** choose the newest **1.3** build (build 9 or later).
 3. **Text:** paste the promotional text, description, keywords, and **What's New in Version 1.3** from *Listing text* above.
-4. **Screenshots:** in **iPhone 6.9" Display**, remove the old ones and drag in the 8 files from `screenshots/` in order. Do the same for **6.5" Display** with `screenshots/6.5-inch/`.
+4. **Screenshots:** in **iPhone 6.9" Display**, remove the old ones and drag in the 8 files from `screenshots/` in order. Do the same for **6.5" Display** with `screenshots/6.5-inch/`, and for **6.1" / 6.3" Display** with `screenshots/6.3-inch/` (1206 × 2622).
 5. **App Privacy** (Apps → NextTrain → App Privacy → Edit): add **Identifiers → Device ID** and **Diagnostics → Crash Data**, as in *App Privacy answers* above, then **Publish**.
 6. **App Review Information:** paste the review notes above, which cover 1.3. Then **Add for Review → Submit**. Choose **Manually release** if you want to pick the moment it goes live.
 
