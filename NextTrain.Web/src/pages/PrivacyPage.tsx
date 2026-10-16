@@ -31,8 +31,9 @@ export default function PrivacyPage() {
           </li>
           <li>
             <strong>Your location.</strong> "Near you" and the map's locate button use your location on your device only,
-            to sort stations by distance and center the map. It's never sent to our servers. You can turn location access
-            off at any time; the rest of NextTrain keeps working.
+            to sort stations by distance and center the map. After you use it once, they find you without asking again
+            (the map shows your dot without moving). It's never sent to our servers. You can turn location access off at
+            any time; the rest of NextTrain keeps working.
           </li>
           <li>
             <strong>Analytics, only if you allow it, and only on the website.</strong> If you choose Allow in the cookie

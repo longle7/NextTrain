@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useEffectEvent, useMemo, useRef, useState, type ReactNode } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router'
 import {
   api, busGroups, busRouteIds, findRoute, getRoutes, getStations, ROUTES, searchRoutes, stationRouteIds, towardLabel,
@@ -6,7 +6,7 @@ import {
 } from '../api'
 import { directionOf, showsDirection, type Direction } from '../direction'
 import { LineBadge, linkButton, primaryButton, SearchInput, secondaryButton, Status } from '../components'
-import { boundsOf, locationErrorMessage, nearestStations, OUT_OF_AREA_MILES } from '../geo'
+import { boundsOf, locationErrorMessage, locationRemembered, nearestStations, OUT_OF_AREA_MILES, rememberLocation } from '../geo'
 import { keepLabels, loadMapKit, stationElement, trainCallout, trainElement, updateTrainElement, userElement, type Preview } from '../mapkit'
 import { lastMapView, rememberMapView } from '../mapSession'
 import { decodePolyline } from '../polyline'
@@ -441,12 +441,19 @@ export default function MapPage() {
     if (!map) return
     setLocating(true)
     setLocateMessage(undefined)
+    findMe(true)
+  }
+  // With move false (the map opening, for a rider who has used their location before), only the dot: the map stays
+  // where it is, and nothing is said.
+  const findMe = (move: boolean) => {
+    if (!map) return
     navigator.geolocation.getCurrentPosition(
       ({ coords }) => {
         setLocating(false)
+        rememberLocation(true)
         const nearest = stations.data && nearestStations(stations.data, coords, 1)[0]
         if (nearest && nearest.miles > OUT_OF_AREA_MILES) {
-          setLocateMessage("You're outside the MBTA area.")
+          if (move) setLocateMessage("You're outside the MBTA area.")
           return
         }
         const here = new mapkit.Coordinate(coords.latitude, coords.longitude)
@@ -461,15 +468,22 @@ export default function MapPage() {
           map.addAnnotation(me.current)
         }
         me.current.coordinate = here
-        map.setRegionAnimated(new mapkit.CoordinateRegion(here, new mapkit.CoordinateSpan(0.012, 0.012)), animate())
+        if (move) map.setRegionAnimated(new mapkit.CoordinateRegion(here, new mapkit.CoordinateSpan(0.012, 0.012)), animate())
       },
       (error) => {
         setLocating(false)
-        setLocateMessage(locationErrorMessage(error))
+        if (error.code === error.PERMISSION_DENIED) rememberLocation(false)
+        if (move) setLocateMessage(locationErrorMessage(error))
       },
       { maximumAge: 30_000, timeout: 15_000 },
     )
   }
+
+  // Your dot, without a tap, once you've used your location here.
+  const showMe = useEffectEvent(() => findMe(false))
+  useEffect(() => {
+    if (map && locationRemembered()) showMe()
+  }, [map])
 
   return (
     <>

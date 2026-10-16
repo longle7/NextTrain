@@ -18,6 +18,7 @@ export default function CookiesPage() {
             ['nexttrain.notifications', "Remembers whether you turned delay alerts on or off (iPhone app), so we don't ask again", 'Until you use Delete my data'],
             ['nexttrain.analyticsConsent', 'Remembers your analytics choice, so we don\'t ask again', 'Until you use Delete my data'],
             ['nexttrain.cache.*', 'The last train times, stations, alerts, and commutes NextTrain loaded, so it can show them (with their age) when you open it offline, e.g. in a tunnel', 'Until newer data replaces it, or you use Delete my data'],
+            ['nexttrain.location', 'Remembers that you used your location, so Near you and the map find you without a tap. Your location itself is never stored', 'Until you turn location access off, or use Delete my data'],
             ['nexttrain.mapTipSeen', 'Remembers that you closed the map\'s tip, so it doesn\'t show again', 'Until you delete the app or clear site data'],
             ['nexttrain.termsAccepted', 'Remembers which version of the Terms you agreed to, so we only ask again when they change', 'Until you delete the app or clear site data'],
           ]}

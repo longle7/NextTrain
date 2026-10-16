@@ -8,7 +8,7 @@ import {
 } from '../api'
 import { commuteTiming, daysLabel, liveActivityEnd, sortCommutes, timingLabel, windowLabel } from '../commutes'
 import { Card, LineBadge, linkButton, primaryButton, SearchInput, secondaryButton, StationLink, Status, WarningIcon } from '../components'
-import { locationErrorMessage, nearestStations, OUT_OF_AREA_MILES, walkLabel } from '../geo'
+import { locationErrorMessage, locationRemembered, nearestStations, OUT_OF_AREA_MILES, rememberLocation, walkLabel } from '../geo'
 import { endLiveActivities, liveActivityDetails, showLiveActivity, updateWidget, widgetCommutes } from '../liveActivity'
 import { declineNotifications, notificationChoice, notificationsAvailable, turnOnNotifications } from '../notifications'
 import { clock, dateRange, departureLabel, groupDepartures, secondsAgo, STALE_AFTER_SECONDS } from '../time'
@@ -256,19 +256,30 @@ function Nearby({ stations, busStops, routes, alerts }: {
   routes: Route[] | undefined
   alerts: Alert[] | undefined
 }) {
-  const [location, setLocation] = useState<Located>({ state: 'idle' })
+  // Once the rider has used their location here, Home finds them without a tap. (The iPhone app's web view doesn't
+  // answer the permissions query below, hence remembering it.)
+  const [location, setLocation] = useState<Located>(() => (locationRemembered() ? { state: 'locating' } : { state: 'idle' }))
 
   const locate = () => {
     setLocation({ state: 'locating' })
+    find()
+  }
+  const find = () =>
     navigator.geolocation.getCurrentPosition(
-      (position) => setLocation({ state: 'found', coords: position.coords }),
-      (error) => setLocation({ state: 'error', message: locationErrorMessage(error) }),
+      (position) => {
+        rememberLocation(true)
+        setLocation({ state: 'found', coords: position.coords })
+      },
+      (error) => {
+        if (error.code === error.PERMISSION_DENIED) rememberLocation(false)
+        setLocation({ state: 'error', message: locationErrorMessage(error) })
+      },
       { maximumAge: 60_000, timeout: 15_000 },
     )
-  }
 
-  // Skip the button if the user already allowed location.
+  // Skip the button if location was used here before, or the browser says it's allowed.
   useEffect(() => {
+    if (locationRemembered()) return find()
     navigator.permissions
       ?.query({ name: 'geolocation' })
       .then((p) => p.state === 'granted' && locate())

@@ -7,6 +7,7 @@ import { forgetRemembered } from '../cache'
 import { api, commutePredictionsPath, forgetUserId, getRoutes, type Commute, type Prediction } from '../api'
 import { sortCommutes } from '../commutes'
 import { Card, dangerButton, primaryButton } from '../components'
+import { rememberLocation } from '../geo'
 import { legalPages } from '../legal'
 import { endLiveActivities, liveActivitiesAvailable, liveActivityDetails, showLiveActivity, updateWidget } from '../liveActivity'
 import { forgetNotificationChoice, notificationChoice, notificationsAvailable, notificationsBlocked, turnOffNotifications, turnOnNotifications } from '../notifications'
@@ -31,6 +32,7 @@ export default function SettingsPage() {
       forgetRemembered()
       forgetAnalyticsChoice()
       forgetNotificationChoice()
+      rememberLocation(false)
       void endLiveActivities()
       void updateWidget([]) // the Home Screen widget forgets them too
       setDeletion('done')

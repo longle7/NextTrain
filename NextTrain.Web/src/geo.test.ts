@@ -1,6 +1,6 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { Station } from './api'
-import { boundsOf, distanceMiles, nearestStations, walkLabel } from './geo'
+import { boundsOf, distanceMiles, locationRemembered, nearestStations, rememberLocation, walkLabel } from './geo'
 
 const station = (mbtaStopId: string, latitude: number, longitude: number): Station => ({
   mbtaStopId, name: mbtaStopId, latitude, longitude, routeId: 'Red', averageWeekdayBoardings: null, isAccessible: null,
@@ -48,5 +48,29 @@ describe('boundsOf', () => {
   it('is undefined for no points, and a point for one point', () => {
     expect(boundsOf([])).toBeUndefined()
     expect(boundsOf([[42.36, -71.06]])).toEqual({ north: 42.36, south: 42.36, east: -71.06, west: -71.06 })
+  })
+})
+
+describe('remembered location', () => {
+  afterEach(() => vi.unstubAllGlobals())
+
+  it('is remembered once used, and forgotten when refused', () => {
+    const stored = new Map<string, string>()
+    vi.stubGlobal('localStorage', {
+      getItem: (k: string) => stored.get(k) ?? null,
+      setItem: (k: string, v: string) => stored.set(k, v),
+      removeItem: (k: string) => stored.delete(k),
+    })
+    expect(locationRemembered()).toBe(false)
+    rememberLocation(true)
+    expect(locationRemembered()).toBe(true)
+    rememberLocation(false)
+    expect(locationRemembered()).toBe(false)
+  })
+
+  it('is not assumed when storage is blocked', () => {
+    vi.stubGlobal('localStorage', { getItem: () => { throw new Error('blocked') }, setItem: () => { throw new Error('blocked') } })
+    rememberLocation(true)
+    expect(locationRemembered()).toBe(false)
   })
 })
