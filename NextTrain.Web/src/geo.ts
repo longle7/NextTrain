@@ -1,4 +1,5 @@
 import type { Station } from './api'
+import { readKey, writeKey } from './cache'
 
 interface Point {
   latitude: number
@@ -24,6 +25,14 @@ export function nearestStations(stations: Station[], here: Point, count = 3) {
     .sort((a, b) => a.miles - b.miles)
     .slice(0, count)
 }
+
+const LOCATION_KEY = 'nexttrain.location'
+
+/** Whether the rider has used their location here before: then Home and the Map find them without a tap. */
+export const locationRemembered = () => readKey(LOCATION_KEY) === 'on'
+
+/** Remembers that location works, or forgets it (permission refused, Delete my data) so the button comes back. */
+export const rememberLocation = (on: boolean) => writeKey(LOCATION_KEY, on ? 'on' : null)
 
 /** What to tell someone when the phone can't give us their location. */
 export const locationErrorMessage = (error: GeolocationPositionError) =>

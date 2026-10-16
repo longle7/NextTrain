@@ -59,14 +59,18 @@ namespace NextTrain.Api.Services
                     .FirstOrDefaultAsync(c => c.Id == activity.CommuteId && c.UserId == activity.UserId, cancellationToken);
                 var endsAt = new DateTimeOffset(activity.EndsAtUtc, TimeSpan.Zero);
                 var end = commute is null || endsAt <= now;
-                var content = end ? new LiveActivityContent([], null, endsAt) : await ContentAsync(mbta, commute!, endsAt, now);
+                var content = end ? new LiveActivityContent([], null, endsAt, endsAt) : await ContentAsync(mbta, commute!, endsAt, now);
                 var result = await _apns.UpdateLiveActivityAsync(activity.Token, content, end, cancellationToken);
                 if (end || result == ApnsResult.Unregistered) db.LiveActivityTokens.Remove(activity);
             }
             await db.SaveChangesAsync(cancellationToken);
         }
 
-        /// <summary>The commute's next three departures and its worst major alert, as the app's Home card shows them.</summary>
+        /// <summary>
+        /// The commute's next three departures and its worst major alert, as the app's Home card shows them. It goes stale
+        /// when the next train leaves: iOS then redraws it, and the countdown moves on to the train after, even before the
+        /// next push arrives.
+        /// </summary>
         public static async Task<LiveActivityContent> ContentAsync(IMbtaClient mbta, UserCommute commute, DateTimeOffset endsAt, DateTimeOffset now)
         {
             var departures = (await mbta.GetPredictionsAsync(commute.Station!.MbtaStopId, commute.RouteId))
@@ -76,8 +80,9 @@ namespace NextTrain.Api.Services
                 .Where(t => t >= now.AddSeconds(-15)) // the app counts a train as boarding until 15 s after it leaves
                 .Order()
                 .Take(3)
-                .Select(t => t.ToUnixTimeSeconds())
                 .ToList();
+            var next = departures.FirstOrDefault(t => t > now);
+            var staleAt = next != default && next < endsAt ? next : endsAt;
 
             var subway = commute.Station.SubwayRouteIds().Contains(commute.RouteId);
             var alerts = subway ? await mbta.GetSubwayAlertsAsync() : await mbta.GetRouteAlertsAsync(commute.RouteId);
@@ -85,7 +90,7 @@ namespace NextTrain.Api.Services
                 .Where(a => a.Attributes.Severity >= MajorSeverity && DelayNotifier.Covers(a, commute))
                 .MaxBy(a => a.Attributes.Severity);
             var alert = worst is null ? null : string.IsNullOrWhiteSpace(worst.Attributes.ServiceEffect) ? worst.Attributes.Header : worst.Attributes.ServiceEffect;
-            return new LiveActivityContent(departures, alert, endsAt);
+            return new LiveActivityContent(departures.Select(t => t.ToUnixTimeSeconds()).ToList(), alert, staleAt, endsAt);
         }
     }
 }

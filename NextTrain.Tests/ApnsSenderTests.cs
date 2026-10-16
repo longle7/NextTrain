@@ -76,8 +76,9 @@ public class ApnsSenderTests : IDisposable
     [Fact]
     public async Task ALiveActivityUpdate_GoesToItsTopic_WithTheContentStateTheAppDecodes()
     {
-        var staleAt = DateTimeOffset.UtcNow.AddMinutes(20);
-        var result = await Sender().UpdateLiveActivityAsync(Token, new LiveActivityContent([1760270580, 1760270940], "Red Line delay", staleAt), end: false);
+        var staleAt = DateTimeOffset.UtcNow.AddMinutes(3);
+        var endsAt = DateTimeOffset.UtcNow.AddMinutes(20);
+        var result = await Sender().UpdateLiveActivityAsync(Token, new LiveActivityContent([1760270580, 1760270940], "Red Line delay", staleAt, endsAt), end: false);
 
         Assert.Equal(ApnsResult.Sent, result);
         var (request, body) = Assert.Single(_apple.Requests);
@@ -91,12 +92,13 @@ public class ApnsSenderTests : IDisposable
         var state = aps.GetProperty("content-state");
         Assert.Equal([1760270580L, 1760270940L], state.GetProperty("departures").EnumerateArray().Select(d => d.GetInt64()));
         Assert.Equal("Red Line delay", state.GetProperty("alert").GetString());
+        Assert.Equal(endsAt.ToUnixTimeSeconds(), state.GetProperty("endsAt").GetInt64());
     }
 
     [Fact]
     public async Task EndingALiveActivity_DismissesIt_AndLeavesOutAMissingAlert()
     {
-        await Sender().UpdateLiveActivityAsync(Token, new LiveActivityContent([], null, DateTimeOffset.UtcNow), end: true);
+        await Sender().UpdateLiveActivityAsync(Token, new LiveActivityContent([], null, DateTimeOffset.UtcNow, DateTimeOffset.UtcNow), end: true);
 
         using var json = JsonDocument.Parse(Assert.Single(_apple.Requests).Body);
         var aps = json.RootElement.GetProperty("aps");

@@ -24,8 +24,9 @@ namespace NextTrain.Api.Services
     }
 
     // A Live Activity's content-state: what CommuteActivityAttributes.ContentState decodes (departures in Unix seconds,
-    // soonest first, and the worst alert), and when it goes stale (the end of the commute window).
-    public record LiveActivityContent(IReadOnlyList<long> Departures, string? Alert, DateTimeOffset StaleAt);
+    // soonest first, the worst alert, and the end of the commute window), and when it goes stale: when the next train
+    // leaves, so iOS redraws it and the countdown moves on, or the end of the window.
+    public record LiveActivityContent(IReadOnlyList<long> Departures, string? Alert, DateTimeOffset StaleAt, DateTimeOffset EndsAt);
 
     /// <summary>
     /// Sends notifications through Apple's push service (APNs) over HTTP/2, authenticated with a token signed by our
@@ -73,13 +74,20 @@ namespace NextTrain.Api.Services
             {
                 ["timestamp"] = now.ToUnixTimeSeconds(),
                 ["event"] = end ? "end" : "update",
-                ["content-state"] = content.Alert is null
-                    ? new Dictionary<string, object> { ["departures"] = content.Departures }
-                    : new Dictionary<string, object> { ["departures"] = content.Departures, ["alert"] = content.Alert },
+                ["content-state"] = State(content),
                 [end ? "dismissal-date" : "stale-date"] = end ? now.AddMinutes(1).ToUnixTimeSeconds() : content.StaleAt.ToUnixTimeSeconds(),
             };
             return PostAsync(activityToken, $"{_topic}.push-type.liveactivity", "liveactivity", priority: 5, expires: now.AddMinutes(2), now,
                 new { aps }, cancellationToken);
+        }
+
+        // CommuteActivityAttributes.ContentState: departures (Unix seconds, soonest first), when the commute window ends
+        // (the app then says the commute is over), and the worst alert, if any.
+        private static Dictionary<string, object> State(LiveActivityContent content)
+        {
+            var state = new Dictionary<string, object> { ["departures"] = content.Departures, ["endsAt"] = content.EndsAt.ToUnixTimeSeconds() };
+            if (content.Alert is not null) state["alert"] = content.Alert;
+            return state;
         }
 
         private async Task<ApnsResult> PostAsync(string deviceToken, string topic, string pushType, int priority, DateTimeOffset expires,

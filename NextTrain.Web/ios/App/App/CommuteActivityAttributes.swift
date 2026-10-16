@@ -9,6 +9,7 @@ struct CommuteActivityAttributes: ActivityAttributes {
     struct ContentState: Codable, Hashable {
         var departures: [Double] // the next trains' departure times, soonest first
         var alert: String?       // the worst service alert on this commute, if any
+        var endsAt: Double?      // the end of the commute window (missing from pushes sent before this field existed)
     }
 
     var commuteId: Int
