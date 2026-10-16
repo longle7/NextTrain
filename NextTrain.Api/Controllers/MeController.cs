@@ -29,6 +29,7 @@ namespace NextTrain.Api.Controllers
             await _db.UserCommutes.Where(c => c.UserId == userId).ExecuteDeleteAsync();
             await _db.PushDevices.Where(d => d.UserId == userId).ExecuteDeleteAsync();
             await _db.SentNotifications.Where(n => n.UserId == userId).ExecuteDeleteAsync();
+            await _db.LiveActivityTokens.Where(t => t.UserId == userId).ExecuteDeleteAsync();
             return NoContent();
         }
 
@@ -55,6 +56,34 @@ namespace NextTrain.Api.Controllers
             return NoContent();
         }
 
+        // PUT /me/live-activity {commuteId, token, endsAt}: keep this commute's Live Activity up to date with the app
+        // closed (LiveActivityUpdater), until endsAt. Replaces the user's earlier one: one shows at a time.
+        [HttpPut("live-activity")]
+        public async Task<IActionResult> RegisterLiveActivity(
+            [FromHeader(Name = "X-User-Id"), Required, MaxLength(100)] string userId,
+            LiveActivityRequest request)
+        {
+            if (!await _db.UserCommutes.AnyAsync(c => c.Id == request.CommuteId && c.UserId == userId)) return NotFound();
+            var endsAt = DateTimeOffset.FromUnixTimeSeconds(request.EndsAt).UtcDateTime;
+            if (endsAt <= DateTime.UtcNow || endsAt > DateTime.UtcNow.AddHours(24))
+            {
+                ModelState.AddModelError(nameof(request.EndsAt), "The commute window must end within the next day.");
+                return ValidationProblem();
+            }
+            await _db.LiveActivityTokens.Where(t => t.UserId == userId || t.Token == request.Token).ExecuteDeleteAsync();
+            _db.LiveActivityTokens.Add(new LiveActivityToken { UserId = userId, CommuteId = request.CommuteId, Token = request.Token, EndsAtUtc = endsAt });
+            await _db.SaveChangesAsync();
+            return NoContent();
+        }
+
+        // DELETE /me/live-activity: the app ended its Live Activity; stop updating it.
+        [HttpDelete("live-activity")]
+        public async Task<IActionResult> RemoveLiveActivity([FromHeader(Name = "X-User-Id"), Required, MaxLength(100)] string userId)
+        {
+            await _db.LiveActivityTokens.Where(t => t.UserId == userId).ExecuteDeleteAsync();
+            return NoContent();
+        }
+
         // DELETE /me/push-token: the app's notifications switch, off.
         [HttpDelete("push-token")]
         public async Task<IActionResult> RemovePushTokens([FromHeader(Name = "X-User-Id"), Required, MaxLength(100)] string userId)
@@ -63,6 +92,9 @@ namespace NextTrain.Api.Controllers
             return NoContent();
         }
     }
+
+    // Live Activity push tokens are hex too, and longer. EndsAt is Unix seconds: when the commute window ends.
+    public record LiveActivityRequest(int CommuteId, [Required, RegularExpression("^[0-9a-fA-F]{64,400}$")] string Token, long EndsAt);
 
     // Apple's device tokens are hex (64 characters today; Apple says they may grow).
     public record PushTokenRequest([Required, RegularExpression("^[0-9a-fA-F]{64,200}$")] string Token);

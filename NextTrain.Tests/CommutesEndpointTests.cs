@@ -177,6 +177,35 @@ public class CommutesEndpointTests : IDisposable
     }
 
     [Fact]
+    public async Task LiveActivity_OnlyForYourOwnCommute_UntilItsWindowEnds_OnePerUser()
+    {
+        using var alice = ClientFor("alice");
+        using var bob = ClientFor("bob");
+        var commute = (await (await alice.PostAsJsonAsync("/commutes", Request())).Content.ReadFromJsonAsync<CommuteResponse>())!;
+        var inHalfAnHour = DateTimeOffset.UtcNow.AddMinutes(30).ToUnixTimeSeconds();
+        LiveActivityRequest Activity(char hex, long? endsAt = null) => new(commute.Id, new string(hex, 160), endsAt ?? inHalfAnHour);
+
+        Assert.Equal(HttpStatusCode.NotFound, (await bob.PutAsJsonAsync("/me/live-activity", Activity('b'))).StatusCode); // not Bob's commute
+        Assert.Equal(HttpStatusCode.BadRequest, (await alice.PutAsJsonAsync("/me/live-activity", Activity('a', DateTimeOffset.UtcNow.AddMinutes(-1).ToUnixTimeSeconds()))).StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, (await alice.PutAsJsonAsync("/me/live-activity", Activity('z'))).StatusCode); // not hex
+
+        Assert.Equal(HttpStatusCode.NoContent, (await alice.PutAsJsonAsync("/me/live-activity", Activity('a'))).StatusCode);
+        Assert.Equal(HttpStatusCode.NoContent, (await alice.PutAsJsonAsync("/me/live-activity", Activity('c'))).StatusCode); // a new one replaces it
+        using (var db = TestDb.Open())
+        {
+            var token = Assert.Single(db.LiveActivityTokens);
+            Assert.Equal(("alice", 'c'), (token.UserId, token.Token[0]));
+        }
+
+        Assert.Equal(HttpStatusCode.NoContent, (await alice.DeleteAsync("/me/live-activity")).StatusCode);
+        using (var db = TestDb.Open()) Assert.Empty(db.LiveActivityTokens);
+
+        await alice.PutAsJsonAsync("/me/live-activity", Activity('a'));
+        await alice.DeleteAsync("/me"); // Delete my data
+        using (var db = TestDb.Open()) Assert.Empty(db.LiveActivityTokens);
+    }
+
+    [Fact]
     public async Task PushToken_NotAnAppleToken_Returns400()
     {
         using var alice = ClientFor("alice");

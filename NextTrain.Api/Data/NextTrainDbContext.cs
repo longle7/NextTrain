@@ -20,6 +20,7 @@ namespace NextTrain.Api.Data
         public DbSet<UserCommute> UserCommutes { get; set; } = null!;
         public DbSet<PushDevice> PushDevices { get; set; } = null!;
         public DbSet<SentNotification> SentNotifications { get; set; } = null!;
+        public DbSet<LiveActivityToken> LiveActivityTokens { get; set; } = null!;
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -55,6 +56,14 @@ namespace NextTrain.Api.Data
                 entity.HasIndex(d => d.UserId).IsUnique();
                 entity.Property(d => d.UserId).IsRequired().HasMaxLength(100);
                 entity.Property(d => d.Token).IsRequired().HasMaxLength(200);
+            });
+
+            modelBuilder.Entity<LiveActivityToken>(entity =>
+            {
+                entity.HasIndex(t => t.UserId).IsUnique();
+                entity.HasIndex(t => t.Token).IsUnique();
+                entity.Property(t => t.UserId).IsRequired().HasMaxLength(100);
+                entity.Property(t => t.Token).IsRequired().HasMaxLength(400);
             });
 
             modelBuilder.Entity<SentNotification>(entity =>
