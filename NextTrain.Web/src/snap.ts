@@ -1,3 +1,5 @@
+import { angleBetween } from './geo'
+
 /**
  * Puts trains exactly on their line, pointing the way they're going.
  *
@@ -31,7 +33,7 @@ interface StationLike {
   longitude: number
 }
 
-export interface Placed {
+interface Placed {
   latitude: number
   longitude: number
   heading: number | null // arrow direction, degrees clockwise from north; null if unknown
@@ -140,6 +142,5 @@ export function trackSnapper(tracks: Track[], stations: StationLike[]) {
 // 0 or 180: whichever way along the track is closer to MBTA's compass bearing.
 function alignedWithBearing(bearing: number | null, forward: number): number | null {
   if (bearing === null) return null
-  const difference = Math.abs(((bearing - forward) % 360 + 540) % 360 - 180) // 0..180
-  return difference <= 90 ? 0 : 180
+  return angleBetween(bearing, forward) <= 90 ? 0 : 180
 }

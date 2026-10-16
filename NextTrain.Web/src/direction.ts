@@ -1,4 +1,4 @@
-import { distanceMiles } from './geo'
+import { angleBetween, distanceMiles } from './geo'
 import type { Route } from './api'
 
 // Inbound and outbound on the map: toward downtown Boston, or away from it.
@@ -23,7 +23,7 @@ export function directionOf(route: Route | undefined, directionId: number, latit
   if (named === 'Inbound' || named === 'Outbound') return named === 'Inbound' ? 'inbound' : 'outbound'
   if (heading === null || distanceMiles({ latitude, longitude }, DOWNTOWN) < DOWNTOWN_MILES) return undefined
   const toDowntown = bearing(latitude, longitude, DOWNTOWN.latitude, DOWNTOWN.longitude)
-  const off = Math.abs(((heading - toDowntown + 540) % 360) - 180) // 0 = straight at downtown, 180 = straight away
+  const off = angleBetween(heading, toDowntown) // 0 = straight at downtown, 180 = straight away
   return off < 90 ? 'inbound' : 'outbound'
 }
 

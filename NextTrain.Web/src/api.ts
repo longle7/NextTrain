@@ -1,3 +1,5 @@
+import { writeKey } from './cache'
+
 // Types mirror the NextTrain API responses (camelCase JSON).
 
 export interface Route {
@@ -130,7 +132,7 @@ export class ApiError extends Error {
 export const API_URL = import.meta.env.VITE_API_URL ?? '/api'
 
 /** Give up on a request after this long, so a stalled connection (a tunnel, weak signal) shows an error, not a spinner forever. */
-export const REQUEST_TIMEOUT_MS = 15_000
+const REQUEST_TIMEOUT_MS = 15_000
 export const TIMEOUT_MESSAGE = 'NextTrain is taking too long to respond. Check your connection and try again.'
 export const NETWORK_MESSAGE = "Couldn't reach NextTrain. Check your connection and try again."
 
@@ -185,11 +187,7 @@ function userId(): string {
 /** After "Delete my data": the next request starts a fresh anonymous ID. */
 export function forgetUserId() {
   sessionUserId = undefined
-  try {
-    localStorage.removeItem(USER_ID_KEY)
-  } catch {
-    // storage blocked: nothing stored to forget
-  }
+  writeKey(USER_ID_KEY, null)
 }
 
 // randomUUID needs HTTPS; getRandomValues also works over plain HTTP (e.g. testing on a phone over Wi-Fi).
@@ -263,6 +261,10 @@ export const commutePredictionsPath = (c: Pick<Commute, 'mbtaStopId' | 'routeId'
 export const lineLabel = (routeId: string, route?: Route) =>
   !isSubwayRoute(routeId) ? (route?.shortName || routeId)
   : routeId.startsWith('Green-') ? `GL ${routeId.slice(6)}` : routeId === 'Mattapan' ? 'M' : `${routeId[0]}L`
+
+/** What riders call a route: "Route 1" or "Route SL1" for a bus, "Red Line" for the subway. */
+export const routeName = (routeId: string, route?: Route) =>
+  route?.type === 'bus' ? `Route ${lineLabel(routeId, route)}` : (route?.name ?? routeId)
 
 /** A route by ID: exact, since bus route "1" must not match "10". "Green" (all branches) takes the first branch. */
 export const findRoute = (routes: Route[] | undefined, routeId: string) =>

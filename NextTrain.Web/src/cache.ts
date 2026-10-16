@@ -8,6 +8,25 @@ interface Entry<T> {
   at: number // when it was fetched (ms since epoch)
 }
 
+/** localStorage that never throws: blocked storage reads as nothing stored, and a write that can't happen is skipped. */
+export function readKey(key: string): string | null {
+  try {
+    return localStorage.getItem(key)
+  } catch {
+    return null
+  }
+}
+
+/** Stores a value, or removes the key for null. */
+export function writeKey(key: string, value: string | null) {
+  try {
+    if (value === null) localStorage.removeItem(key)
+    else localStorage.setItem(key, value)
+  } catch {
+    // storage blocked or full: it still applies for this visit
+  }
+}
+
 /** Which keys to drop so only the `max` newest remain. */
 export const keysToEvict = (entries: [key: string, at: number][], max = MAX_ENTRIES) =>
   [...entries].sort((a, b) => a[1] - b[1]).slice(0, Math.max(0, entries.length - max)).map(([key]) => key)
@@ -33,13 +52,7 @@ export function remember(key: string, data: unknown) {
 }
 
 /** Drop one remembered answer, e.g. your commutes after you change them, so Home doesn't open on the old list. */
-export function forget(key: string) {
-  try {
-    localStorage.removeItem(PREFIX + key)
-  } catch {
-    // storage blocked: nothing stored
-  }
-}
+export const forget = (key: string) => writeKey(PREFIX + key, null)
 
 /** Delete my data. */
 export function forgetRemembered() {

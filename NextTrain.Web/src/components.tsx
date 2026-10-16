@@ -2,7 +2,7 @@ import { Component, type ReactNode } from 'react'
 import { Link } from 'react-router'
 import { useOnline, useTitle } from './usePolling'
 import { MAJOR_SEVERITY } from './alerts'
-import { ApiError, busRouteIds, findRoute, lineLabel, stationRouteIds, type Alert, type Route, type Station } from './api'
+import { ApiError, busRouteIds, findRoute, lineLabel, routeName, stationRouteIds, type Alert, type Route, type Station } from './api'
 import { reportError } from './errors'
 
 /** Full-width main action ("Save commute"). Works on <button> and <Link>. */
@@ -29,7 +29,7 @@ export function AppLogo() {
 export function LineBadge({ routeId, routes }: { routeId: string; routes: Route[] | undefined }) {
   const route = findRoute(routes, routeId)
   const label = lineLabel(routeId, route)
-  const name = routeId === 'Green' ? 'Green Line' : route?.type === 'bus' ? `Route ${label}` : (route?.name ?? routeId)
+  const name = routeId === 'Green' ? 'Green Line' : routeName(routeId, route)
   return (
     <span
       className="inline-flex h-6 min-w-9 shrink-0 items-center justify-center rounded-full bg-mbta-silver px-2 text-xs font-bold whitespace-nowrap text-white"
