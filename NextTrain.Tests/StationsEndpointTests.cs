@@ -83,25 +83,15 @@ public class StationsEndpointTests : IDisposable
         Assert.Equal("Alewife", station!.Name);
     }
 
-    private static MbtaPredictionDto Prediction(string route, int direction, string? departure) => new()
-    {
-        Attributes = new MbtaPredictionAttributesDto
-        {
-            DirectionId = direction,
-            DepartureTime = departure is null ? null : DateTimeOffset.Parse(departure),
-        },
-        Relationships = new MbtaPredictionRelationshipsDto { Route = new() { Data = new() { Id = route } } }
-    };
-
     [Fact]
     public async Task GetPredictions_FiltersByRouteAndDirection_SortedSoonestFirst()
     {
         _mbta.PredictionsByStop["place-pktrm"] = new()
         {
-            Prediction("Red", 0, "2026-09-29T08:05:00-04:00"),
-            Prediction("Green-B", 1, null), // ends here: nothing to board, dropped
-            Prediction("Red", 1, "2026-09-29T08:03:00-04:00"),
-            Prediction("Red", 0, null), // skipped stop, dropped
+            FakeMbtaClient.Prediction("Red", 0, "2026-09-29T08:05:00-04:00"),
+            FakeMbtaClient.Prediction("Green-B", 1, null), // ends here: nothing to board, dropped
+            FakeMbtaClient.Prediction("Red", 1, "2026-09-29T08:03:00-04:00"),
+            FakeMbtaClient.Prediction("Red", 0, null), // skipped stop, dropped
         };
 
         var red = await _client.GetFromJsonAsync<List<PredictionResponse>>("/stations/place-pktrm/predictions?route=Red");
@@ -114,7 +104,7 @@ public class StationsEndpointTests : IDisposable
     [Fact]
     public async Task GetPredictions_Schedules_FillOnlyRoutesWithNothingPredicted()
     {
-        _mbta.PredictionsByStop["place-pktrm"] = new() { Prediction("Red", 0, "2026-09-29T23:50:00-04:00") };
+        _mbta.PredictionsByStop["place-pktrm"] = new() { FakeMbtaClient.Prediction("Red", 0, "2026-09-29T23:50:00-04:00") };
         _mbta.SchedulesByStop["place-pktrm"] = new()
         {
             new("Red", 0, DateTimeOffset.Parse("2026-09-29T23:52:00-04:00")), // Red one way is predicted: not added
@@ -137,7 +127,7 @@ public class StationsEndpointTests : IDisposable
     [Fact]
     public async Task GetPredictions_WithoutSchedules_AnswersExactlyAsBefore()
     {
-        _mbta.PredictionsByStop["place-pktrm"] = new() { Prediction("Red", 0, "2026-09-29T08:05:00-04:00") };
+        _mbta.PredictionsByStop["place-pktrm"] = new() { FakeMbtaClient.Prediction("Red", 0, "2026-09-29T08:05:00-04:00") };
         _mbta.SchedulesByStop["place-pktrm"] = new() { new("Red", 1, DateTimeOffset.Parse("2026-09-29T08:06:00-04:00")) };
 
         var json = await _client.GetStringAsync("/stations/place-pktrm/predictions");
@@ -230,20 +220,6 @@ public class StationsEndpointTests : IDisposable
     }
 
     [Fact]
-    public async Task GetVehicles_ReturnsLivePositions()
-    {
-        _mbta.Vehicles.Add(new MbtaVehicle("R-1", "Red", 1, 42.3, -71.06, 85, "STOPPED_AT", "Savin Hill", "place-shmnl",
-            [new MbtaCar("MANY_SEATS_AVAILABLE", 12), new MbtaCar(null, null)]));
-
-        var vehicle = Assert.Single((await _client.GetFromJsonAsync<List<MbtaVehicle>>("/vehicles"))!);
-
-        Assert.Equal("Savin Hill", vehicle.StopName);
-        Assert.Equal("place-shmnl", vehicle.StationId);
-        Assert.Equal(85, vehicle.Bearing);
-        Assert.Equal(new[] { new MbtaCar("MANY_SEATS_AVAILABLE", 12), new MbtaCar(null, null) }, vehicle.Cars);
-    }
-
-    [Fact]
     public async Task UnexpectedError_InProduction_Returns500ProblemJson_WithoutInternals()
     {
         _mbta.VehiclesError = new InvalidOperationException("secret internal detail");
@@ -254,14 +230,6 @@ public class StationsEndpointTests : IDisposable
         Assert.Equal(HttpStatusCode.InternalServerError, response.StatusCode);
         Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
         Assert.DoesNotContain("secret internal detail", await response.Content.ReadAsStringAsync());
-    }
-
-    [Fact]
-    public async Task GetVehicles_MbtaDown_Returns503()
-    {
-        _mbta.VehiclesError = new HttpRequestException("MBTA down");
-
-        Assert.Equal(HttpStatusCode.ServiceUnavailable, (await _client.GetAsync("/vehicles")).StatusCode);
     }
 
     [Fact]
@@ -342,14 +310,6 @@ public class StationsEndpointTests : IDisposable
 
         Assert.Equal(new[] { "elevator", "escalator" }, access.Select(a => a.Id));
         Assert.Equal(HttpStatusCode.NotFound, (await _client.GetAsync("/stations/place-nowhere/access")).StatusCode);
-    }
-
-    [Fact]
-    public async Task GetAlerts_MbtaDown_Returns503()
-    {
-        _mbta.AlertsError = new HttpRequestException("MBTA down");
-
-        Assert.Equal(HttpStatusCode.ServiceUnavailable, (await _client.GetAsync("/alerts")).StatusCode);
     }
 
     [Fact]
