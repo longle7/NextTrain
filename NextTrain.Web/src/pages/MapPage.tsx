@@ -7,7 +7,7 @@ import {
 import { directionOf, showsDirection, type Direction } from '../direction'
 import { LineBadge, linkButton, primaryButton, SearchInput, secondaryButton, Status } from '../components'
 import { boundsOf, locationErrorMessage, nearestStations, OUT_OF_AREA_MILES } from '../geo'
-import { loadMapKit, stationElement, trainCallout, trainElement, updateTrainElement, userElement, type Preview } from '../mapkit'
+import { keepLabels, loadMapKit, stationElement, trainCallout, trainElement, updateTrainElement, userElement, type Preview } from '../mapkit'
 import { lastMapView, rememberMapView } from '../mapSession'
 import { decodePolyline } from '../polyline'
 import { trackSnapper } from '../snap'
@@ -55,6 +55,18 @@ const animate = () => !matchMedia('(prefers-reduced-motion: reduce)').matches
 // anchorOffset y moves it up, so shift down by half the height. The e2e tests check markers land on their coordinates.
 const centered = (size: number) => ({ size: { width: size, height: size }, anchorOffset: new DOMPoint(0, -size / 2) })
 
+// The map, kept for the session once made: leaving the tab takes it off the page, coming back puts it back, with its
+// street tiles loaded and where you'd zoomed to. `shown` is the routes it was last fitted to (String(shown)).
+// ponytail: one MapKit map stays in memory while you're on other tabs; destroy it on a memory warning if that matters.
+let parked: { map: mapkit.Map; element: HTMLDivElement; shown?: string } | undefined
+
+// Hides station names that would overlap one already shown (see keepLabels). Only while names are shown.
+function declutter(root: HTMLElement | null) {
+  const labels = [...(root?.querySelectorAll<HTMLElement>('.show-names .station-name') ?? [])]
+  const keep = keepLabels(labels.map((l) => l.getBoundingClientRect()))
+  labels.forEach((l, i) => (l.style.visibility = keep[i] ? '' : 'hidden')) // still measured when hidden
+}
+
 export default function MapPage() {
   const navigate = useNavigate()
   const [params, setParams] = useSearchParams()
@@ -101,13 +113,15 @@ export default function MapPage() {
   const trains = useRef(new Map<string, mapkit.Annotation>())
   const me = useRef<mapkit.Annotation>(undefined)
   const [map, setMap] = useState<mapkit.Map>()
+  // Back on a map already made this session (see parked): it's on screen at once, as you left it.
+  const [reused] = useState(() => !!parked)
   // Lines, stations, and trains are drawn together once all of them have loaded (or failed), not one after another,
-  // and trains go straight onto their tracks.
+  // and trains go straight onto their tracks. Coming back, lines and stations (remembered) don't wait for the trains.
   const settled = (poll: { data?: unknown; error?: Error }) => poll.data !== undefined || !!poll.error
-  const ready = !!map && settled(shapes) && settled(stations) && settled(routes) && settled(vehicles)
+  const ready = !!map && settled(shapes) && settled(stations) && settled(routes) && (reused || settled(vehicles))
   // MapKit paints lines right away but its markers a moment later, so the map stays covered until the markers are on
   // it too. Only the first time: after that, changes draw in place.
-  const [drawn, setDrawn] = useState(false)
+  const [drawn, setDrawn] = useState(reused)
   const [mapError, setMapError] = useState<Error>()
   const [locating, setLocating] = useState(false)
   const [locateMessage, setLocateMessage] = useState<string>()
@@ -153,15 +167,36 @@ export default function MapPage() {
   }, [])
   useEffect(() => () => clearTimeout(previewTimer.current), [])
 
-  // Station names appear beside the dots once zoomed in far enough that they have room (about a neighborhood across).
+  // Station names appear beside the dots once zoomed in far enough that they have room (about a neighborhood across),
+  // except where they'd overlap: after each zoom or pan, and whenever MapKit puts dots on the map (it adds their
+  // elements a moment after we add the stations, so it's watched rather than timed).
   const [showNames, setShowNames] = useState(false)
   useEffect(() => {
     if (!map) return
-    const update = () => setShowNames(map.region.span.latitudeDelta < SHOW_NAMES_BELOW)
+    const update = () => {
+      setShowNames(map.region.span.latitudeDelta < SHOW_NAMES_BELOW)
+      requestAnimationFrame(() => declutter(container.current))
+    }
     update()
     map.addEventListener('region-change-end', update)
     return () => map.removeEventListener('region-change-end', update)
   }, [map])
+  useEffect(() => {
+    const element = container.current
+    if (!showNames || !element) return
+    let frame = 0
+    const soon = () => {
+      cancelAnimationFrame(frame)
+      frame = requestAnimationFrame(() => declutter(element)) // once a frame, however many dots arrive
+    }
+    const observer = new MutationObserver(soon) // declutter only changes styles, so it never retriggers this
+    observer.observe(element, { childList: true, subtree: true })
+    soon()
+    return () => {
+      observer.disconnect()
+      cancelAnimationFrame(frame)
+    }
+  }, [showNames])
 
   // Light or dark map, following the phone's setting, including when it changes while the map is open.
   useEffect(() => {
@@ -194,8 +229,10 @@ export default function MapPage() {
   }, [ready, map, tracks, routes.data, shown])
 
   // Picking a line or branch zooms to fit it (and you, once located, so your dot stays in view); All goes back to downtown.
+  // Coming back to the same lines keeps your zoom and pan.
   useEffect(() => {
-    if (!ready || !map || !tracks) return
+    if (!ready || !map || !tracks || !parked || parked.shown === String(shown)) return
+    parked.shown = String(shown)
     const you = me.current ? [[me.current.coordinate.latitude, me.current.coordinate.longitude] as [number, number]] : []
     const region = shown && regionAround([...tracks.filter((t) => onLine(shown, t.routeId)).flatMap((t) => t.points), ...you])
     map.setRegionAnimated(region || bostonRegion(), animate())
@@ -322,32 +359,44 @@ export default function MapPage() {
     keepOnTop(map, ...trains.current.values(), me.current)
   }, [ready, map, stations.data, shown])
 
-  // Apple Maps: loads MapKit (once per visit) with a token from our API, then draws the map.
+  // Apple Maps: loads MapKit (once per visit) with a token from our API, then draws the map, or puts back the one
+  // made earlier this session (see parked). Leaving the page takes it off the page but keeps it.
   // Declared after the effects that add lines and markers: React runs cleanups in declaration order, so leaving the
-  // page removes those first and destroys the map last (MapKit throws if you remove things from a destroyed map).
+  // page removes those first, then the trains and your dot, leaving a bare map for next time.
   useEffect(() => {
     let cancelled = false
-    let created: mapkit.Map | undefined
+    const host = container.current!
     loadMapKit().then(
       () => {
         if (cancelled) return
-        created = new mapkit.Map(container.current!, {
-          region: bostonRegion(),
-          isRotationEnabled: false, // north stays up, like the line diagrams
-          showsCompass: mapkit.FeatureVisibility.Hidden,
-          showsScale: mapkit.FeatureVisibility.Hidden,
-          showsMapTypeControl: false,
-          showsUserLocationControl: false, // our own button, which knows when you're outside the T's area
-          pointOfInterestFilter: mapkit.PointOfInterestFilter.excludingAllCategories, // stations, not coffee shops
-        })
-        setMap(created)
+        if (parked) host.append(parked.element)
+        else {
+          // On the page before MapKit measures it.
+          const element = host.appendChild(Object.assign(document.createElement('div'), { className: 'size-full' }))
+          parked = {
+            element,
+            map: new mapkit.Map(element, {
+              region: bostonRegion(),
+              isRotationEnabled: false, // north stays up, like the line diagrams
+              showsCompass: mapkit.FeatureVisibility.Hidden,
+              showsScale: mapkit.FeatureVisibility.Hidden,
+              showsMapTypeControl: false,
+              showsUserLocationControl: false, // our own button, which knows when you're outside the T's area
+              pointOfInterestFilter: mapkit.PointOfInterestFilter.excludingAllCategories, // stations, not coffee shops
+            }),
+          }
+        }
+        setMap(parked.map)
       },
       () => !cancelled && setMapError(new Error("The map isn't available right now.")), // Status shows a friendly message and Try again
     )
     const markers = trains.current
     return () => {
       cancelled = true
-      created?.destroy()
+      if (parked?.element.parentNode === host) {
+        parked.map.removeAnnotations([...markers.values(), ...(me.current ? [me.current] : [])])
+        parked.element.remove()
+      }
       markers.clear()
       me.current = undefined
     }
@@ -758,7 +807,7 @@ function MapKey({ bus }: { bus: boolean }) {
       <ul aria-label="Map key" className="flex flex-wrap justify-center gap-x-4 gap-y-1">
         {item(<span aria-hidden className="size-3 rounded-full border-2 border-neutral-800 bg-white" />, bus ? 'Stop' : 'Station')}
         {item(
-          <span aria-hidden className="size-3 rounded-full border-2 border-white shadow-sm" style={{ backgroundColor: bus ? BUS_YELLOW : '#DA291C' }} />,
+          <span aria-hidden className="size-3 rounded-full border-2 border-white shadow-[0_0_0_1px_rgb(0_0_0/0.8)]" style={{ backgroundColor: bus ? BUS_YELLOW : '#DA291C' }} />,
           `${bus ? 'Bus' : 'Train'}: zoom in for its direction`,
         )}
         {item(<span aria-hidden className="size-3 rounded-full border-2 border-white bg-blue-600 shadow-sm" />, 'You')}

@@ -90,9 +90,14 @@ html:has(#consent-title) {
   outline-offset: 2px;
 }
 /* Trains (and buses) on the map: a small dot when zoomed out, so downtown isn't a pile of arrows; zoomed in (MapPage
-   adds .show-names) the full marker with the arrow for its direction. The tap area stays 24 px either way. */
+   adds .show-names) the full marker with the arrow for its direction. The tap area stays 24 px either way. A white
+   ring and a dark halo set it apart from the line under it, which is the same color, on light and dark maps. */
+.train {
+  overflow: visible;
+  filter: drop-shadow(0 0 1px rgb(0 0 0 / 0.9)) drop-shadow(0 1px 2px rgb(0 0 0 / 0.45));
+}
 .train circle {
-  r: 6px;
+  r: 8px;
 }
 .train path {
   display: none;

@@ -1,6 +1,6 @@
 import { expect, it } from 'vitest'
 import type { Route, Vehicle } from './api'
-import { MAPKIT_INTEGRITY, MAPKIT_URL, trainCallout } from './mapkit'
+import { keepLabels, MAPKIT_INTEGRITY, MAPKIT_URL, trainCallout } from './mapkit'
 
 const red: Route = {
   id: 'Red', name: 'Red Line', color: '#DA291C', textColor: '#FFFFFF', directionNames: ['South', 'North'],
@@ -26,4 +26,13 @@ it('leaves the subtitle empty without a stop, and falls back to the route ID bef
 it('pins MapKit to an exact https version with a SHA-384 integrity hash', () => {
   expect(MAPKIT_URL).toMatch(/^https:\/\/cdn\.apple-mapkit\.com\/mk\/\d+\.\d+\.\d+\/mapkit\.js$/) // no "5.x.x"
   expect(MAPKIT_INTEGRITY).toMatch(/^sha384-[A-Za-z0-9+/]{64}$/)
+})
+
+it('hides a station name that would overlap one already shown, keeping the first', () => {
+  const box = (left: number, top: number) => ({ left, right: left + 60, top, bottom: top + 14 })
+  // The stop across the street (same spot, give or take), then one well clear of both.
+  expect(keepLabels([box(0, 0), box(5, 3), box(0, 40)])).toEqual([true, false, true])
+  // 2 px apart: too close with the default 4 px gap, fine with none.
+  expect(keepLabels([box(0, 0), box(62, 0)])).toEqual([true, false])
+  expect(keepLabels([box(0, 0), box(62, 0)], 0)).toEqual([true, true])
 })

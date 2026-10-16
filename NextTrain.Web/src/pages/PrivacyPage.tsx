@@ -25,6 +25,11 @@ export default function PrivacyPage() {
             through Apple's push notification service. Turning them off in Settings deletes the token.
           </li>
           <li>
+            <strong>Live Activities (iPhone app).</strong> While your commute's Live Activity is on your Lock Screen, we store
+            the update token Apple gives it, so we can keep its train times current with the app closed. We delete it when
+            the commute window ends or the Live Activity is closed.
+          </li>
+          <li>
             <strong>Your location.</strong> "Near you" and the map's locate button use your location on your device only,
             to sort stations by distance and center the map. It's never sent to our servers. You can turn location access
             off at any time; the rest of NextTrain keeps working.

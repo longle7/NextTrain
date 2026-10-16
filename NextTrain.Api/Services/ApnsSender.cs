@@ -18,7 +18,14 @@ namespace NextTrain.Api.Services
         bool IsConfigured { get; }
 
         Task<ApnsResult> SendAsync(string deviceToken, string title, string body, CancellationToken cancellationToken = default);
+
+        // Updates a Live Activity (new departures, alert), or ends it when `end` is true.
+        Task<ApnsResult> UpdateLiveActivityAsync(string activityToken, LiveActivityContent content, bool end, CancellationToken cancellationToken = default);
     }
+
+    // A Live Activity's content-state: what CommuteActivityAttributes.ContentState decodes (departures in Unix seconds,
+    // soonest first, and the worst alert), and when it goes stale (the end of the commute window).
+    public record LiveActivityContent(IReadOnlyList<long> Departures, string? Alert, DateTimeOffset StaleAt);
 
     /// <summary>
     /// Sends notifications through Apple's push service (APNs) over HTTP/2, authenticated with a token signed by our
@@ -49,23 +56,46 @@ namespace NextTrain.Api.Services
         public bool IsConfigured =>
             !string.IsNullOrWhiteSpace(_teamId) && !string.IsNullOrWhiteSpace(_keyId) && !string.IsNullOrWhiteSpace(_privateKey);
 
-        public async Task<ApnsResult> SendAsync(string deviceToken, string title, string body, CancellationToken cancellationToken = default)
+        public Task<ApnsResult> SendAsync(string deviceToken, string title, string body, CancellationToken cancellationToken = default)
         {
             var now = DateTimeOffset.UtcNow;
+            // A delay notice is pointless later: Apple drops it if the phone stays unreachable for an hour.
+            return PostAsync(deviceToken, _topic, "alert", priority: 10, expires: now.AddHours(1), now,
+                new { aps = new { alert = new { title, body }, sound = "default" } }, cancellationToken);
+        }
+
+        // Priority 5: Apple delivers it soon, without counting against the app's budget of urgent updates. Expires in
+        // two minutes, since the next minute brings fresher times. Ending dismisses it from the Lock Screen a minute later.
+        public Task<ApnsResult> UpdateLiveActivityAsync(string activityToken, LiveActivityContent content, bool end, CancellationToken cancellationToken = default)
+        {
+            var now = DateTimeOffset.UtcNow;
+            var aps = new Dictionary<string, object?>
+            {
+                ["timestamp"] = now.ToUnixTimeSeconds(),
+                ["event"] = end ? "end" : "update",
+                ["content-state"] = content.Alert is null
+                    ? new Dictionary<string, object> { ["departures"] = content.Departures }
+                    : new Dictionary<string, object> { ["departures"] = content.Departures, ["alert"] = content.Alert },
+                [end ? "dismissal-date" : "stale-date"] = end ? now.AddMinutes(1).ToUnixTimeSeconds() : content.StaleAt.ToUnixTimeSeconds(),
+            };
+            return PostAsync(activityToken, $"{_topic}.push-type.liveactivity", "liveactivity", priority: 5, expires: now.AddMinutes(2), now,
+                new { aps }, cancellationToken);
+        }
+
+        private async Task<ApnsResult> PostAsync(string deviceToken, string topic, string pushType, int priority, DateTimeOffset expires,
+            DateTimeOffset now, object payload, CancellationToken cancellationToken)
+        {
             using var request = new HttpRequestMessage(HttpMethod.Post, $"https://api.push.apple.com/3/device/{deviceToken}")
             {
                 Version = HttpVersion.Version20,
                 VersionPolicy = HttpVersionPolicy.RequestVersionExact,
-                Content = JsonContent.Create(new
-                {
-                    aps = new { alert = new { title, body }, sound = "default" },
-                }),
+                Content = JsonContent.Create(payload),
             };
             request.Headers.Authorization = new AuthenticationHeaderValue("bearer", Token(now));
-            request.Headers.Add("apns-topic", _topic);
-            request.Headers.Add("apns-push-type", "alert");
-            // A delay notice is pointless later: Apple drops it if the phone stays unreachable for an hour.
-            request.Headers.Add("apns-expiration", now.AddHours(1).ToUnixTimeSeconds().ToString());
+            request.Headers.Add("apns-topic", topic);
+            request.Headers.Add("apns-push-type", pushType);
+            request.Headers.Add("apns-priority", priority.ToString());
+            request.Headers.Add("apns-expiration", expires.ToUnixTimeSeconds().ToString());
 
             using var response = await _http.SendAsync(request, cancellationToken);
             if (response.IsSuccessStatusCode) return ApnsResult.Sent;

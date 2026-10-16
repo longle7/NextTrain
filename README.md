@@ -41,6 +41,8 @@ Commutes belong to an anonymous ID stored on the device (sent as `X-User-Id`) un
 | DELETE | `/me` | Delete everything stored for this user (the app's "Delete my data") |
 | PUT | `/me/push-token` | Send delay notifications for your commutes to this phone; body `{ "token": "<Apple device token>" }` |
 | DELETE | `/me/push-token` | Stop delay notifications to this phone |
+| PUT | `/me/live-activity` | Keep this commute's Live Activity updated with the app closed; body `{ "commuteId": 7, "token": "<Live Activity push token>", "endsAt": <Unix seconds> }` |
+| DELETE | `/me/live-activity` | Stop updating it (the app ended it) |
 
 Routes: `Red`, `Mattapan`, `Orange`, `Blue`, `Green-B`, `Green-C`, `Green-D`, `Green-E`. Direction is `0` or `1`.
 
@@ -104,6 +106,7 @@ How the API works (station import, caching, errors, adding an endpoint) is in [d
 - Ridership is average weekday boardings per station from MassDOT's Fall 2024 counts (embedded snapshot, applied on import). Mattapan stops are not in the dataset.
 - `/alerts` returns every subway alert with the routes, stations, and directions it covers; the app decides what each line, station, and commute shows. A line's status counts alerts of severity 3 and up (MBTA uses 1-2 for things like a closed staircase, which still show on that station's page).
 - Delay notifications: `DelayNotifier`, a background job in the API, checks every minute for major alerts (suspensions, shuttles, closures, detours, or anything of severity 5 and up) on the line, station, and direction of each commute that's on or starts within 30 minutes, and sends each rider each alert once through Apple's push service (`ApnsSender`). Phones register with `PUT /me/push-token`. It's off until the APNs key is set (`Apns:KeyId`, `Apns:PrivateKey`; the team ID comes from `MapKit:TeamId`).
+- Live Activities: the app registers each one's push token with `PUT /me/live-activity`, and `LiveActivityUpdater` pushes its commute's next three departures and worst alert every minute (priority 5, so it doesn't use up Apple's budget for urgent updates) until the window ends, then ends it.
 - The live map (`/map`) is Apple Maps (MapKit JS), loaded only when the map opens. `mapkit.ts` pins Apple's script to one version with a Subresource Integrity hash, and MapKit gets its 30-minute tokens from `GET /mapkit/token`, so the signing key stays on the server. Trains are drawn on their own line, pointing the way they're going (`snap.ts`).
 
 ## Hosting (Azure)
