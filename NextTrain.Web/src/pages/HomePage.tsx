@@ -388,28 +388,30 @@ function MyCommutes({ routes, alerts: subwayAlerts }: { routes: Route[] | undefi
       <Status error={failure(commutes)} loading={!commutes.data && !commutes.error} rows={1} />
       {commutes.data?.length === 0 && <GetStarted />}
       {hasCommutes && <NotificationsPrompt />}
+      {/* The commute that's on (or next) in full, with its live times; the others one line each, until their turn. */}
       <ul className="space-y-2">
-        {sorted?.map((commute) => (
-          <li key={commute.id}>
-            <CommuteCard
-              commute={commute}
-              route={routes?.find((r) => r.id === commute.routeId)}
-              routes={routes}
-              now={now}
-              liveActivity={commute.id === liveId}
-              alert={
-                alerts &&
-                majorAlert(alertsFor(alerts, { routeIds: [commute.routeId], stopId: commute.mbtaStopId, directionId: commute.directionId }))
-              }
-              planned={plannedFor(
-                upcoming,
-                { routeIds: [commute.routeId], stopId: commute.mbtaStopId, directionId: commute.directionId },
-                commute.activeDays,
-                now,
+        {sorted?.map((commute, i) => {
+          const route = routes?.find((r) => r.id === commute.routeId)
+          const scope = { routeIds: [commute.routeId], stopId: commute.mbtaStopId, directionId: commute.directionId }
+          const alert = alerts && majorAlert(alertsFor(alerts, scope))
+          return (
+            <li key={commute.id}>
+              {i === 0 ? (
+                <CommuteCard
+                  commute={commute}
+                  route={route}
+                  routes={routes}
+                  now={now}
+                  liveActivity={commute.id === liveId}
+                  alert={alert}
+                  planned={plannedFor(upcoming, scope, commute.activeDays, now)}
+                />
+              ) : (
+                <CommuteRow commute={commute} route={route} routes={routes} now={now} alert={alert} />
               )}
-            />
-          </li>
-        ))}
+            </li>
+          )
+        })}
       </ul>
     </section>
   )
@@ -476,6 +478,46 @@ function CommuteCard({ commute, route, routes, now, liveActivity, alert, planned
         </Link>
       </div>
       {live && <CommuteDepartures commute={commute} route={route} routes={routes} alert={alert} liveActivity={liveActivity} />}
+    </Card>
+  )
+}
+
+// A commute that isn't the one on now: one line, tap for its station. It opens in full once it's the next one.
+function CommuteRow({ commute, route, routes, now, alert }: {
+  commute: Commute
+  route: Route | undefined
+  routes: Route[] | undefined
+  now: Date
+  alert: Alert | undefined
+}) {
+  const destination = route?.directionDestinations[commute.directionId] ?? '…'
+  return (
+    <Card>
+      <div className="-my-1 flex items-center gap-2">
+        <Link to={`/stations/${commute.mbtaStopId}`} className="flex min-h-11 min-w-0 flex-1 items-center gap-2.5">
+          <LineBadge routeId={commute.routeId} routes={routes} />
+          <span className="min-w-0 flex-1">
+            <span className="block truncate font-semibold">
+              {commute.stationName} <span className="font-normal text-neutral-600 dark:text-neutral-300">to {destination}</span>
+            </span>
+            <span className="block truncate text-sm text-neutral-500">
+              {daysLabel(commute.activeDays)} · {timingLabel(commuteTiming(commute, now), now)}
+            </span>
+          </span>
+          {alert && (
+            <span className="shrink-0 text-amber-700 dark:text-amber-400">
+              <WarningIcon className="size-5" />
+              <span className="sr-only">{alert.summary}</span>
+            </span>
+          )}
+        </Link>
+        <Link to={`/commutes/${commute.id}`} className={`-mr-2 shrink-0 text-sm ${linkButton}`}>
+          Edit
+          <span className="sr-only">
+            {' '}commute: {commute.stationName} to {destination}
+          </span>
+        </Link>
+      </div>
     </Card>
   )
 }
