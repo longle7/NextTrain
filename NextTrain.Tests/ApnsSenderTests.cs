@@ -73,6 +73,38 @@ public class ApnsSenderTests : IDisposable
     }
 
     [Fact]
+    public async Task ALiveActivityUpdate_GoesToItsTopic_WithTheContentStateTheAppDecodes()
+    {
+        var staleAt = DateTimeOffset.UtcNow.AddMinutes(20);
+        var result = await Sender().UpdateLiveActivityAsync(Token, new LiveActivityContent([1760270580, 1760270940], "Red Line delay", staleAt), end: false);
+
+        Assert.Equal(ApnsResult.Sent, result);
+        var (request, body) = Assert.Single(_apple.Requests);
+        Assert.Equal("com.longledev.nexttrain.push-type.liveactivity", request.Headers.GetValues("apns-topic").Single());
+        Assert.Equal("liveactivity", request.Headers.GetValues("apns-push-type").Single());
+        Assert.Equal("5", request.Headers.GetValues("apns-priority").Single());
+        using var json = JsonDocument.Parse(body);
+        var aps = json.RootElement.GetProperty("aps");
+        Assert.Equal("update", aps.GetProperty("event").GetString());
+        Assert.Equal(staleAt.ToUnixTimeSeconds(), aps.GetProperty("stale-date").GetInt64());
+        var state = aps.GetProperty("content-state");
+        Assert.Equal([1760270580L, 1760270940L], state.GetProperty("departures").EnumerateArray().Select(d => d.GetInt64()));
+        Assert.Equal("Red Line delay", state.GetProperty("alert").GetString());
+    }
+
+    [Fact]
+    public async Task EndingALiveActivity_DismissesIt_AndLeavesOutAMissingAlert()
+    {
+        await Sender().UpdateLiveActivityAsync(Token, new LiveActivityContent([], null, DateTimeOffset.UtcNow), end: true);
+
+        using var json = JsonDocument.Parse(Assert.Single(_apple.Requests).Body);
+        var aps = json.RootElement.GetProperty("aps");
+        Assert.Equal("end", aps.GetProperty("event").GetString());
+        Assert.True(aps.TryGetProperty("dismissal-date", out _));
+        Assert.False(aps.GetProperty("content-state").TryGetProperty("alert", out _));
+    }
+
+    [Fact]
     public async Task TheSignedToken_IsReused()
     {
         var sender = Sender();

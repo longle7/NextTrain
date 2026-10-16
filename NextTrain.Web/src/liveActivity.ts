@@ -1,5 +1,5 @@
-import { Capacitor, registerPlugin } from '@capacitor/core'
-import { API_URL, lineLabel, type Alert, type Commute, type Route } from './api'
+import { Capacitor, registerPlugin, type PluginListenerHandle } from '@capacitor/core'
+import { api, API_URL, lineLabel, type Alert, type Commute, type Route } from './api'
 
 // The iPhone app's Live Activity: a commute's next trains on the Lock Screen and in the Dynamic Island.
 // The native side is ios/App/App/LiveActivityPlugin.swift; on the website every call does nothing.
@@ -37,6 +37,7 @@ interface LiveActivityPlugin {
   show(details: LiveActivityDetails): Promise<void>
   endAll(): Promise<void>
   setWidgetCommutes(saved: { apiUrl: string; commutes: WidgetCommute[] }): Promise<void>
+  addListener(event: 'pushToken', listener: (activity: { commuteId: number; token: string; endsAt: number }) => void): Promise<PluginListenerHandle>
 }
 
 const plugin = registerPlugin<LiveActivityPlugin>('LiveActivity')
@@ -60,7 +61,25 @@ export const liveActivitiesAvailable = async () =>
 /** Starts or updates this commute's Live Activity, and ends any other: one commute shows at a time. */
 export const showLiveActivity = (details: LiveActivityDetails) => (native ? quietly(plugin.show(details)) : Promise.resolve(false))
 
-export const endLiveActivities = () => (native ? quietly(plugin.endAll()) : Promise.resolve(false))
+/** Ends the Live Activity, and tells our API to stop updating it. */
+export const endLiveActivities = () => {
+  if (!native) return Promise.resolve(false)
+  api('/me/live-activity', { method: 'DELETE' }).catch(() => {})
+  return quietly(plugin.endAll())
+}
+
+/**
+ * At launch (iPhone app): each Live Activity's push token goes to our API, which then keeps its times fresh while the
+ * app is closed, until the commute window ends (the API's LiveActivityUpdater).
+ */
+export function sendLiveActivityTokens() {
+  if (!native) return
+  plugin
+    .addListener('pushToken', (activity) => {
+      api('/me/live-activity', { method: 'PUT', body: JSON.stringify(activity) }).catch(() => {}) // the next token retries
+    })
+    .catch(() => {})
+}
 
 /** Gives the Home Screen widget your commutes (none after Delete my data). The widget fetches their times itself. */
 export const updateWidget = (commutes: WidgetCommute[]) =>
