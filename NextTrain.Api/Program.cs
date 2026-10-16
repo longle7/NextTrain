@@ -60,6 +60,8 @@ builder.Services.AddSingleton<IApnsSender>(services => new ApnsSender(
     services.GetRequiredService<IConfiguration>(),
     services.GetRequiredService<ILogger<ApnsSender>>()));
 builder.Services.AddHostedService<DelayNotifier>();
+// Live Activities keep counting down with the app closed: every minute, fresh times for each one (LiveActivityUpdater).
+builder.Services.AddHostedService<LiveActivityUpdater>();
 
 // Controllers handle the HTTP endpoints. MbtaUnavailableFilter turns "MBTA is down" into a 503 for all of them.
 builder.Services.AddControllers(options => options.Filters.Add<MbtaUnavailableFilter>());

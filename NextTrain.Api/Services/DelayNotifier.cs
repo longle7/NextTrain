@@ -123,13 +123,15 @@ namespace NextTrain.Api.Services
         {
             var major = alerts.Where(a => a.Attributes.Severity >= 5 || (a.Attributes.Severity >= 3 && Disruptions.Contains(a.Attributes.Effect))).ToList();
             return commutes
-                .SelectMany(c => major
-                    .Where(a => a.Attributes.InformedEntity.Any(e =>
-                        (e.Route is null || e.Route == c.RouteId) &&
-                        (e.Stop is null || e.Stop == c.Station!.MbtaStopId) &&
-                        (e.DirectionId is null || e.DirectionId == c.DirectionId)))
-                    .Select(a => (UserId: c.UserId, Alert: a)))
+                .SelectMany(c => major.Where(a => Covers(a, c)).Select(a => (UserId: c.UserId, Alert: a)))
                 .DistinctBy(m => (m.UserId, m.Alert.Id));
         }
+
+        /// <summary>Whether an alert covers a commute's route, station, and direction (as the app's alertsFor decides).</summary>
+        public static bool Covers(MbtaAlertDto alert, UserCommute commute) =>
+            alert.Attributes.InformedEntity.Any(e =>
+                (e.Route is null || e.Route == commute.RouteId) &&
+                (e.Stop is null || e.Stop == commute.Station!.MbtaStopId) &&
+                (e.DirectionId is null || e.DirectionId == commute.DirectionId));
     }
 }

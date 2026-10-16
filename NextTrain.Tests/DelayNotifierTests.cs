@@ -15,20 +15,6 @@ namespace NextTrain.Tests;
 /// </summary>
 public class DelayNotifierTests
 {
-    // Records what would have gone to Apple; answers Unregistered for the tokens in Gone.
-    private class FakeApns : IApnsSender
-    {
-        public List<(string Token, string Title, string Body)> Sent { get; } = new();
-        public HashSet<string> Gone { get; } = new();
-        public bool IsConfigured => true;
-
-        public Task<ApnsResult> SendAsync(string deviceToken, string title, string body, CancellationToken cancellationToken = default)
-        {
-            Sent.Add((deviceToken, title, body));
-            return Task.FromResult(Gone.Contains(deviceToken) ? ApnsResult.Unregistered : ApnsResult.Sent);
-        }
-    }
-
     private static readonly Station ParkStreet = new() { MbtaStopId = "place-pktrm", Name = "Park Street", RouteId = "Green-B,Red" };
     private static readonly string AliceToken = new('a', 64), CarolToken = new('c', 64);
 
