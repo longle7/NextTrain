@@ -62,11 +62,12 @@ const svgElement = (tag: string, attributes: Record<string, string>) => {
 /**
  * A dot in the line's color with an arrowhead pointing the way the train (or bus) is heading (no arrow if unknown).
  * The arrowhead is notched, like a navigation arrow: a plain triangle looks the same turned by 120°, so its
- * direction can't be read. `ink` draws the arrow and outline: white on the subway's colors, black on bus yellow.
+ * direction can't be read. `ink` draws the arrow: white on the subway's colors, black on bus yellow. The ring is
+ * always white, with a dark halo (CSS: .train), so a train stands out on a line of its own color.
  */
 export function trainElement(color: string, heading: number | null, label: string, preview: Preview, ink = 'white') {
   const svg = svgElement('svg', { viewBox: '0 0 24 24', width: '24', height: '24', role: 'img', class: 'train' })
-  svg.append(svgElement('circle', { cx: '12', cy: '12', r: '10', 'stroke-width': '2' }))
+  svg.append(svgElement('circle', { cx: '12', cy: '12', r: '10', 'stroke-width': '2.5' }))
   svg.append(svgElement('path', { d: 'M12 4.5 L17 17 L12 14 L7 17 Z', 'stroke-linejoin': 'round' }))
   updateTrainElement(svg, color, heading, label, ink)
   // Its card: on mouse hover, or on a tap (a touchscreen has no hover).
@@ -80,7 +81,7 @@ export function trainElement(color: string, heading: number | null, label: strin
 export function updateTrainElement(svg: Element, color: string, heading: number | null, label: string, ink = 'white') {
   const [circle, arrow] = svg.children as unknown as [SVGElement, SVGElement]
   circle.style.fill = color // a style property, so an invalid value is just ignored
-  circle.style.stroke = ink
+  circle.style.stroke = 'white'
   arrow.style.fill = ink
   arrow.style.display = heading === null ? 'none' : ''
   ;(svg as SVGElement).style.transform = `rotate(${heading ?? 0}deg)`
@@ -165,6 +166,22 @@ export function stationElement(name: string, open: () => void, preview: Preview,
   dot.addEventListener('focus', () => preview.show(dot))
   dot.addEventListener('blur', () => preview.hide())
   return dot
+}
+
+type Box = { left: number; right: number; top: number; bottom: number }
+
+/**
+ * Which station names to show, in order: each one unless it would touch (within `gap` px) a name already kept. The
+ * stop on each side of a street has the same name and sits a few pixels away, so only one of them is labeled.
+ * ponytail: O(n²) over the names on the map (~150 at most); bucket by grid cell if routes ever get much denser.
+ */
+export function keepLabels(boxes: Box[], gap = 4): boolean[] {
+  const kept: Box[] = []
+  return boxes.map((b) => {
+    const clash = kept.some((k) => b.left < k.right + gap && b.right + gap > k.left && b.top < k.bottom + gap && b.bottom + gap > k.top)
+    if (!clash) kept.push(b)
+    return !clash
+  })
 }
 
 export const userElement = () => Object.assign(document.createElement('div'), { className: 'user-dot' })
