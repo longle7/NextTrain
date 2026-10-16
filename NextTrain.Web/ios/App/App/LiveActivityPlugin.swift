@@ -5,6 +5,8 @@ import WidgetKit
 
 /// The web app's bridge to Live Activities (see src/liveActivity.ts). One commute shows at a time: showing a commute
 /// updates its Live Activity if it's already up, starts it if not, and ends any other commute's.
+/// Each Live Activity also gets a push token from iOS, sent to the web app as a "pushToken" event; our API uses it to
+/// keep the times fresh while the app is closed (LiveActivityUpdater).
 @objc(LiveActivityPlugin)
 public class LiveActivityPlugin: CAPPlugin, CAPBridgedPlugin {
     public let identifier = "LiveActivityPlugin"
@@ -15,6 +17,9 @@ public class LiveActivityPlugin: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "endAll", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "setWidgetCommutes", returnType: CAPPluginReturnPromise),
     ]
+
+    // The Live Activities whose push tokens are being passed on, so each is watched once.
+    private var watched = Set<String>()
 
     /// False before iOS 16.2, or when the user turned Live Activities off for NextTrain in iOS Settings.
     @objc func isAvailable(_ call: CAPPluginCall) {
@@ -50,13 +55,15 @@ public class LiveActivityPlugin: CAPPlugin, CAPBridgedPlugin {
             }
             if let current {
                 await current.update(content)
+                self.watchPushToken(current, endsAt: endsAt)
                 return call.resolve()
             }
             do {
                 let attributes = CommuteActivityAttributes(
                     commuteId: commuteId, stationName: stationName, destination: destination,
                     lineName: lineName, lineColor: lineColor, lineTextColor: lineTextColor)
-                _ = try Activity.request(attributes: attributes, content: content)
+                let activity = try Activity.request(attributes: attributes, content: content, pushType: .token)
+                self.watchPushToken(activity, endsAt: endsAt)
                 call.resolve()
             } catch {
                 call.reject(error.localizedDescription)
@@ -73,6 +80,21 @@ public class LiveActivityPlugin: CAPPlugin, CAPBridgedPlugin {
         }
         WidgetCenter.shared.reloadAllTimelines()
         call.resolve()
+    }
+
+    /// Passes each push token iOS gives this Live Activity (now, and whenever it changes) to the web app, which sends it
+    /// to our API. Kept until JavaScript listens, since this can happen before the page has loaded.
+    @available(iOS 16.2, *)
+    private func watchPushToken(_ activity: Activity<CommuteActivityAttributes>, endsAt: Double) {
+        guard watched.insert(activity.id).inserted else { return }
+        Task {
+            for await data in activity.pushTokenUpdates {
+                let token = data.map { String(format: "%02x", $0) }.joined()
+                self.notifyListeners("pushToken", data: [
+                    "commuteId": activity.attributes.commuteId, "token": token, "endsAt": endsAt,
+                ], retainUntilConsumed: true)
+            }
+        }
     }
 
     @objc func endAll(_ call: CAPPluginCall) {
