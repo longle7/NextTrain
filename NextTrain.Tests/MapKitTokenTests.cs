@@ -20,10 +20,8 @@ public class MapKitTokenTests : IDisposable
 
     public MapKitTokenTests()
     {
-        _factory = new WebApplicationFactory<Program>().WithWebHostBuilder(b => b
+        _factory = TestDb.Api(b => b
             .UseEnvironment("Production") // Development would allow calls without an Origin
-            .UseSetting("ConnectionStrings:DefaultConnection", TestDb.ConnectionString)
-            .UseSetting("Stations:RefreshHours", "0")
             .UseSetting("MapKit:TeamId", "TEAM123456")
             .UseSetting("MapKit:KeyId", "KEY1234567")
             .UseSetting("MapKit:PrivateKey", _key.ExportPkcs8PrivateKeyPem()));
@@ -74,10 +72,7 @@ public class MapKitTokenTests : IDisposable
     [Fact]
     public async Task Token_Is404_UntilMapKitIsConfigured()
     {
-        using var factory = new WebApplicationFactory<Program>().WithWebHostBuilder(b => b
-            .UseSetting("ConnectionStrings:DefaultConnection", TestDb.ConnectionString)
-            .UseSetting("Stations:RefreshHours", "0")
-            .UseSetting("MapKit:PrivateKey", "")); // blank even where a developer's user-secrets set one
+        using var factory = TestDb.Api(b => b.UseSetting("MapKit:PrivateKey", "")); // blank even where a developer's user-secrets set one
         using var client = factory.CreateClient();
         client.DefaultRequestHeaders.Add("Origin", "capacitor://localhost");
 

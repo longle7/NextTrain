@@ -1,3 +1,5 @@
+using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
 using NextTrain.Api.Data;
 
@@ -14,6 +16,14 @@ public static class TestDb
     public static readonly string ConnectionString =
         Environment.GetEnvironmentVariable("NEXTTRAIN_TEST_DB")
         ?? "Server=localhost;Database=NextTrainDb_Tests;Trusted_Connection=True;TrustServerCertificate=True;";
+
+    /// <summary>The API on the test database, with the startup station import off; `more` adds a test's own setup.</summary>
+    public static WebApplicationFactory<Program> Api(Action<IWebHostBuilder>? more = null) =>
+        new WebApplicationFactory<Program>().WithWebHostBuilder(b =>
+        {
+            b.UseSetting("ConnectionStrings:DefaultConnection", ConnectionString).UseSetting("Stations:RefreshHours", "0");
+            more?.Invoke(b);
+        });
 
     public static NextTrainDbContext Open() =>
         new(new DbContextOptionsBuilder<NextTrainDbContext>().UseSqlServer(ConnectionString).Options);

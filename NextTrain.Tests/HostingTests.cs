@@ -8,10 +8,7 @@ namespace NextTrain.Tests;
 /// </summary>
 public class HostingTests : IDisposable
 {
-    private readonly WebApplicationFactory<Program> _factory = new WebApplicationFactory<Program>()
-        .WithWebHostBuilder(b => b
-                .UseSetting("ConnectionStrings:DefaultConnection", TestDb.ConnectionString)
-                .UseSetting("Stations:RefreshHours", "0"));
+    private readonly WebApplicationFactory<Program> _factory = TestDb.Api();
 
     public void Dispose() => _factory.Dispose();
 

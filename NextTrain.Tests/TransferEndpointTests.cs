@@ -36,11 +36,8 @@ public class TransferEndpointTests : IDisposable
             new MbtaStopDto { Id = "place-kencl" }, new MbtaStopDto { Id = "place-pktrm" }, new MbtaStopDto { Id = "place-gover" },
         };
 
-        _factory = new WebApplicationFactory<Program>()
-            .WithWebHostBuilder(b => b
-                .UseSetting("ConnectionStrings:DefaultConnection", TestDb.ConnectionString)
-                .UseSetting("Stations:RefreshHours", "0")
-                .ConfigureTestServices(services => services.AddSingleton<IMbtaClient>(_mbta).AddSingleton<TimeProvider>(new FixedClock(Noon))));
+        _factory = TestDb.Api(b => b.ConfigureTestServices(services =>
+            services.AddSingleton<IMbtaClient>(_mbta).AddSingleton<TimeProvider>(new FixedClock(Noon))));
     }
 
     // The predictions below are around noon on Saturday, October 10, 2026, in Boston.

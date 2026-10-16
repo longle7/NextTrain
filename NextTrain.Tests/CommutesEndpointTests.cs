@@ -21,10 +21,7 @@ public class CommutesEndpointTests : IDisposable
             db.SaveChanges();
         }
 
-        _factory = new WebApplicationFactory<Program>()
-            .WithWebHostBuilder(b => b
-                .UseSetting("ConnectionStrings:DefaultConnection", TestDb.ConnectionString)
-                .UseSetting("Stations:RefreshHours", "0"));
+        _factory = TestDb.Api();
     }
 
     public void Dispose() => _factory.Dispose();

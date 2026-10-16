@@ -32,11 +32,7 @@ public class StationsEndpointTests : IDisposable
             db.SaveChanges();
         }
 
-        _factory = new WebApplicationFactory<Program>()
-            .WithWebHostBuilder(b => b
-                .UseSetting("ConnectionStrings:DefaultConnection", TestDb.ConnectionString)
-                .UseSetting("Stations:RefreshHours", "0")
-                .ConfigureTestServices(services => services.AddSingleton<IMbtaClient>(_mbta)));
+        _factory = TestDb.Api(b => b.ConfigureTestServices(services => services.AddSingleton<IMbtaClient>(_mbta)));
         _client = _factory.CreateClient();
     }
 

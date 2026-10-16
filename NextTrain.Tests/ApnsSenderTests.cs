@@ -1,3 +1,4 @@
+using System.Buffers.Text;
 using System.Net;
 using System.Security.Cryptography;
 using System.Text;
@@ -65,11 +66,11 @@ public class ApnsSenderTests : IDisposable
 
         // "bearer <ES256 JWT>": our team, our key's ID, and a signature the key verifies.
         var jwt = request.Headers.GetValues("authorization").Single()["bearer ".Length..].Split('.');
-        using var header = JsonDocument.Parse(FromBase64Url(jwt[0]));
+        using var header = JsonDocument.Parse(Base64Url.DecodeFromChars(jwt[0]));
         Assert.Equal("PUSHKEY123", header.RootElement.GetProperty("kid").GetString());
-        using var claims = JsonDocument.Parse(FromBase64Url(jwt[1]));
+        using var claims = JsonDocument.Parse(Base64Url.DecodeFromChars(jwt[1]));
         Assert.Equal("TEAM123456", claims.RootElement.GetProperty("iss").GetString());
-        Assert.True(_key.VerifyData(Encoding.ASCII.GetBytes(jwt[0] + "." + jwt[1]), FromBase64Url(jwt[2]), HashAlgorithmName.SHA256));
+        Assert.True(_key.VerifyData(Encoding.ASCII.GetBytes(jwt[0] + "." + jwt[1]), Base64Url.DecodeFromChars(jwt[2]), HashAlgorithmName.SHA256));
     }
 
     [Fact]
@@ -131,7 +132,4 @@ public class ApnsSenderTests : IDisposable
 
     [Fact]
     public void WithoutAKey_ItIsOff() => Assert.False(Sender(configured: false).IsConfigured);
-
-    private static byte[] FromBase64Url(string s) =>
-        Convert.FromBase64String(s.Replace('-', '+').Replace('_', '/').PadRight(s.Length + (4 - s.Length % 4) % 4, '='));
 }
