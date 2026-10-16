@@ -25,6 +25,17 @@ To retake them, run the app locally (API on 5112, Vite on 5173) and capture at 4
 
 Make the app **iPhone-only** in Xcode (Supported Destinations: iPhone). Otherwise Apple also requires iPad screenshots and reviews the iPad layout.
 
+## Artwork
+
+For App Store Connect's artwork (the header and search-result slots take **5244 × 2950** or **3840 × 1646**). Drawn from the app icon (its train, background, and the line colors) with no words, since Apple writes its own text over the bottom:
+
+| File | Size | Shape |
+|---|---|---|
+| `artwork/artwork-5244x2950.png` | 5244 × 2950 | 16:9 |
+| `artwork/artwork-3840x1646.png` | 3840 × 1646 | 21:9, wider |
+
+Upload whichever size the slot asks for. To change them, edit and run `node docs/app-store/artwork/render.mjs` (needs Playwright and Edge, as for the screenshots).
+
 ## Listing text
 
 Updated for **version 1.3**; 1.0 was approved with the subway-only wording. The name and subtitle can change with any new version.
