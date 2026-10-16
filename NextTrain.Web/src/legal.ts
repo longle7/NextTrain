@@ -4,3 +4,10 @@ export const OPERATOR = 'longledev'
 export const CONTACT_EMAIL = 'privacy@longledev.com'
 export const EFFECTIVE_DATE = 'October 14, 2026'
 export const GOVERNING_STATE = 'Massachusetts'
+
+/** The legal pages, linked from each other and from Settings. */
+export const legalPages = [
+  ['/privacy', 'Privacy Policy'],
+  ['/terms', 'Terms of Use'],
+  ['/cookies', 'Cookie Policy'],
+] as const

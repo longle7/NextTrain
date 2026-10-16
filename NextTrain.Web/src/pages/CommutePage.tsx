@@ -1,7 +1,7 @@
 import { useState, type ReactNode } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router'
 import {
-  api, ApiError, busDirections, busRouteIds, findRoute, getBusStops, getRoutes, getStations, lineLabel, ROUTES, searchStations,
+  api, ApiError, busDirections, busRouteIds, findRoute, getBusStops, getRoutes, getStations, ROUTES, routeName, searchStations,
   stationRouteIds, towardLabel,
   type Commute, type CommuteInput, type Route, type Station,
 } from '../api'
@@ -67,10 +67,7 @@ function CommuteForm({ existing, initialStopId, initialRouteId }: { existing: Co
     : ''
   const ride = usePolling(() => (changes && ridePath ? api<Station[]>(ridePath) : Promise.resolve<Station[]>([])), `${ridePath}|${changes}`)
   const otherRoutes = (s: Station) => [...stationRouteIds(s), ...busRouteIds(s)].filter((id) => id !== chosenRouteId)
-  const routeName = (id: string) => {
-    const r = findRoute(routes.data, id)
-    return r?.type === 'bus' ? `Route ${lineLabel(id, r)}` : (r?.name ?? id)
-  }
+  const nameOf = (id: string) => routeName(id, findRoute(routes.data, id))
   const boardingAt = ride.data?.findIndex((s) => s.mbtaStopId === station?.mbtaStopId) ?? -1
   const changeStations = ride.data && boardingAt >= 0 ? ride.data.slice(boardingAt + 1).filter((s) => otherRoutes(s).length > 0) : []
   const changeStation = changeStations.find((s) => s.mbtaStopId === transferStopId)
@@ -197,7 +194,7 @@ function CommuteForm({ existing, initialStopId, initialRouteId }: { existing: Co
                     <span aria-hidden>
                       <LineBadge routeId={transferRoute.id} routes={routes.data} />
                     </span>
-                    <span className="sr-only">{routeName(transferRoute.id)} toward</span>
+                    <span className="sr-only">{nameOf(transferRoute.id)} toward</span>
                     <strong>{transferRoute.directionDestinations[chosenTransferDirection]}</strong>
                   </p>
                   <p className="text-sm text-neutral-500">{transferMinutes} min to change</p>
@@ -247,7 +244,7 @@ function CommuteForm({ existing, initialStopId, initialRouteId }: { existing: Co
                               ))}
                               {otherRoutes(s).length > 3 && <span className="text-xs font-semibold text-neutral-500">+{otherRoutes(s).length - 3}</span>}
                             </span>
-                            <span className="sr-only">: {otherRoutes(s).map(routeName).join(', ')}</span>
+                            <span className="sr-only">: {otherRoutes(s).map(nameOf).join(', ')}</span>
                           </button>
                         </li>
                       ))}
@@ -267,7 +264,7 @@ function CommuteForm({ existing, initialStopId, initialRouteId }: { existing: Co
                           <span aria-hidden>
                             <LineBadge routeId={id} routes={routes.data} />
                           </span>
-                          <span className="text-left">{routeName(id)}</span>
+                          <span className="text-left">{nameOf(id)}</span>
                         </Choice>
                       ))}
                     </div>

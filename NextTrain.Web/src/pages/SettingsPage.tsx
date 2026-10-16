@@ -7,6 +7,7 @@ import { forgetRemembered } from '../cache'
 import { api, commutePredictionsPath, forgetUserId, getRoutes, type Commute, type Prediction } from '../api'
 import { sortCommutes } from '../commutes'
 import { Card, dangerButton, primaryButton } from '../components'
+import { legalPages } from '../legal'
 import { endLiveActivities, liveActivitiesAvailable, liveActivityDetails, showLiveActivity, updateWidget } from '../liveActivity'
 import { forgetNotificationChoice, notificationChoice, notificationsAvailable, notificationsBlocked, turnOffNotifications, turnOnNotifications } from '../notifications'
 import { groupDepartures } from '../time'
@@ -67,27 +68,15 @@ export default function SettingsPage() {
 
       <Section title="Legal">
         <ul className="divide-y divide-neutral-100 rounded-xl bg-white shadow-sm dark:divide-neutral-800 dark:bg-neutral-900">
-          {[
-            ['/privacy', 'Privacy Policy'],
-            ['/terms', 'Terms of Use'],
-            ['/cookies', 'Cookie Policy'],
-          ].map(([to, label]) => (
-            <Row key={to}>
-              <Link to={to} className="flex min-h-12 flex-1 items-center justify-between">
-                {label} <Chevron />
-              </Link>
-            </Row>
+          {legalPages.map(([to, label]) => (
+            <LinkRow key={to} to={to}>{label}</LinkRow>
           ))}
         </ul>
       </Section>
 
       <Section title="About">
         <ul className="divide-y divide-neutral-100 rounded-xl bg-white shadow-sm dark:divide-neutral-800 dark:bg-neutral-900">
-          <Row>
-            <Link to="/support" className="flex min-h-12 flex-1 items-center justify-between">
-              Help &amp; support <Chevron />
-            </Link>
-          </Row>
+          <LinkRow to="/support">Help &amp; support</LinkRow>
           <Row>
             <span className="flex min-h-12 flex-1 items-center justify-between">
               Version <span className="text-neutral-500">{version}</span>
@@ -153,7 +142,6 @@ function DelayNotifications() {
   )
 }
 
-// The website's analytics switch. Not shown where analytics can't run (the iPhone app, or no analytics set up).
 // iPhone app only. iOS has the on/off switch itself (Settings → NextTrain → Live Activities), so there's none here.
 function LiveActivities() {
   const [available, setAvailable] = useState(false)
@@ -200,6 +188,7 @@ function LiveActivities() {
   )
 }
 
+// The website's analytics switch. Not shown where analytics can't run (the iPhone app, or no analytics set up).
 function AnalyticsChoice() {
   const choice = useAnalyticsChoice()
   const blocked = analyticsBlocked()
@@ -262,6 +251,14 @@ function Switch({ on, disabled, labelledBy, describedBy, onClick }: {
 }
 
 const Row = ({ children }: { children: ReactNode }) => <li className="flex px-4">{children}</li>
+
+const LinkRow = ({ to, children }: { to: string; children: ReactNode }) => (
+  <Row>
+    <Link to={to} className="flex min-h-12 flex-1 items-center justify-between">
+      {children} <Chevron />
+    </Link>
+  </Row>
+)
 
 const Chevron = () => (
   <svg viewBox="0 0 24 24" className="size-5 fill-none stroke-neutral-400 stroke-2" aria-hidden>
