@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 import { Link } from 'react-router'
-import { CONTACT_EMAIL, EFFECTIVE_DATE } from '../legal'
+import { CONTACT_EMAIL, EFFECTIVE_DATE, legalPages } from '../legal'
 import { useTitle } from '../usePolling'
 
 const linkStyle = 'text-blue-700 underline dark:text-blue-300'
@@ -16,9 +16,9 @@ export function LegalPage({ title, children }: { title: string; children: ReactN
       </div>
       {children}
       <nav aria-label="Legal" className="flex flex-wrap gap-x-4 gap-y-1 border-t border-neutral-200 pt-4 text-sm dark:border-neutral-800">
-        <Link to="/privacy" className={linkStyle}>Privacy Policy</Link>
-        <Link to="/terms" className={linkStyle}>Terms of Use</Link>
-        <Link to="/cookies" className={linkStyle}>Cookie Policy</Link>
+        {legalPages.map(([to, label]) => (
+          <Link key={to} to={to} className={linkStyle}>{label}</Link>
+        ))}
       </nav>
     </article>
   )

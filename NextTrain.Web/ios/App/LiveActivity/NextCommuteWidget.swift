@@ -7,7 +7,6 @@ import WidgetKit
 
 /// One commute as the app saves it for the widget (src/liveActivity.ts, widgetCommutes).
 struct WidgetCommute: Decodable {
-    let id: Int
     let stopId: String
     let stationName: String
     let routeId: String
@@ -235,7 +234,7 @@ extension CommuteEntry {
     static let sample = CommuteEntry(
         date: .now,
         commute: WidgetCommute(
-            id: 0, stopId: "place-pktrm", stationName: "Park Street", routeId: "Red", directionId: 1, destination: "Alewife",
+            stopId: "place-pktrm", stationName: "Park Street", routeId: "Red", directionId: 1, destination: "Alewife",
             lineName: "RL", lineColor: "#DA291C", lineTextColor: "#FFFFFF", windowStart: "08:00:00", windowEnd: "09:00:00",
             activeDays: "Mon,Tue,Wed,Thu,Fri"),
         isOn: true,

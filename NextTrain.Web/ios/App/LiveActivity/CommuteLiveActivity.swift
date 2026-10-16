@@ -131,16 +131,6 @@ struct LineBadge: View {
     let color: String
     let textColor: String
 
-    init(name: String, color: String, textColor: String) {
-        self.name = name
-        self.color = color
-        self.textColor = textColor
-    }
-
-    init(attributes: CommuteActivityAttributes) {
-        self.init(name: attributes.lineName, color: attributes.lineColor, textColor: attributes.lineTextColor)
-    }
-
     var body: some View {
         Text(name)
             .font(.caption.bold())
@@ -148,6 +138,13 @@ struct LineBadge: View {
             .padding(.vertical, 3)
             .background(Capsule().fill(Color(hex: color)))
             .foregroundStyle(Color(hex: textColor))
+    }
+}
+
+// In an extension, so Swift still generates LineBadge(name:color:textColor:) for the widget.
+extension LineBadge {
+    init(attributes: CommuteActivityAttributes) {
+        self.init(name: attributes.lineName, color: attributes.lineColor, textColor: attributes.lineTextColor)
     }
 }
 

@@ -76,17 +76,12 @@ public class FakeMbtaClient : IMbtaClient
     public Task<IReadOnlyList<MbtaShape>> GetRouteShapesAsync(string routeId) =>
         Task.FromResult<IReadOnlyList<MbtaShape>>(RouteShapes.GetValueOrDefault(routeId) ?? new());
 
-    // Set AlertsError to simulate MBTA being down.
     public List<MbtaAlertDto> Alerts { get; } = new();
-    public Exception? AlertsError { get; set; }
 
     // Keyed by the route IDs asked for, e.g. "1,741".
     public Dictionary<string, List<MbtaAlertDto>> RouteAlerts { get; } = new();
 
-    public Task<IReadOnlyList<MbtaAlertDto>> GetSubwayAlertsAsync() =>
-        AlertsError is not null
-            ? Task.FromException<IReadOnlyList<MbtaAlertDto>>(AlertsError)
-            : Task.FromResult<IReadOnlyList<MbtaAlertDto>>(Alerts);
+    public Task<IReadOnlyList<MbtaAlertDto>> GetSubwayAlertsAsync() => Task.FromResult<IReadOnlyList<MbtaAlertDto>>(Alerts);
 
     public Task<IReadOnlyList<MbtaAlertDto>> GetRouteAlertsAsync(string routeIds) =>
         Task.FromResult<IReadOnlyList<MbtaAlertDto>>(RouteAlerts.GetValueOrDefault(routeIds) ?? new());
@@ -102,4 +97,16 @@ public class FakeMbtaClient : IMbtaClient
 
     public Task<IReadOnlyList<MbtaAlertDto>> GetAccessAlertsAsync(string mbtaStopId) =>
         Task.FromResult<IReadOnlyList<MbtaAlertDto>>(AccessAlerts.GetValueOrDefault(mbtaStopId) ?? new());
+
+    // A prediction (or schedule entry) as MBTA sends it; times are ISO 8601 strings.
+    public static MbtaPredictionDto Prediction(string route, int direction, string? departure, string? trip = null, string? arrival = null) => new()
+    {
+        Attributes = new()
+        {
+            DirectionId = direction,
+            DepartureTime = departure is null ? null : DateTimeOffset.Parse(departure),
+            ArrivalTime = arrival is null ? null : DateTimeOffset.Parse(arrival),
+        },
+        Relationships = new() { Route = new() { Data = new() { Id = route } }, Trip = new() { Data = new() { Id = trip ?? "" } } },
+    };
 }

@@ -8,7 +8,7 @@ const BY_DATE_DAY = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] // Date.ge
 /** A commute starting within this long counts as "soon" and gets live departures. */
 const SOON_MS = 60 * 60_000
 
-export type CommuteTiming =
+type CommuteTiming =
   | { state: 'now'; ends: Date }
   | { state: 'soon' | 'later'; starts: Date }
   | { state: 'never' }
@@ -33,7 +33,7 @@ export function commuteTiming(commute: Schedule, now: Date): CommuteTiming {
 }
 
 /** The iPhone Live Activity shows from this long before a commute's window until the window ends. */
-export const LIVE_ACTIVITY_LEAD_MS = 15 * 60_000
+const LIVE_ACTIVITY_LEAD_MS = 15 * 60_000
 
 /** When the commute's Live Activity should end, if it should be showing at `now`; otherwise undefined. */
 export function liveActivityEnd(commute: Schedule, now: Date): Date | undefined {

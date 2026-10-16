@@ -32,11 +32,11 @@ it('labels Green Line branches like the app does', () => {
 it('gives the Home Screen widget each commute with its window, days, badge, colors, and destination', () => {
   expect(widgetCommutes([commute, { ...commute, id: 8, routeId: 'Green-B', directionId: 0 }], [red])).toEqual([
     {
-      id: 7, stopId: 'place-pktrm', stationName: 'Park Street', routeId: 'Red', directionId: 1, destination: 'Alewife',
+      stopId: 'place-pktrm', stationName: 'Park Street', routeId: 'Red', directionId: 1, destination: 'Alewife',
       lineName: 'RL', lineColor: '#DA291C', lineTextColor: '#FFFFFF',
       windowStart: '07:45:00', windowEnd: '08:15:00', activeDays: 'Mon,Tue,Wed,Thu,Fri',
     },
     // A route not loaded yet still gets its badge text, in gray.
-    expect.objectContaining({ id: 8, routeId: 'Green-B', lineName: 'GL B', lineColor: '#7C878E', destination: '' }),
+    expect.objectContaining({ routeId: 'Green-B', lineName: 'GL B', lineColor: '#7C878E', destination: '' }),
   ])
 })

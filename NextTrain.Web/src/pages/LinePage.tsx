@@ -1,7 +1,7 @@
 import { Link, useParams, useSearchParams } from 'react-router'
 import { alertsFor } from '../alerts'
 import {
-  ALERTS_REFRESH_MS, api, findRoute, getAlerts, getRoutes, isSubwayRoute, ROUTES, UPCOMING_REFRESH_MS, upcomingAlertsPath,
+  ALERTS_REFRESH_MS, api, findRoute, getAlerts, getRoutes, isSubwayRoute, ROUTES, routeName, UPCOMING_REFRESH_MS, upcomingAlertsPath,
   type Alert, type Station, type Vehicle,
 } from '../api'
 import { AlertBanner, Card, LineBadge, LoadingText, NotFound, secondaryButton, Status, StationLink } from '../components'
@@ -51,7 +51,7 @@ export default function LinePage() {
   const ink = route?.textColor ?? '#FFFFFF' // readable on `color`: black on bus yellow
   // Bus yellow is too pale against a white card on its own; a thin dark edge keeps the strip visible.
   const edge = route?.textColor === '#000000' ? 'inset 0 0 0 1px rgb(0 0 0 / 0.3)' : undefined
-  const name = route && (bus ? `Route ${route.shortName || route.id}` : route.name)
+  const name = route && routeName(route.id, route)
   useTitle(notFound ? 'Line not found' : (name ?? routeId))
   const trains =
     lineOrder && route && stations.data && vehicles.data

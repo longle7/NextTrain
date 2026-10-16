@@ -11,11 +11,7 @@ namespace NextTrain.Tests;
 /// </summary>
 public class RateLimitTests : IDisposable
 {
-    private readonly WebApplicationFactory<Program> _factory = new WebApplicationFactory<Program>()
-        .WithWebHostBuilder(b => b
-            .UseSetting("ConnectionStrings:DefaultConnection", TestDb.ConnectionString)
-            .UseSetting("Stations:RefreshHours", "0")
-            .UseSetting("RateLimit:PerMinute", "3"));
+    private readonly WebApplicationFactory<Program> _factory = TestDb.Api(b => b.UseSetting("RateLimit:PerMinute", "3"));
 
     public void Dispose() => _factory.Dispose();
 

@@ -1,34 +1,24 @@
 import { Capacitor } from '@capacitor/core'
 import { PushNotifications } from '@capacitor/push-notifications'
 import { api } from './api'
+import { readKey, writeKey } from './cache'
 
 // Delay notifications (iPhone app only): when a major delay or closure hits one of your commutes, the API's
 // DelayNotifier sends it through Apple. Here: asking iOS for permission, and giving our API this phone's push token.
 
 /** 'on' or 'off' once the rider has chosen (the Home prompt or Settings); null before. Kept on this device. */
-export type NotificationChoice = 'on' | 'off' | null
+type NotificationChoice = 'on' | 'off' | null
 
 const KEY = 'nexttrain.notifications'
 
 export const notificationsAvailable = () => Capacitor.isNativePlatform()
 
 export function notificationChoice(): NotificationChoice {
-  try {
-    const value = localStorage.getItem(KEY)
-    return value === 'on' || value === 'off' ? value : null
-  } catch {
-    return null
-  }
+  const value = readKey(KEY)
+  return value === 'on' || value === 'off' ? value : null
 }
 
-function remember(choice: NotificationChoice) {
-  try {
-    if (choice) localStorage.setItem(KEY, choice)
-    else localStorage.removeItem(KEY)
-  } catch {
-    // storage blocked: asked again next time
-  }
-}
+const remember = (choice: NotificationChoice) => writeKey(KEY, choice)
 
 // iOS hands over the token after register(), here, and again whenever it changes.
 let listening: Promise<unknown> | undefined

@@ -1,13 +1,6 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Globalization;
-using System.Linq;
-using System.Net.Http;
-using System.Net.Http.Json;
+﻿using System.Globalization;
 using System.Text.Json;
-using System.Threading.Tasks;
 using Microsoft.Extensions.Caching.Memory;
-using Microsoft.Extensions.Configuration;
 using NextTrain.Core.Services;
 
 namespace NextTrain.Api.Services
@@ -45,25 +38,25 @@ namespace NextTrain.Api.Services
 
         private readonly HttpClient _httpClient;
         private readonly IMemoryCache _cache;
-        private readonly string? _apiKey;
 
         public MbtaClient(HttpClient httpClient, IConfiguration configuration, IMemoryCache cache)
         {
             _httpClient = httpClient;
             _cache = cache;
 
-            // Optional API key (Mbta:ApiKey in configuration). Sent as a header on every request; see GetAsync.
-            _apiKey = configuration["Mbta:ApiKey"];
+            // Optional API key (Mbta:ApiKey in configuration), sent as a header on every request.
+            var apiKey = configuration["Mbta:ApiKey"];
+            if (!string.IsNullOrWhiteSpace(apiKey)) _httpClient.DefaultRequestHeaders.Add("x-api-key", apiKey);
         }
 
         public async Task<IReadOnlyList<MbtaStopDto>> GetStopDtosAsync(string routeId, int? directionId = null)
         {
             // Returned in line order. Cached like routes: stations almost never change.
-            var payload = await GetCachedAsync<MbtaStopsResponseDto>(
+            var payload = await GetCachedAsync<MbtaResponse<MbtaStopDto>>(
                 $"https://api-v3.mbta.com/stops?filter[route]={Uri.EscapeDataString(routeId)}" +
                 (directionId is null ? "" : $"&filter[direction_id]={directionId}"), RouteCacheDuration);
 
-            return payload?.Data ?? new List<MbtaStopDto>();
+            return payload.Data;
         }
 
         public async Task<IReadOnlyList<MbtaPredictionDto>> GetPredictionsAsync(string mbtaStopId, string routeIds)
@@ -71,29 +64,29 @@ namespace NextTrain.Api.Services
             var url = $"https://api-v3.mbta.com/predictions?filter[stop]={Uri.EscapeDataString(mbtaStopId)}" +
                       $"&filter[route]={Uri.EscapeDataString(routeIds)}";
 
-            var payload = await GetCachedAsync<MbtaPredictionsResponseDto>(url, PredictionCacheDuration);
-            return payload?.Data ?? new List<MbtaPredictionDto>();
+            var payload = await GetCachedAsync<MbtaResponse<MbtaPredictionDto>>(url, PredictionCacheDuration);
+            return payload.Data;
         }
 
         public async Task<IReadOnlyList<MbtaPredictionDto>> GetTripPredictionsAsync(string mbtaStopId, string tripIds)
         {
-            var payload = await GetCachedAsync<MbtaPredictionsResponseDto>(
+            var payload = await GetCachedAsync<MbtaResponse<MbtaPredictionDto>>(
                 $"https://api-v3.mbta.com/predictions?filter[stop]={Uri.EscapeDataString(mbtaStopId)}&filter[trip]={Uri.EscapeDataString(tripIds)}",
                 PredictionCacheDuration);
-            return payload?.Data ?? new List<MbtaPredictionDto>();
+            return payload.Data;
         }
 
         public async Task<IReadOnlyList<MbtaScheduledDeparture>> GetSchedulesAsync(string mbtaStopId, string routeIds)
         {
             var (date, from, to) = ScheduleWindow(DateTimeOffset.UtcNow);
-            var payload = await GetCachedAsync<MbtaPredictionsResponseDto>(
+            var payload = await GetCachedAsync<MbtaResponse<MbtaPredictionDto>>(
                 $"https://api-v3.mbta.com/schedules?filter[stop]={Uri.EscapeDataString(mbtaStopId)}" +
                 $"&filter[route]={Uri.EscapeDataString(routeIds)}&filter[date]={date}&filter[min_time]={from}&filter[max_time]={to}" +
                 "&sort=departure_time&fields[schedule]=departure_time,direction_id,pickup_type", ScheduleCacheDuration);
-            return payload?.Data
+            return payload.Data
                 .Where(s => s.Attributes.DepartureTime is not null && s.Attributes.PickupType != 1)
                 .Select(s => new MbtaScheduledDeparture(s.Relationships.Route.Data.Id, s.Attributes.DirectionId, s.Attributes.DepartureTime!.Value))
-                .ToList() ?? new List<MbtaScheduledDeparture>();
+                .ToList();
         }
 
         /// <summary>
@@ -110,19 +103,13 @@ namespace NextTrain.Api.Services
             return ((afterMidnight ? local.AddDays(-1) : local).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture), Time(minutes), Time(minutes + 180));
         }
 
-        public async Task<IReadOnlyList<MbtaRouteDto>> GetSubwayRoutesAsync()
-        {
-            var payload = await GetCachedAsync<MbtaRoutesResponseDto>(
-                "https://api-v3.mbta.com/routes?filter[type]=0,1", RouteCacheDuration);
-            return payload?.Data.OrderBy(r => r.Attributes.SortOrder).ToList() ?? new List<MbtaRouteDto>();
-        }
+        public Task<IReadOnlyList<MbtaRouteDto>> GetSubwayRoutesAsync() => GetRoutesAsync("0,1");
 
-        public async Task<IReadOnlyList<MbtaRouteDto>> GetBusRoutesAsync()
-        {
-            var payload = await GetCachedAsync<MbtaRoutesResponseDto>(
-                "https://api-v3.mbta.com/routes?filter[type]=3", RouteCacheDuration);
-            return payload?.Data.OrderBy(r => r.Attributes.SortOrder).ToList() ?? new List<MbtaRouteDto>();
-        }
+        public Task<IReadOnlyList<MbtaRouteDto>> GetBusRoutesAsync() => GetRoutesAsync("3");
+
+        private async Task<IReadOnlyList<MbtaRouteDto>> GetRoutesAsync(string types) =>
+            (await GetCachedAsync<MbtaResponse<MbtaRouteDto>>($"https://api-v3.mbta.com/routes?filter[type]={types}", RouteCacheDuration))
+                .Data.OrderBy(r => r.Attributes.SortOrder).ToList();
 
         public Task<IReadOnlyList<MbtaVehicle>> GetSubwayVehiclesAsync() =>
             GetVehiclesAsync("filter[route_type]=0,1");
@@ -136,7 +123,6 @@ namespace NextTrain.Api.Services
                 $"https://api-v3.mbta.com/vehicles?{filter}&include=stop&fields[stop]=name" +
                 "&fields[vehicle]=latitude,longitude,bearing,direction_id,current_status,carriages,occupancy_status,occupancy_percentage",
                 PredictionCacheDuration);
-            if (payload is null) return new List<MbtaVehicle>();
 
             // Vehicles report a platform stop; its parent_station is the station the app knows.
             var stops = payload.Included.ToDictionary(s => s.Id);
@@ -173,7 +159,6 @@ namespace NextTrain.Api.Services
                 $"https://api-v3.mbta.com/route_patterns?filter[route]={Uri.EscapeDataString(routeIds)}" +
                 "&filter[canonical]=true&filter[direction_id]=0&include=representative_trip.shape&fields[shape]=polyline",
                 RouteCacheDuration);
-            if (payload is null) return new List<MbtaShape>();
 
             var polylines = payload.Included.Where(r => r.Type == "shape").ToDictionary(s => s.Id, s => s.Attributes.Polyline);
             return payload.Included
@@ -193,7 +178,6 @@ namespace NextTrain.Api.Services
                 $"https://api-v3.mbta.com/route_patterns?filter[route]={Uri.EscapeDataString(routeId)}" +
                 "&include=representative_trip.shape&fields[shape]=polyline",
                 RouteCacheDuration);
-            if (payload is null) return new List<MbtaShape>();
 
             var typical = payload.Data.Where(p => p.Attributes.Typicality == 1).Select(p => p.RelatedId("representative_trip")).ToHashSet();
             var polylines = payload.Included.Where(r => r.Type == "shape").ToDictionary(s => s.Id, s => s.Attributes.Polyline);
@@ -209,7 +193,7 @@ namespace NextTrain.Api.Services
         {
             var payload = await GetCachedAsync<MbtaAlertsResponseDto>(
                 $"https://api-v3.mbta.com/alerts?filter[route]={Uri.EscapeDataString(routeIds)}&filter[datetime]=NOW", AlertCacheDuration);
-            return payload?.Data ?? new List<MbtaAlertDto>();
+            return payload.Data;
         }
 
         public async Task<IReadOnlyList<MbtaAlertDto>> GetUpcomingAlertsAsync(string? routeIds)
@@ -217,7 +201,7 @@ namespace NextTrain.Api.Services
             var scope = routeIds is null ? "filter[route_type]=0,1" : $"filter[route]={Uri.EscapeDataString(routeIds)}";
             var payload = await GetCachedAsync<MbtaAlertsResponseDto>(
                 $"https://api-v3.mbta.com/alerts?{scope}&filter[lifecycle]=UPCOMING,ONGOING_UPCOMING", AlertCacheDuration);
-            return payload?.Data ?? new List<MbtaAlertDto>();
+            return payload.Data;
         }
 
         public async Task<IReadOnlyList<MbtaAlertDto>> GetAccessAlertsAsync(string mbtaStopId)
@@ -226,7 +210,6 @@ namespace NextTrain.Api.Services
             var payload = await GetCachedAsync<MbtaAlertsResponseDto>(
                 $"https://api-v3.mbta.com/alerts?filter[stop]={Uri.EscapeDataString(mbtaStopId)}" +
                 "&filter[activity]=USING_WHEELCHAIR,USING_ESCALATOR&filter[datetime]=NOW&include=facilities", AlertCacheDuration);
-            if (payload is null) return new List<MbtaAlertDto>();
 
             // MBTA's summary ("Alewife escalator unavailable") doesn't say which one; the facility does:
             // "Escalator 351: Main concourse to platform". (Same answer every time, so the cached copy can keep it.)
@@ -250,33 +233,18 @@ namespace NextTrain.Api.Services
             // MBTA's default activity filter (board, exit, ride) leaves out elevator and escalator outages.
             var payload = await GetCachedAsync<MbtaAlertsResponseDto>(
                 "https://api-v3.mbta.com/alerts?filter[route_type]=0,1&filter[datetime]=NOW", AlertCacheDuration);
-            return payload?.Data ?? new List<MbtaAlertDto>();
+            return payload.Data;
         }
 
         // The cache, keyed by URL: the first request fetches from MBTA; everyone else within `duration` gets the same
         // answer from memory. So 1,000 people watching Park Street cost MBTA one request every 10 seconds.
-        // Failures are not cached: GetOrCreateAsync stores nothing when the fetch throws, so the next request retries.
-        private Task<T?> GetCachedAsync<T>(string url, TimeSpan duration) =>
-            _cache.GetOrCreateAsync(url, entry =>
+        // Failures are not cached: GetOrCreateAsync stores nothing when the fetch throws (GetFromJsonAsync throws on
+        // a non-success status), so the next request retries.
+        private async Task<T> GetCachedAsync<T>(string url, TimeSpan duration) where T : new() =>
+            await _cache.GetOrCreateAsync(url, async entry =>
             {
                 entry.AbsoluteExpirationRelativeToNow = duration;
-                return GetAsync<T>(url);
-            });
-
-        private async Task<T?> GetAsync<T>(string url)
-        {
-            using var request = new HttpRequestMessage(HttpMethod.Get, url);
-
-            if (!string.IsNullOrWhiteSpace(_apiKey))
-            {
-                request.Headers.Add("x-api-key", _apiKey);
-            }
-
-            using var response = await _httpClient.SendAsync(request);
-
-            response.EnsureSuccessStatusCode();
-
-            return await response.Content.ReadFromJsonAsync<T>(JsonOptions);
-        }
+                return await _httpClient.GetFromJsonAsync<T>(url, JsonOptions) ?? new T();
+            }) ?? new T();
     }
 }

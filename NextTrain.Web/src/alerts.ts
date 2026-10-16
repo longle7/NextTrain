@@ -1,4 +1,5 @@
 import type { Alert } from './api'
+import { serviceDayEnd } from './time'
 
 /** Severity 3 and up changes how you travel; MBTA uses 1-2 for things like a closed staircase. */
 export const MAJOR_SEVERITY = 3
@@ -43,7 +44,7 @@ const bostonWeekday = new Intl.DateTimeFormat('en-US', { weekday: 'short', timeZ
 // The days of the week a planned change covers (all seven when it's a week or more, or open-ended).
 function weekdaysOf(alert: Alert): string[] {
   const days = new Set<string>()
-  const last = alert.end ? Date.parse(alert.end) - 4 * 3_600_000 : Infinity // ending at 3 AM: the day before
+  const last = alert.end ? serviceDayEnd(alert.end) : Infinity
   for (let time = Date.parse(alert.start!); days.size < 7 && time <= last; time += 86_400_000) days.add(bostonWeekday.format(time))
   return [...days]
 }

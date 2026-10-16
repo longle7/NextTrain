@@ -28,11 +28,7 @@ public class ClientErrorsTests : IDisposable
 
     public ClientErrorsTests()
     {
-        _factory = new WebApplicationFactory<Program>()
-            .WithWebHostBuilder(b => b
-                .UseSetting("ConnectionStrings:DefaultConnection", TestDb.ConnectionString)
-                .UseSetting("Stations:RefreshHours", "0")
-                .ConfigureServices(services => services.AddSingleton<ILoggerProvider>(new CapturingLogger(_logged))));
+        _factory = TestDb.Api(b => b.ConfigureServices(services => services.AddSingleton<ILoggerProvider>(new CapturingLogger(_logged))));
     }
 
     public void Dispose() => _factory.Dispose();

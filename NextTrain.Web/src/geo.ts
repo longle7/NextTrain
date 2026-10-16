@@ -14,6 +14,9 @@ export function distanceMiles(a: Point, b: Point): number {
   return 2 * 3958.8 * Math.asin(Math.sqrt(h))
 }
 
+/** The angle between two compass headings, 0 (same way) to 180 (opposite), for any degrees, negative too. */
+export const angleBetween = (a: number, b: number) => Math.abs((((a - b) % 360) + 540) % 360 - 180)
+
 /** The `count` closest stations to `here`, nearest first, with their distance. */
 export function nearestStations(stations: Station[], here: Point, count = 3) {
   return stations

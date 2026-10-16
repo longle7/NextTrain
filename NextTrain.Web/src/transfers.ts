@@ -1,7 +1,7 @@
-import { lineLabel, type ConnectionPlan, type Route } from './api'
+import { routeName, type ConnectionPlan, type Route } from './api'
 import { clock, countdown } from './time'
 
-export type AdviceTone = 'calm' | 'hurry' | 'neutral'
+type AdviceTone = 'calm' | 'hurry' | 'neutral'
 
 /**
  * Transfer advice as a sentence, from GET /connections. `toRoute` is the line the rider changes onto, `via` the
@@ -11,7 +11,7 @@ export type AdviceTone = 'calm' | 'hurry' | 'neutral'
  */
 export function adviceText(plan: ConnectionPlan, toRoute: Route | undefined, via: string, now: Date): { tone: AdviceTone; text: string } {
   const bus = toRoute?.type === 'bus'
-  const line = toRoute ? (bus ? `Route ${lineLabel(toRoute.id, toRoute)}` : toRoute.name) : 'connecting'
+  const line = toRoute ? routeName(toRoute.id, toRoute) : 'connecting'
   const makes = (time: string) => `the ${clock(time)} ${line} ${bus ? 'bus' : 'train'}`
   const when = (time: string) => countdown(time, now) ?? 'now'
   const [first, next] = plan.trains

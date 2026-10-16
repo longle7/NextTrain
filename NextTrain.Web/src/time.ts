@@ -55,9 +55,12 @@ export function dateRange(start: string, end: string | null | undefined): string
   const day = (time: number) => new Date(time).toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric', timeZone: 'America/New_York' })
   const from = day(Date.parse(start))
   if (!end) return `From ${from}`
-  const to = day(Date.parse(end) - 4 * 3_600_000)
+  const to = day(serviceDayEnd(end))
   return to === from ? from : `${from} – ${to}`
 }
+
+/** When a period ending at `end` really ends: MBTA's periods end at 3 AM, the end of the service day before. */
+export const serviceDayEnd = (end: string) => Date.parse(end) - 4 * 3_600_000
 
 /** A departure as shown: a live countdown ("5 min"), or a timetable time as the clock time ("5:32 AM"). */
 export const departureLabel = (time: string, scheduled: boolean, now: Date) => (scheduled ? clock(time) : countdown(time, now))

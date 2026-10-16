@@ -153,8 +153,6 @@ export default function MapPage() {
         }, 120),
       hide,
     })
-    const forStation = (station: Station) => showFor({ station })
-    const forTrain = (trainId: string) => showFor({ trainId })
     const enterCard = () => {
       overCard.current = true
       clearTimeout(previewTimer.current)
@@ -163,7 +161,7 @@ export default function MapPage() {
       overCard.current = false
       hide()
     }
-    return { forStation, forTrain, hide, enterCard, leaveCard }
+    return { showFor, hide, enterCard, leaveCard }
   }, [])
   useEffect(() => () => clearTimeout(previewTimer.current), [])
 
@@ -245,7 +243,7 @@ export default function MapPage() {
     const annotations = stations.data.filter((s) => busMode || stationRouteIds(s).some((id) => onLine(shown, id))).map((s) => {
       const open = () => navigate(`/stations/${s.mbtaStopId}`)
       const kind = s.routeId ? 'station' : 'stop'
-      return new mapkit.Annotation(new mapkit.Coordinate(s.latitude, s.longitude), () => stationElement(s.name, open, previews.forStation(s), kind), {
+      return new mapkit.Annotation(new mapkit.Coordinate(s.latitude, s.longitude), () => stationElement(s.name, open, previews.showFor({ station: s }), kind), {
         ...centered(24), // the dot's tap area; it looks 12 px
         title: s.name, // plain text: MapKit never parses it as HTML
         enabled: false, // the dot handles its own taps (see stationElement)
@@ -323,7 +321,7 @@ export default function MapPage() {
       const label = subtitle ? `${title}. ${subtitle}` : title
       let annotation = trains.current.get(v.id)
       if (!annotation) {
-        annotation = new mapkit.Annotation(coordinate([latitude, longitude]), () => trainElement(color, heading, label, previews.forTrain(v.id), ink), {
+        annotation = new mapkit.Annotation(coordinate([latitude, longitude]), () => trainElement(color, heading, label, previews.showFor({ trainId: v.id }), ink), {
           ...centered(24),
           enabled: false, // the train handles its own hover and taps (our card, not MapKit's callout)
           displayPriority: mapkit.Annotation.DisplayPriority.Required,
@@ -520,12 +518,13 @@ export default function MapPage() {
           selected={dir}
           route={busRouteInfo}
           bus={busMode}
-          onSelect={(d) => {
-            const next = new URLSearchParams(params)
-            if (d) next.set('dir', d)
-            else next.delete('dir')
-            setParams(next, { replace: true })
-          }}
+          onSelect={(d) =>
+            setParams((p) => {
+              if (d) p.set('dir', d)
+              else p.delete('dir')
+              return p
+            }, { replace: true })
+          }
         />
       )}
       <MapTip />
@@ -545,7 +544,8 @@ export default function MapPage() {
         {preview && 'station' in preview && (
           <StationPreview
             key={preview.station.mbtaStopId}
-            {...preview}
+            station={preview.station}
+            at={preview}
             routes={routes.data}
             bus={busMode}
             shown={shown}
@@ -886,11 +886,9 @@ function MarkerCard({ id, role = 'tooltip', label, x, y, width, onPointerEnter, 
  * A station's next trains, over the map beside its dot: on mouse hover or keyboard focus. Each direction's next two
  * departures, refreshed every 10 seconds while it's open. Select the station for all of them.
  */
-function StationPreview({ station, x, y, width, routes, bus, shown, onPointerEnter, onPointerLeave }: {
+function StationPreview({ station, at, routes, bus, shown, onPointerEnter, onPointerLeave }: {
   station: Station
-  x: number
-  y: number
-  width: number
+  at: CardAt
   routes: Route[] | undefined
   bus: boolean // on a bus route's map: include the station's buses
   shown: string[] | undefined // the routes on the map (undefined: all)
@@ -908,7 +906,7 @@ function StationPreview({ station, x, y, width, routes, bus, shown, onPointerEnt
   const routeId = served?.length === 1 ? served[0] : undefined
 
   return (
-    <MarkerCard id="station-preview" role="dialog" label={station.name} x={x} y={y} width={width} onPointerEnter={onPointerEnter} onPointerLeave={onPointerLeave}>
+    <MarkerCard id="station-preview" role="dialog" label={station.name} {...at} onPointerEnter={onPointerEnter} onPointerLeave={onPointerLeave}>
       <div>
         <p className="font-semibold">{station.name}</p>
         {/* Each side of a street is its own stop: say which way this one goes (on a route's map, just that route). */}

@@ -36,11 +36,8 @@ public class TransferEndpointTests : IDisposable
             new MbtaStopDto { Id = "place-kencl" }, new MbtaStopDto { Id = "place-pktrm" }, new MbtaStopDto { Id = "place-gover" },
         };
 
-        _factory = new WebApplicationFactory<Program>()
-            .WithWebHostBuilder(b => b
-                .UseSetting("ConnectionStrings:DefaultConnection", TestDb.ConnectionString)
-                .UseSetting("Stations:RefreshHours", "0")
-                .ConfigureTestServices(services => services.AddSingleton<IMbtaClient>(_mbta).AddSingleton<TimeProvider>(new FixedClock(Noon))));
+        _factory = TestDb.Api(b => b.ConfigureTestServices(services =>
+            services.AddSingleton<IMbtaClient>(_mbta).AddSingleton<TimeProvider>(new FixedClock(Noon))));
     }
 
     // The predictions below are around noon on Saturday, October 10, 2026, in Boston.
@@ -99,33 +96,22 @@ public class TransferEndpointTests : IDisposable
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
 
-    private static MbtaPredictionDto Prediction(string route, int direction, string trip, string? departure, string? arrival = null) => new()
-    {
-        Attributes = new MbtaPredictionAttributesDto
-        {
-            DirectionId = direction,
-            DepartureTime = departure is null ? null : DateTimeOffset.Parse(departure),
-            ArrivalTime = arrival is null ? null : DateTimeOffset.Parse(arrival),
-        },
-        Relationships = new MbtaPredictionRelationshipsDto { Route = new() { Data = new() { Id = route } }, Trip = new() { Data = new() { Id = trip } } },
-    };
-
     [Fact]
     public async Task Connections_NoRush_WhenThisTrainAndTheNextMakeTheSameBlueLineTrain()
     {
         _mbta.PredictionsByStop["place-pktrm"] = new()
         {
-            Prediction("Green-B", 1, "g1", "2026-10-10T12:02:00-04:00"),
-            Prediction("Green-B", 1, "g2", "2026-10-10T12:05:00-04:00"),
-            Prediction("Green-B", 0, "g9", "2026-10-10T12:01:00-04:00"), // the other way
+            FakeMbtaClient.Prediction("Green-B", 1, "2026-10-10T12:02:00-04:00", "g1"),
+            FakeMbtaClient.Prediction("Green-B", 1, "2026-10-10T12:05:00-04:00", "g2"),
+            FakeMbtaClient.Prediction("Green-B", 0, "2026-10-10T12:01:00-04:00", "g9"), // the other way
         };
         _mbta.PredictionsByStop["place-gover"] = new()
         {
-            Prediction("Green-B", 1, "g1", null, "2026-10-10T12:04:00-04:00"), // ends here: an arrival, no departure
-            Prediction("Green-B", 1, "g2", null, "2026-10-10T12:07:00-04:00"),
-            Prediction("Blue", 1, "b1", "2026-10-10T12:06:00-04:00"), // too soon for either
-            Prediction("Blue", 1, "b2", "2026-10-10T12:12:00-04:00"),
-            Prediction("Blue", 0, "b3", "2026-10-10T12:08:00-04:00"), // the other way
+            FakeMbtaClient.Prediction("Green-B", 1, null, "g1", "2026-10-10T12:04:00-04:00"), // ends here: an arrival, no departure
+            FakeMbtaClient.Prediction("Green-B", 1, null, "g2", "2026-10-10T12:07:00-04:00"),
+            FakeMbtaClient.Prediction("Blue", 1, "2026-10-10T12:06:00-04:00", "b1"), // too soon for either
+            FakeMbtaClient.Prediction("Blue", 1, "2026-10-10T12:12:00-04:00", "b2"),
+            FakeMbtaClient.Prediction("Blue", 0, "2026-10-10T12:08:00-04:00", "b3"), // the other way
         };
         using var client = _factory.CreateClient();
 
@@ -143,15 +129,15 @@ public class TransferEndpointTests : IDisposable
     {
         _mbta.PredictionsByStop["place-pktrm"] = new()
         {
-            Prediction("Green-B", 1, "g0", "2026-10-10T11:56:00-04:00"), // left 4 minutes ago; MBTA still lists it
-            Prediction("Green-B", 1, "g1", "2026-10-10T12:02:00-04:00"),
+            FakeMbtaClient.Prediction("Green-B", 1, "2026-10-10T11:56:00-04:00", "g0"), // left 4 minutes ago; MBTA still lists it
+            FakeMbtaClient.Prediction("Green-B", 1, "2026-10-10T12:02:00-04:00", "g1"),
         };
         _mbta.PredictionsByStop["place-gover"] = new()
         {
-            Prediction("Green-B", 1, "g0", null, "2026-10-10T11:58:00-04:00"),
-            Prediction("Green-B", 1, "g1", null, "2026-10-10T12:04:00-04:00"),
-            Prediction("Blue", 1, "b0", "2026-10-10T11:59:00-04:00"), // also gone
-            Prediction("Blue", 1, "b1", "2026-10-10T12:10:00-04:00"),
+            FakeMbtaClient.Prediction("Green-B", 1, null, "g0", "2026-10-10T11:58:00-04:00"),
+            FakeMbtaClient.Prediction("Green-B", 1, null, "g1", "2026-10-10T12:04:00-04:00"),
+            FakeMbtaClient.Prediction("Blue", 1, "2026-10-10T11:59:00-04:00", "b0"), // also gone
+            FakeMbtaClient.Prediction("Blue", 1, "2026-10-10T12:10:00-04:00", "b1"),
         };
         using var client = _factory.CreateClient();
 

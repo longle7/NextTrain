@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, useLocation } from 'react-router'
+import { readKey, writeKey } from './cache'
 import { AppLogo, primaryButton } from './components'
 import { EFFECTIVE_DATE } from './legal'
 
@@ -7,13 +8,7 @@ import { EFFECTIVE_DATE } from './legal'
 const ACCEPTED_KEY = 'nexttrain.termsAccepted'
 const LEGAL_PAGES = ['/terms', '/privacy', '/cookies', '/support'] // readable before agreeing
 
-function accepted() {
-  try {
-    return localStorage.getItem(ACCEPTED_KEY) === EFFECTIVE_DATE
-  } catch {
-    return false // storage blocked: ask each visit, never assume agreement
-  }
-}
+const accepted = () => readKey(ACCEPTED_KEY) === EFFECTIVE_DATE // storage blocked: ask each visit, never assume agreement
 
 /**
  * First launch (and whenever the Terms change): what NextTrain is, the key limits (MBTA estimates, not affiliated),
@@ -39,11 +34,7 @@ export default function Welcome() {
   }, [open])
 
   const agree = () => {
-    try {
-      localStorage.setItem(ACCEPTED_KEY, EFFECTIVE_DATE)
-    } catch {
-      // Can't remember it; it still counts for this visit.
-    }
+    writeKey(ACCEPTED_KEY, EFFECTIVE_DATE)
     setAgreed(true)
   }
 

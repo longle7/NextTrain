@@ -1,13 +1,11 @@
-﻿using System.Collections.Generic;
-
-namespace NextTrain.Core.Services
+﻿namespace NextTrain.Core.Services
 {
     /// <summary>
-    /// Top-level MBTA stops response.
+    /// Top-level MBTA response: { "data": [...] }.
     /// </summary>
-    public class MbtaStopsResponseDto
+    public class MbtaResponse<T>
     {
-        public List<MbtaStopDto> Data { get; set; } = new();
+        public List<T> Data { get; set; } = new();
     }
 
     /// <summary>

@@ -1,3 +1,4 @@
+using System.Buffers.Text;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -14,12 +15,10 @@ namespace NextTrain.Api.Services
         public static string Create(string keyId, string privateKeyPem, IDictionary<string, object> claims)
         {
             var header = new Dictionary<string, object> { ["alg"] = "ES256", ["kid"] = keyId, ["typ"] = "JWT" };
-            var unsigned = Base64Url(JsonSerializer.SerializeToUtf8Bytes(header)) + "." + Base64Url(JsonSerializer.SerializeToUtf8Bytes(claims));
+            var unsigned = Base64Url.EncodeToString(JsonSerializer.SerializeToUtf8Bytes(header)) + "." + Base64Url.EncodeToString(JsonSerializer.SerializeToUtf8Bytes(claims));
             using var key = ECDsa.Create();
             key.ImportFromPem(privateKeyPem);
-            return unsigned + "." + Base64Url(key.SignData(Encoding.ASCII.GetBytes(unsigned), HashAlgorithmName.SHA256));
+            return unsigned + "." + Base64Url.EncodeToString(key.SignData(Encoding.ASCII.GetBytes(unsigned), HashAlgorithmName.SHA256));
         }
-
-        private static string Base64Url(byte[] bytes) => Convert.ToBase64String(bytes).TrimEnd('=').Replace('+', '-').Replace('/', '_');
     }
 }

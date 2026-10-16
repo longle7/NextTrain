@@ -1,5 +1,6 @@
 import { Capacitor } from '@capacitor/core'
 import { useSyncExternalStore } from 'react'
+import { readKey, writeKey } from './cache'
 
 /**
  * Google Analytics, only with consent. Nothing is loaded and nothing is sent to Google unless all of these hold:
@@ -22,13 +23,10 @@ export function analyticsBlocked(): 'unavailable' | 'privacy-signal' | undefined
   if (navigator.globalPrivacyControl === true || navigator.doNotTrack === '1') return 'privacy-signal'
 }
 
+// Storage blocked reads as no choice: ask again next visit, and never assume a yes.
 function storedChoice(): Choice | undefined {
-  try {
-    const value = localStorage.getItem(CONSENT_KEY)
-    return value === 'granted' || value === 'denied' ? value : undefined
-  } catch {
-    return undefined // storage blocked: ask again next visit, and never assume a yes
-  }
+  const value = readKey(CONSENT_KEY)
+  return value === 'granted' || value === 'denied' ? value : undefined
 }
 
 /** The person's choice, re-rendering when it changes (banner and Settings stay in step). */
@@ -37,6 +35,7 @@ export function useAnalyticsChoice(): Choice | undefined {
 }
 
 const listeners = new Set<() => void>()
+const notify = () => listeners.forEach((listener) => listener())
 function subscribe(listener: () => void) {
   listeners.add(listener)
   return () => listeners.delete(listener)
@@ -44,25 +43,17 @@ function subscribe(listener: () => void) {
 
 /** Records the choice and starts or stops analytics to match. */
 export function setAnalyticsChoice(choice: Choice) {
-  try {
-    localStorage.setItem(CONSENT_KEY, choice)
-  } catch {
-    // Can't remember it; it still applies for this visit.
-  }
+  writeKey(CONSENT_KEY, choice)
   if (choice === 'granted') start()
   else stop()
-  listeners.forEach((listener) => listener())
+  notify()
 }
 
 /** Delete my data: forgets the choice (the banner asks again) and deletes the analytics cookies. */
 export function forgetAnalyticsChoice() {
-  try {
-    localStorage.removeItem(CONSENT_KEY)
-  } catch {
-    // Nothing stored.
-  }
+  writeKey(CONSENT_KEY, null)
   stop()
-  listeners.forEach((listener) => listener())
+  notify()
 }
 
 /** At startup: resumes analytics for someone who already said yes (and nothing otherwise). */
