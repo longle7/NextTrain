@@ -1,4 +1,4 @@
-import { getMapKitToken, type Route, type Vehicle } from './api'
+import { getMapKitToken, routeName, type Route, type Vehicle } from './api'
 
 // Apple's MapKit JS, pinned to one version with Subresource Integrity: the browser refuses to run the script if
 // Apple's file ever differs from the one this hash was made from, so a tampered CDN file can't run in our app.
@@ -44,7 +44,7 @@ const STATUS = { INCOMING_AT: 'Arriving at', STOPPED_AT: 'Stopped at', IN_TRANSI
  * Park Street") when MBTA says.
  */
 export function trainCallout(v: Vehicle, route: Route | undefined) {
-  const name = route?.type === 'bus' ? `Route ${route.shortName || route.id}` : (route?.name ?? v.routeId)
+  const name = routeName(v.routeId, route)
   return {
     title: `${name} to ${route?.directionDestinations[v.directionId] ?? 'unknown'}`,
     subtitle: v.stopName && v.currentStatus ? `${STATUS[v.currentStatus]} ${v.stopName}` : '',

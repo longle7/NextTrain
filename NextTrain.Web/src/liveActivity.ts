@@ -18,7 +18,6 @@ export interface LiveActivityDetails {
 
 /** What the Home Screen widget needs for each commute: when it's on, where, and how it looks (NextCommuteWidget.swift). */
 export interface WidgetCommute {
-  id: number
   stopId: string
   stationName: string
   routeId: string
@@ -92,7 +91,7 @@ export function widgetCommutes(commutes: Commute[], routes: Route[]): WidgetComm
       c, routes.find((r) => r.id === c.routeId), [], new Date(0), undefined,
     )
     return {
-      id: c.id, stopId: c.mbtaStopId, stationName, routeId: c.routeId, directionId: c.directionId, destination,
+      stopId: c.mbtaStopId, stationName, routeId: c.routeId, directionId: c.directionId, destination,
       lineName, lineColor, lineTextColor, windowStart: c.windowStart, windowEnd: c.windowEnd, activeDays: c.activeDays,
     }
   })

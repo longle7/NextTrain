@@ -3,6 +3,7 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import App from './App'
 import { startAnalyticsIfAllowed } from './analytics'
+import { writeKey } from './cache'
 import { startErrorReports } from './errors'
 import { sendLiveActivityTokens } from './liveActivity'
 import { refreshNotifications } from './notifications'
@@ -12,11 +13,7 @@ import './index.css'
 if (Capacitor.isNativePlatform()) document.documentElement.classList.add('native')
 
 // Recently viewed stations were removed from NextTrain; clear what earlier versions stored.
-try {
-  localStorage.removeItem('nexttrain.recentStations')
-} catch {
-  // storage blocked: nothing stored
-}
+writeKey('nexttrain.recentStations', null)
 
 // Errors are reported (production builds only; see errors.ts and the Privacy Policy).
 startErrorReports()
