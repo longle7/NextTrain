@@ -19,12 +19,6 @@ public class LiveActivityUpdaterTests
     private readonly FakeMbtaClient _mbta = new();
     private readonly FakeApns _apns = new();
 
-    private static MbtaPredictionDto Prediction(string route, int direction, string departure) => new()
-    {
-        Attributes = new MbtaPredictionAttributesDto { DirectionId = direction, DepartureTime = DateTimeOffset.Parse(departure) },
-        Relationships = new MbtaPredictionRelationshipsDto { Route = new() { Data = new() { Id = route } }, Trip = new() { Data = new() { Id = "t" } } },
-    };
-
     // Alice's Red Line commute from Park Street, northbound, with its Live Activity registered until `endsAt`.
     private (LiveActivityUpdater Updater, int CommuteId) Seed(DateTimeOffset endsAt)
     {
@@ -62,13 +56,13 @@ public class LiveActivityUpdaterTests
         var (updater, _) = Seed(Now.AddMinutes(30));
         _mbta.PredictionsByStop["place-pktrm"] =
         [
-            Prediction("Red", 1, "2026-10-12T07:58:00-04:00"), // left two minutes ago
-            Prediction("Red", 1, "2026-10-12T08:09:00-04:00"),
-            Prediction("Red", 1, "2026-10-12T08:03:00-04:00"),
-            Prediction("Red", 0, "2026-10-12T08:01:00-04:00"), // the other way
-            Prediction("Green-B", 1, "2026-10-12T08:02:00-04:00"), // another line
-            Prediction("Red", 1, "2026-10-12T08:15:00-04:00"),
-            Prediction("Red", 1, "2026-10-12T08:21:00-04:00"),
+            FakeMbtaClient.Prediction("Red", 1, "2026-10-12T07:58:00-04:00"), // left two minutes ago
+            FakeMbtaClient.Prediction("Red", 1, "2026-10-12T08:09:00-04:00"),
+            FakeMbtaClient.Prediction("Red", 1, "2026-10-12T08:03:00-04:00"),
+            FakeMbtaClient.Prediction("Red", 0, "2026-10-12T08:01:00-04:00"), // the other way
+            FakeMbtaClient.Prediction("Green-B", 1, "2026-10-12T08:02:00-04:00"), // another line
+            FakeMbtaClient.Prediction("Red", 1, "2026-10-12T08:15:00-04:00"),
+            FakeMbtaClient.Prediction("Red", 1, "2026-10-12T08:21:00-04:00"),
         ];
         _mbta.Alerts.AddRange(
         [
@@ -86,8 +80,20 @@ public class LiveActivityUpdaterTests
             new[] { "08:03", "08:09", "08:15" },
             content.Departures.Select(t => DateTimeOffset.FromUnixTimeSeconds(t).ToOffset(TimeSpan.FromHours(-4)).ToString("HH:mm")));
         Assert.Equal("Red Line delay", content.Alert);
-        Assert.Equal(Now.AddMinutes(30), content.StaleAt);
+        Assert.Equal(DateTimeOffset.Parse("2026-10-12T08:03:00-04:00"), content.StaleAt); // redrawn when the 8:03 leaves
+        Assert.Equal(Now.AddMinutes(30), content.EndsAt);
         Assert.Equal(1, Tokens()); // kept for the next minute
+    }
+
+    [Fact]
+    public async Task WhenTheWindowEndsBeforeTheNextTrain_ItGoesStaleThen()
+    {
+        var (updater, _) = Seed(Now.AddMinutes(2));
+        _mbta.PredictionsByStop["place-pktrm"] = [FakeMbtaClient.Prediction("Red", 1, "2026-10-12T08:09:00-04:00")];
+
+        await updater.RunOnceAsync(Now);
+
+        Assert.Equal(Now.AddMinutes(2), Assert.Single(_apns.LiveActivityUpdates).Content.StaleAt);
     }
 
     [Fact]

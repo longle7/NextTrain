@@ -38,11 +38,13 @@ public class LiveActivityPlugin: CAPPlugin, CAPBridgedPlugin {
               let endsAt = call.getDouble("endsAt")
         else { return call.reject("Missing commute details") }
 
-        let state = CommuteActivityAttributes.ContentState(
-            departures: (call.getArray("departures") ?? []).compactMap { ($0 as? NSNumber)?.doubleValue },
-            alert: call.getString("alert"))
-        // Stale at the end of the commute window: the view then says the commute is over instead of showing times.
-        let content = ActivityContent(state: state, staleDate: Date(timeIntervalSince1970: endsAt))
+        let departures = (call.getArray("departures") ?? []).compactMap { ($0 as? NSNumber)?.doubleValue }
+        let state = CommuteActivityAttributes.ContentState(departures: departures, alert: call.getString("alert"), endsAt: endsAt)
+        // Stale when the next train leaves (or the window ends): iOS redraws it then, so the countdown moves on to the
+        // train after without waiting for an update. The server's pushes do the same (LiveActivityUpdater).
+        let now = Date.now.timeIntervalSince1970
+        let next = departures.first { $0 > now }.map { min($0, endsAt) } ?? endsAt
+        let content = ActivityContent(state: state, staleDate: Date(timeIntervalSince1970: next))
 
         Task {
             var current: Activity<CommuteActivityAttributes>?

@@ -23,7 +23,10 @@ struct CommuteLiveActivity: Widget {
         } dynamicIsland: { context in
             DynamicIsland {
                 DynamicIslandExpandedRegion(.leading) {
-                    LineBadge(attributes: context.attributes)
+                    HStack(spacing: 6) {
+                        NextTrainLogo().frame(width: 22, height: 22)
+                        LineBadge(attributes: context.attributes)
+                    }
                 }
                 DynamicIslandExpandedRegion(.trailing) {
                     Countdown(state: context.state, isStale: context.isStale)
@@ -40,12 +43,17 @@ struct CommuteLiveActivity: Widget {
                     .frame(maxWidth: .infinity, alignment: .leading)
                 }
             } compactLeading: {
-                Circle()
-                    .fill(Color(hex: context.attributes.lineColor))
-                    .frame(width: 10, height: 10)
+                NextTrainLogo().frame(width: 20, height: 20)
             } compactTrailing: {
-                Countdown(state: context.state, isStale: context.isStale)
-                    .frame(maxWidth: 56)
+                // The next train's line color, then its countdown.
+                HStack(spacing: 4) {
+                    Circle()
+                        .fill(Color(hex: context.attributes.lineColor))
+                        .frame(width: 8, height: 8)
+                    Countdown(state: context.state, isStale: context.isStale)
+                }
+                .foregroundStyle(.white)
+                .frame(maxWidth: 64)
             } minimal: {
                 Countdown(state: context.state, isStale: context.isStale)
             }
@@ -79,14 +87,15 @@ struct LockScreenView: View {
     }
 }
 
-/// Counts down to the next train on its own, without updates from the app. Once the commute is over (the activity
-/// went stale), or every known train has left, it shows a dash rather than a wrong time.
+/// Counts down to the next train on its own, without updates from the app. When that train leaves, the activity goes
+/// stale and iOS redraws it, so this moves on to the train after. Once the commute is over, or every known train has
+/// left, it shows a dash rather than a wrong time.
 struct Countdown: View {
     let state: CommuteActivityAttributes.ContentState
     let isStale: Bool
 
     var body: some View {
-        if !isStale, let next = upcoming(state).first {
+        if !isOver(state, isStale: isStale), let next = upcoming(state).first {
             Text(timerInterval: Date.now...next, countsDown: true)
                 .monospacedDigit()
                 .multilineTextAlignment(.trailing)
@@ -103,13 +112,45 @@ struct LaterTrains: View {
 
     var body: some View {
         let later = upcoming(state).dropFirst()
-        if isStale {
+        if isOver(state, isStale: isStale) {
             Text("Commute over. Open NextTrain for live times.").font(.footnote).foregroundStyle(.secondary)
         } else if !later.isEmpty {
             Text("Then " + later.map { $0.formatted(date: .omitted, time: .shortened) }.joined(separator: ", "))
                 .font(.footnote)
                 .foregroundStyle(.secondary)
         }
+    }
+}
+
+/// The NextTrain logo (public/favicon.svg) without its dark tile, which the Dynamic Island's black would hide anyway: a
+/// train front over rails in the four subway colors. Drawn in the SVG's units, cropped to the drawing (x 10-54, y 7-56).
+struct NextTrainLogo: View {
+    var body: some View {
+        Canvas { context, size in
+            let scale = min(size.width / 44, size.height / 49)
+            context.translateBy(x: (size.width - 44 * scale) / 2, y: (size.height - 49 * scale) / 2)
+            context.scaleBy(x: scale, y: scale)
+            context.translateBy(x: -10, y: -7)
+            let dark = Color(hex: "#171717")
+            func rounded(_ x: Double, _ y: Double, _ width: Double, _ height: Double, _ radius: Double) -> Path {
+                Path(roundedRect: CGRect(x: x, y: y, width: width, height: height), cornerRadius: radius)
+            }
+            context.fill(rounded(18, 8, 28, 35, 8), with: .color(.white)) // the train's front
+            context.fill(rounded(22.5, 13, 19, 12, 3), with: .color(dark)) // windshield
+            for x in [25.5, 38.5] { // headlights
+                context.fill(Path(ellipseIn: CGRect(x: x - 2.6, y: 31.9, width: 5.2, height: 5.2)), with: .color(dark))
+            }
+            var legs = Path()
+            legs.move(to: CGPoint(x: 25, y: 43.5))
+            legs.addLine(to: CGPoint(x: 21, y: 50))
+            legs.move(to: CGPoint(x: 39, y: 43.5))
+            legs.addLine(to: CGPoint(x: 43, y: 50))
+            context.stroke(legs, with: .color(.white), style: StrokeStyle(lineWidth: 3.6, lineCap: .round))
+            for (x, hex) in [(11.0, "#E0392B"), (22.0, "#F2A11F"), (33.0, "#22A355"), (44.0, "#3B82F6")] { // the rails
+                context.fill(rounded(x, 51, 9.5, 4.5, 2.25), with: .color(Color(hex: hex)))
+            }
+        }
+        .accessibilityHidden(true)
     }
 }
 
@@ -146,6 +187,12 @@ extension LineBadge {
     init(attributes: CommuteActivityAttributes) {
         self.init(name: attributes.lineName, color: attributes.lineColor, textColor: attributes.lineTextColor)
     }
+}
+
+/// Whether the commute window has ended. Content from before endsAt existed has only the stale date, which was then the
+/// window's end.
+private func isOver(_ state: CommuteActivityAttributes.ContentState, isStale: Bool) -> Bool {
+    state.endsAt.map { Date.now.timeIntervalSince1970 >= $0 } ?? isStale
 }
 
 /// Departures that haven't left yet, as of when the view is drawn.
