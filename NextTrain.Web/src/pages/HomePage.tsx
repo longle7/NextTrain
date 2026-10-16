@@ -127,7 +127,8 @@ type Located = { state: 'idle' | 'locating' } | { state: 'error'; message: strin
 // Bus stops farther than this aren't "near you" (about a 12-minute walk).
 const BUS_STOP_MILES = 0.5
 
-// New here (no commutes yet): the three things NextTrain does, each one tap away. Gone once a commute is saved.
+// New here (no commutes yet): the three things NextTrain does, each one tap away, and why a commute is worth saving.
+// Gone once a commute is saved.
 // iPhone app, once there's a commute: offer delay notifications, until the rider answers (Settings can change it).
 function NotificationsPrompt() {
   const [asked, setAsked] = useState(() => !notificationsAvailable() || notificationChoice() !== null)
@@ -159,7 +160,7 @@ function NotificationsPrompt() {
   )
 }
 
-function GetStarted() {
+function GetStarted({ routes }: { routes: Route[] | undefined }) {
   const search = () => document.querySelector<HTMLInputElement>('input[type="search"]')?.focus()
   // Lands on "Use my location", so the location prompt comes from the rider's own tap on it.
   const nearby = () => {
@@ -194,10 +195,58 @@ function GetStarted() {
           </span>
         </li>
       </ol>
+      {/* Why bother: what a saved commute gets you, then what it looks like outside the app. */}
+      <div className="mt-3 space-y-2 border-t border-neutral-100 pt-3 dark:border-neutral-800">
+        <p className="text-sm font-semibold">Why save a commute?</p>
+        <ul className="list-disc space-y-0.5 pl-5 text-sm text-neutral-600 dark:text-neutral-300">
+          <li>Its next train or bus is right here when you open NextTrain.</li>
+          <li>A heads-up 30 minutes before it starts if there's a suspension or long delay.</li>
+          <li>A countdown on your Lock Screen while it's on, and a Home Screen widget:</li>
+        </ul>
+        <CommutePreview routes={routes} />
+        {!notificationsAvailable() && (
+          <p className="text-xs text-neutral-500">Alerts, Lock Screen, and widget are in the NextTrain iPhone app.</p>
+        )}
+      </div>
       <Link to="/commutes/new" className={`mt-3 ${primaryButton}`}>
         Add a commute
       </Link>
     </Card>
+  )
+}
+
+// A saved commute outside the app, with example times: the Lock Screen Live Activity and the Home Screen widget, drawn
+// like CommuteLiveActivity.swift and NextCommuteWidget.swift. One sentence for screen readers, not the pieces.
+function CommutePreview({ routes }: { routes: Route[] | undefined }) {
+  const caption = 'text-center text-xs text-neutral-500'
+  return (
+    <div
+      role="img"
+      aria-label="Example: on your Lock Screen and in a Home Screen widget, Red Line from Davis to Ashmont/Braintree, next train in 4 minutes, then 8:12 and 8:19."
+      className="grid grid-cols-[1fr_auto] gap-x-3 gap-y-1"
+    >
+      <div aria-hidden className="rounded-2xl bg-neutral-800 p-3 text-white shadow-sm dark:bg-neutral-700">
+        <div className="flex items-center justify-between gap-2">
+          <span className="flex min-w-0 items-center gap-1.5">
+            <LineBadge routeId="Red" routes={routes} />
+            <span className="truncate text-sm font-semibold">Davis</span>
+          </span>
+          <span className="text-2xl font-bold tabular-nums">4 min</span>
+        </div>
+        <p className="mt-1 truncate text-xs text-white/70">to Ashmont/Braintree</p>
+        <p className="text-xs text-white/70">Then 8:12, 8:19</p>
+      </div>
+      <div aria-hidden className="flex size-28 flex-col justify-between rounded-2xl bg-neutral-100 p-2.5 shadow-sm dark:bg-neutral-800">
+        <span className="flex min-w-0 items-center gap-1">
+          <LineBadge routeId="Red" routes={routes} />
+          <span className="truncate text-xs font-semibold">Davis</span>
+        </span>
+        <span className="text-2xl leading-none font-bold tabular-nums">4 min</span>
+        <span className="truncate text-xs text-neutral-500 dark:text-neutral-400">to Ashmont/Braintree</span>
+      </div>
+      <p aria-hidden className={caption}>Lock Screen</p>
+      <p aria-hidden className={caption}>Widget</p>
+    </div>
   )
 }
 
@@ -386,7 +435,7 @@ function MyCommutes({ routes, alerts: subwayAlerts }: { routes: Route[] | undefi
       </div>
       {/* One placeholder card, the size of a commute, so Home doesn't jump when they arrive. */}
       <Status error={failure(commutes)} loading={!commutes.data && !commutes.error} rows={1} />
-      {commutes.data?.length === 0 && <GetStarted />}
+      {commutes.data?.length === 0 && <GetStarted routes={routes} />}
       {hasCommutes && <NotificationsPrompt />}
       {/* The commute that's on (or next) in full, with its live times; the others one line each, until their turn. */}
       <ul className="space-y-2">
