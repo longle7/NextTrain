@@ -4,6 +4,7 @@ import { createRoot } from 'react-dom/client'
 import App from './App'
 import { startAnalyticsIfAllowed } from './analytics'
 import { startErrorReports } from './errors'
+import { sendLiveActivityTokens } from './liveActivity'
 import { refreshNotifications } from './notifications'
 import './index.css'
 
@@ -25,6 +26,7 @@ startAnalyticsIfAllowed()
 
 // iPhone app with delay notifications on: give our API this phone's current push token (iOS can change it).
 void refreshNotifications().catch(() => {})
+sendLiveActivityTokens()
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

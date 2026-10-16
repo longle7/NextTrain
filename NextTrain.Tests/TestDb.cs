@@ -26,6 +26,7 @@ public static class TestDb
         db.UserCommutes.ExecuteDelete(); // FK to Stations, delete first
         db.PushDevices.ExecuteDelete();
         db.SentNotifications.ExecuteDelete();
+        db.LiveActivityTokens.ExecuteDelete();
         db.Stations.ExecuteDelete();
         return db;
     }
