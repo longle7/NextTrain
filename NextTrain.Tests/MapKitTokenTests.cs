@@ -1,3 +1,4 @@
+using System.Buffers.Text;
 using System.Net;
 using System.Security.Cryptography;
 using System.Text;
@@ -47,17 +48,17 @@ public class MapKitTokenTests : IDisposable
         var parts = (await response.Content.ReadAsStringAsync()).Split('.');
         Assert.Equal(3, parts.Length);
 
-        using var header = JsonDocument.Parse(FromBase64Url(parts[0]));
+        using var header = JsonDocument.Parse(Base64Url.DecodeFromChars(parts[0]));
         Assert.Equal("ES256", header.RootElement.GetProperty("alg").GetString());
         Assert.Equal("KEY1234567", header.RootElement.GetProperty("kid").GetString());
 
-        using var payload = JsonDocument.Parse(FromBase64Url(parts[1]));
+        using var payload = JsonDocument.Parse(Base64Url.DecodeFromChars(parts[1]));
         Assert.Equal("TEAM123456", payload.RootElement.GetProperty("iss").GetString());
         Assert.Equal("capacitor://localhost", payload.RootElement.GetProperty("origin").GetString());
         var lifetime = payload.RootElement.GetProperty("exp").GetInt64() - payload.RootElement.GetProperty("iat").GetInt64();
         Assert.Equal((long)MapKitController.TokenLifetime.TotalSeconds, lifetime);
 
-        Assert.True(_key.VerifyData(Encoding.ASCII.GetBytes(parts[0] + "." + parts[1]), FromBase64Url(parts[2]), HashAlgorithmName.SHA256));
+        Assert.True(_key.VerifyData(Encoding.ASCII.GetBytes(parts[0] + "." + parts[1]), Base64Url.DecodeFromChars(parts[2]), HashAlgorithmName.SHA256));
     }
 
     [Fact]
@@ -82,7 +83,4 @@ public class MapKitTokenTests : IDisposable
 
         Assert.Equal(HttpStatusCode.NotFound, (await client.GetAsync("/mapkit/token")).StatusCode);
     }
-
-    private static byte[] FromBase64Url(string s) =>
-        Convert.FromBase64String(s.Replace('-', '+').Replace('_', '/').PadRight(s.Length + (4 - s.Length % 4) % 4, '='));
 }

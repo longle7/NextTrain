@@ -1,9 +1,5 @@
-﻿using System;
-using System.Collections.Concurrent;
-using System.Collections.Generic;
-using System.Linq;
+﻿using System.Collections.Concurrent;
 using System.Text.Json;
-using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
 using NextTrain.Api.Data;
 using NextTrain.Core.Domain;
@@ -181,20 +177,7 @@ namespace NextTrain.Api.Services
             return stopsByRoute
                 .Where(x => x.Stop.Attributes.Latitude.HasValue && x.Stop.Attributes.Longitude.HasValue)
                 .GroupBy(x => x.Stop.Id)
-                .Select(g =>
-                {
-                    var stop = g.First().Stop;
-                    return new Station
-                    {
-                        MbtaStopId = stop.Id,
-                        Name = stop.Attributes.Name,
-                        Latitude = stop.Attributes.Latitude!.Value,
-                        Longitude = stop.Attributes.Longitude!.Value,
-                        IsAccessible = Accessible(stop),
-                        RouteId = string.Join(",", g.Select(x => x.RouteId).Distinct().Order(StringComparer.Ordinal)),
-                        CreatedAtUtc = DateTime.UtcNow
-                    };
-                })
+                .Select(g => ToStation(g.First().Stop, string.Join(",", g.Select(x => x.RouteId).Distinct().Order(StringComparer.Ordinal)), null))
                 .ToList();
         }
 
@@ -207,25 +190,20 @@ namespace NextTrain.Api.Services
             return memberships
                 .Where(x => x.Stop.Attributes.Latitude.HasValue && x.Stop.Attributes.Longitude.HasValue)
                 .GroupBy(x => x.Stop.Id)
-                .Select(g =>
-                {
-                    var stop = g.First().Stop;
-                    return new Station
-                    {
-                        MbtaStopId = stop.Id,
-                        Name = stop.Attributes.Name,
-                        Latitude = stop.Attributes.Latitude!.Value,
-                        Longitude = stop.Attributes.Longitude!.Value,
-                        IsAccessible = Accessible(stop),
-                        RouteId = "",
-                        BusRoutes = string.Join(",", g.Select(x => $"{x.RouteId}:{x.DirectionId}").Distinct().Order(StringComparer.Ordinal)),
-                        CreatedAtUtc = DateTime.UtcNow
-                    };
-                })
+                .Select(g => ToStation(g.First().Stop, "", string.Join(",", g.Select(x => $"{x.RouteId}:{x.DirectionId}").Distinct().Order(StringComparer.Ordinal))))
                 .ToList();
         }
 
-        private static bool? Accessible(MbtaStopDto stop) =>
-            stop.Attributes.WheelchairBoarding switch { 1 => true, 2 => false, _ => null };
+        private static Station ToStation(MbtaStopDto stop, string routeId, string? busRoutes) => new()
+        {
+            MbtaStopId = stop.Id,
+            Name = stop.Attributes.Name,
+            Latitude = stop.Attributes.Latitude!.Value,
+            Longitude = stop.Attributes.Longitude!.Value,
+            IsAccessible = stop.Attributes.WheelchairBoarding switch { 1 => true, 2 => false, _ => null },
+            RouteId = routeId,
+            BusRoutes = busRoutes,
+            CreatedAtUtc = DateTime.UtcNow
+        };
     }
 }

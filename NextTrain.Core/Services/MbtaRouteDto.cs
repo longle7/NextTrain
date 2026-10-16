@@ -1,14 +1,6 @@
 namespace NextTrain.Core.Services
 {
     /// <summary>
-    /// Top-level MBTA routes response.
-    /// </summary>
-    public class MbtaRoutesResponseDto
-    {
-        public List<MbtaRouteDto> Data { get; set; } = new();
-    }
-
-    /// <summary>
     /// A route (line), e.g., "Red".
     /// </summary>
     public class MbtaRouteDto

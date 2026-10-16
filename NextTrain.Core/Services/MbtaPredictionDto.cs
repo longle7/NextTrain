@@ -1,14 +1,6 @@
 namespace NextTrain.Core.Services
 {
     /// <summary>
-    /// Top-level MBTA predictions response.
-    /// </summary>
-    public class MbtaPredictionsResponseDto
-    {
-        public List<MbtaPredictionDto> Data { get; set; } = new();
-    }
-
-    /// <summary>
     /// A single real-time prediction for a trip at a stop. Timetable entries (MBTA's /schedules) have the same shape, so
     /// they use it too. Only the route relationship is read: a schedule also has list-valued ones ("added_routes").
     /// </summary>
