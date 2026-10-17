@@ -20,6 +20,7 @@
 
   <ItemGroup>
     <EmbeddedResource Include="Data/ridership-fall-2024.json" LogicalName="ridership.json" />
+    <EmbeddedResource Include="Data/landmarks.json" LogicalName="landmarks.json" />
   </ItemGroup>
 
   <ItemGroup>

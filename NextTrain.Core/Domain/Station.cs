@@ -33,6 +33,11 @@
         // Average weekday boardings (all lines), from MBTA's published ridership counts. Null if unknown.
         public int? AverageWeekdayBoardings { get; set; }
 
+        // A bus stop's nearest big, recognizable place ("Taco Bell"), so riders can tell same-named stops on each side
+        // of a street apart: "Harvard St @ Beacon St (near Taco Bell)". From OpenStreetMap. Null for subway stations
+        // and stops with nothing nearby.
+        public string? Landmark { get; set; }
+
         // Timestamps for auditing/cache freshness.
         public DateTime CreatedAtUtc { get; set; } = DateTime.UtcNow;
         public DateTime? UpdatedAtUtc { get; set; }

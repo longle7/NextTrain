@@ -240,7 +240,8 @@ namespace NextTrain.Api.Controllers
         [Range(0, 1)] int? TransferDirectionId = null,
         [Range(1, 10)] int? TransferMinutes = null);
 
-    // The Transfer* fields are left out of the JSON for a commute without one, so it reads exactly as before.
+    // The Transfer* fields are left out of the JSON for a commute without one, so it reads exactly as before; so is
+    // StationLandmark (a bus stop's "Taco Bell") where there's none, as at every subway station.
     public record CommuteResponse(
         int Id,
         string MbtaStopId,
@@ -254,7 +255,8 @@ namespace NextTrain.Api.Controllers
         [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? TransferStationName = null,
         [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? TransferRouteId = null,
         [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] int? TransferDirectionId = null,
-        [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] int? TransferMinutes = null)
+        [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] int? TransferMinutes = null,
+        [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? StationLandmark = null)
     {
         public static CommuteResponse From(UserCommute c) => new(
             c.Id,
@@ -269,6 +271,7 @@ namespace NextTrain.Api.Controllers
             c.TransferStation?.Name,
             c.TransferRouteId,
             c.TransferDirectionId,
-            c.TransferMinutes);
+            c.TransferMinutes,
+            c.Station.Landmark);
     }
 }
