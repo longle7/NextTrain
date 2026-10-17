@@ -501,7 +501,9 @@ function CommuteCard({ commute, route, routes, now, liveActivity, alert, planned
         <p className="mt-1 font-medium">to {route?.directionDestinations[commute.directionId] ?? '…'}</p>
         {commute.transferStopId && commute.transferRouteId && (
           <p className="mt-0.5 flex flex-wrap items-center gap-1.5 text-sm text-neutral-600 dark:text-neutral-300">
-            Change at {commute.transferStationName} to
+            {commute.transferFromStationName
+              ? `Get off at ${commute.transferFromStationName}, walk to ${commute.transferStationName} for`
+              : `Change at ${commute.transferStationName} to`}
             <LineBadge routeId={commute.transferRouteId} routes={routes} />
             {findRoute(routes, commute.transferRouteId)?.directionDestinations[commute.transferDirectionId ?? 0] ?? '…'}
           </p>

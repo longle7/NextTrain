@@ -1,11 +1,12 @@
 import { useState, type ReactNode } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router'
 import {
-  api, ApiError, busDirections, busRouteIds, findRoute, getBusStops, getRoutes, getStations, ROUTES, routeName, searchStations,
-  stationRouteIds, towardLabel,
+  api, ApiError, busDirections, busRouteIds, findRoute, getBusStops, getRoutes, getStations, isSubwayRoute, lineLabel, ROUTES, routeName,
+  searchStations, stationRouteIds, towardLabel,
   type Commute, type CommuteInput, type Route, type Station,
 } from '../api'
 import { forget } from '../cache'
+import { CHANGE_WALK_MINUTES, changeOptions, type CatchPoint } from '../changes'
 import { stepNumbers, WEEK } from '../commutes'
 import { Card, dangerButton, LineBadge, linkButton, NotFound, primaryButton, SearchInput, secondaryButton, Status, StopName } from '../components'
 import { usePolling, useTitle } from '../usePolling'
@@ -46,6 +47,7 @@ function CommuteForm({ existing, initialStopId, initialRouteId }: { existing: Co
   const [changes, setChanges] = useState(!!existing?.transferStopId)
   const [transferStopId, setTransferStopId] = useState(existing?.transferStopId ?? '')
   const [transferRouteId, setTransferRouteId] = useState(existing?.transferRouteId ?? '')
+  const [lineQuery, setLineQuery] = useState('') // "Which bus or line?": "22"
   const [transferDirectionId, setTransferDirectionId] = useState(existing?.transferDirectionId)
   const [transferMinutes, setTransferMinutes] = useState(existing?.transferMinutes ?? 3)
   // Done tapped: the change shows as a one-line summary. A saved change opens that way.
@@ -61,24 +63,43 @@ function CommuteForm({ existing, initialStopId, initialRouteId }: { existing: Co
   const directions = route?.type === 'bus' && station ? busDirections(station, route.id) : [0, 1]
   const chosenDirection =
     directionId !== undefined && directions.includes(directionId) ? directionId : directions.length === 1 ? directions[0] : undefined
-  // Where you can change: the first ride's later stops where another line or route stops, in riding order.
+  // Where you can change, by the route you change to: the first ride's later stops, and every station or stop within
+  // a 5-minute walk of one (changes.ts), so the 66 offers the 22 a minute's walk away at Columbus Ave @ Malcolm X Blvd.
   const ridePath = chosenRouteId && chosenDirection !== undefined
     ? `/stations?route=${encodeURIComponent(chosenRouteId)}&direction=${chosenDirection}&sort=line`
     : ''
   const ride = usePolling(() => (changes && ridePath ? api<Station[]>(ridePath) : Promise.resolve<Station[]>([])), `${ridePath}|${changes}`)
-  const otherRoutes = (s: Station) => [...stationRouteIds(s), ...busRouteIds(s)].filter((id) => id !== chosenRouteId)
   const nameOf = (id: string) => routeName(id, findRoute(routes.data, id))
+  const badgeOf = (id: string) => lineLabel(id, findRoute(routes.data, id)) // "22", "OL"
   const boardingAt = ride.data?.findIndex((s) => s.mbtaStopId === station?.mbtaStopId) ?? -1
-  const changeStations = ride.data && boardingAt >= 0 ? ride.data.slice(boardingAt + 1).filter((s) => otherRoutes(s).length > 0) : []
-  const changeStation = changeStations.find((s) => s.mbtaStopId === transferStopId)
-  const changeRoutes = changeStation ? otherRoutes(changeStation) : []
-  const chosenTransferRoute = changeRoutes.includes(transferRouteId) ? transferRouteId : changeRoutes.length === 1 ? changeRoutes[0] : undefined
+  const options = changes && ride.data && boardingAt >= 0 && allStops && chosenRouteId
+    ? changeOptions(ride.data.slice(boardingAt + 1), allStops, chosenRouteId)
+    : undefined
+  // The T first, then buses by number; typing "22" (or "orange") narrows them.
+  const reachable = [...(options?.keys() ?? [])]
+    .sort((a, b) => Number(!isSubwayRoute(a)) - Number(!isSubwayRoute(b)) || badgeOf(a).localeCompare(badgeOf(b), undefined, { numeric: true }))
+  const q = lineQuery.trim().toLowerCase()
+  const matching = q ? reachable.filter((id) => badgeOf(id).toLowerCase().startsWith(q) || (q.length > 1 && nameOf(id).toLowerCase().includes(q))) : reachable
+  const chosenTransferRoute = options?.has(transferRouteId) ? transferRouteId : undefined
   const transferRoute = findRoute(routes.data, chosenTransferRoute ?? '')
+  const catchPoints = (chosenTransferRoute && options?.get(chosenTransferRoute)) || []
+  const catchPoint = catchPoints.find((p) => p.on.mbtaStopId === transferStopId)
+  const changeStation = catchPoint?.on
   const transferDirections = transferRoute?.type === 'bus' && changeStation ? busDirections(changeStation, transferRoute.id) : [0, 1]
   const chosenTransferDirection = transferDirectionId !== undefined && transferDirections.includes(transferDirectionId)
     ? transferDirectionId
     : transferDirections.length === 1 ? transferDirections[0] : undefined
-  const transferDone = !changes || (!!changeStation && !!chosenTransferRoute && chosenTransferDirection !== undefined)
+  const transferDone = !changes || (!!catchPoint && chosenTransferDirection !== undefined)
+  const pickLine = (id: string) => {
+    setTransferRouteId(id)
+    setTransferStopId('')
+    setTransferDirectionId(undefined)
+  }
+  const pickCatchPoint = ({ on, walk }: CatchPoint) => {
+    setTransferStopId(on.mbtaStopId)
+    setTransferDirectionId(undefined)
+    setTransferMinutes(walk ? Math.min(10, walk + 1) : 3) // the walk and a minute; 3 to change platforms
+  }
   const ready = station && chosenRouteId && chosenDirection !== undefined && start < end && days.length > 0 && transferDone && (!changes || confirmed)
 
   const pickStation = (id: string) => {
@@ -93,8 +114,8 @@ function CommuteForm({ existing, initialStopId, initialRouteId }: { existing: Co
       mbtaStopId: station.mbtaStopId, routeId: chosenRouteId, directionId: chosenDirection,
       windowStart: start, windowEnd: end, activeDays: days.join(','),
       ...(changes && {
-        transferStopId: changeStation!.mbtaStopId, transferRouteId: chosenTransferRoute, transferDirectionId: chosenTransferDirection,
-        transferMinutes,
+        transferStopId: catchPoint!.on.mbtaStopId, transferRouteId: chosenTransferRoute, transferDirectionId: chosenTransferDirection,
+        transferMinutes, transferFromStopId: catchPoint!.walk ? catchPoint!.off.mbtaStopId : undefined,
       }),
     }
     await submit(() => api(existing ? `/commutes/${existing.id}` : '/commutes', { method: existing ? 'PUT' : 'POST', body: JSON.stringify(body) }))
@@ -180,19 +201,27 @@ function CommuteForm({ existing, initialStopId, initialRouteId }: { existing: Co
       {changeShown && (
         <Step
           n={changeStep}
-          title="Do you change trains?"
-          hint={changes ? 'Where you get off, and what you catch next.' : 'For example, the Green Line to the Blue Line at Government Center.'}
+          title="Do you change trains/buses?"
+          hint={changes ? 'What you catch next, and where.' : 'For example, the Green Line to the Blue Line at Government Center, or the 66 to the 22.'}
         >
           {!changes ? (
             <button onClick={() => setChanges(true)} className={secondaryButton}>
               <span aria-hidden>+</span> Add a change
             </button>
-          ) : confirmed && changeStation && transferRoute && chosenTransferDirection !== undefined ? (
+          ) : confirmed && catchPoint && transferRoute && chosenTransferDirection !== undefined ? (
             <Card>
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0 space-y-1">
                   <p className="flex flex-wrap items-center gap-x-1.5 gap-y-1">
-                    Change at <strong>{changeStation.name}</strong> to
+                    {catchPoint.walk ? (
+                      <>
+                        Get off at <strong>{catchPoint.off.name}</strong>, walk {catchPoint.walk} min to <strong>{catchPoint.on.name}</strong> for
+                      </>
+                    ) : (
+                      <>
+                        Change at <strong>{catchPoint.on.name}</strong> to
+                      </>
+                    )}
                     <span aria-hidden>
                       <LineBadge routeId={transferRoute.id} routes={routes.data} />
                     </span>
@@ -215,64 +244,75 @@ function CommuteForm({ existing, initialStopId, initialRouteId }: { existing: Co
             <Card>
               <div className="space-y-5">
                 <div className="space-y-2">
-                  <h3 className="text-sm font-semibold text-neutral-500 uppercase">Where do you change?</h3>
-                  {!ride.data ? (
+                  <h3 className="text-sm font-semibold text-neutral-500 uppercase">Which bus or line?</h3>
+                  {!options ? (
                     <Status loading rows={1} />
-                  ) : changeStations.length === 0 ? (
-                    <p className="text-sm text-neutral-500">No other lines stop after {station?.name} going this way.</p>
-                  ) : changeStation ? (
+                  ) : reachable.length === 0 ? (
+                    <p className="text-sm text-neutral-500">
+                      No other line or bus stops within a {CHANGE_WALK_MINUTES}-minute walk of this ride after {station?.name}.
+                    </p>
+                  ) : transferRoute ? (
                     <div className="flex items-center justify-between gap-2">
-                      <span className="font-semibold">{changeStation.name}</span>
-                      <button onClick={() => setTransferStopId('')} className={linkButton}>
-                        Change<span className="sr-only"> where you change</span>
+                      <LineName id={transferRoute.id} routes={routes.data} />
+                      <button onClick={() => pickLine('')} className={linkButton}>
+                        Change<span className="sr-only"> the bus or line</span>
                       </button>
                     </div>
                   ) : (
-                    <ul className="-mx-1 divide-y divide-neutral-100 dark:divide-neutral-800">
-                      {changeStations.map((s) => (
-                        <li key={s.mbtaStopId}>
-                          <button
-                            onClick={() => {
-                              setTransferStopId(s.mbtaStopId)
-                              setTransferRouteId('')
-                              setTransferDirectionId(undefined)
-                            }}
-                            className="flex min-h-12 w-full items-center justify-between gap-3 rounded-lg px-1 text-left active:bg-neutral-100 dark:active:bg-neutral-800"
-                          >
-                            <span className="min-w-0 font-semibold">{s.name}</span>
-                            <span aria-hidden className="flex shrink-0 items-center gap-1">
-                              {otherRoutes(s).slice(0, 3).map((id) => (
-                                <LineBadge key={id} routeId={id} routes={routes.data} />
-                              ))}
-                              {otherRoutes(s).length > 3 && <span className="text-xs font-semibold text-neutral-500">+{otherRoutes(s).length - 3}</span>}
-                            </span>
-                            <span className="sr-only">: {otherRoutes(s).map(nameOf).join(', ')}</span>
-                          </button>
-                        </li>
-                      ))}
-                    </ul>
+                    <>
+                      {/* What you can catch along this ride (the same stop, or up to a 5-minute walk); typing narrows it. */}
+                      <SearchInput value={lineQuery} onChange={setLineQuery} placeholder="Which bus or line? e.g. 22" onSubmit={() => matching[0] && pickLine(matching[0])} />
+                      {matching.length === 0 ? (
+                        <p className="text-sm text-neutral-500">
+                          No line or bus “{lineQuery.trim()}” within a {CHANGE_WALK_MINUTES}-minute walk of this ride.
+                        </p>
+                      ) : (
+                        <div className="flex flex-wrap gap-2">
+                          {matching.map((id) => (
+                            <button
+                              key={id}
+                              onClick={() => pickLine(id)}
+                              className="flex min-h-11 items-center gap-1.5 rounded-lg bg-neutral-100 px-3 text-sm font-semibold active:bg-neutral-200 dark:bg-neutral-800 dark:active:bg-neutral-700"
+                            >
+                              <span className="text-neutral-500 dark:text-neutral-400">{isSubwayRoute(id) ? 'T:' : 'Bus:'}</span>
+                              <span aria-hidden>
+                                <LineBadge routeId={id} routes={routes.data} />
+                              </span>
+                              <span className="sr-only">{nameOf(id)}</span>
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </>
                   )}
                 </div>
 
-                {changeStation && changeRoutes.length > 1 && (
+                {transferRoute && (
                   <div className="space-y-2">
-                    <h3 className="text-sm font-semibold text-neutral-500 uppercase">Onto which line?</h3>
-                    <div className="flex flex-wrap gap-2">
-                      {changeRoutes.map((id) => (
-                        <Choice key={id} selected={chosenTransferRoute === id} onClick={() => {
-                            setTransferRouteId(id)
-                            setTransferDirectionId(undefined)
-                          }}>
-                          <span aria-hidden>
-                            <LineBadge routeId={id} routes={routes.data} />
-                          </span>
-                          <span className="text-left">{nameOf(id)}</span>
-                        </Choice>
-                      ))}
-                    </div>
+                    <h3 className="text-sm font-semibold text-neutral-500 uppercase">Where do you catch it?</h3>
+                    {catchPoint ? (
+                      <div className="flex items-center justify-between gap-2">
+                        <CatchPlace point={catchPoint} />
+                        <button onClick={() => setTransferStopId('')} className={linkButton}>
+                          Change<span className="sr-only"> where you catch it</span>
+                        </button>
+                      </div>
+                    ) : (
+                      <ul className="-mx-1 divide-y divide-neutral-100 dark:divide-neutral-800">
+                        {catchPoints.map((p) => (
+                          <li key={p.on.mbtaStopId}>
+                            <button
+                              onClick={() => pickCatchPoint(p)}
+                              className="flex min-h-12 w-full items-center rounded-lg px-1 py-1 text-left active:bg-neutral-100 dark:active:bg-neutral-800"
+                            >
+                              <CatchPlace point={p} />
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
                   </div>
                 )}
-
                 {transferRoute && (
                   <div className="space-y-2">
                     <h3 className="text-sm font-semibold text-neutral-500 uppercase">Which way then?</h3>
@@ -290,7 +330,7 @@ function CommuteForm({ existing, initialStopId, initialRouteId }: { existing: Co
                   <div className="flex items-center justify-between gap-3">
                     <span>
                       <span className="block text-sm font-semibold text-neutral-500 uppercase">Time to change</span>
-                      <span className="block text-sm text-neutral-500">Platform to platform</span>
+                      <span className="block text-sm text-neutral-500">{catchPoint?.walk ? 'Including the walk' : 'Platform to platform'}</span>
                     </span>
                     <span className="flex items-center gap-2">
                       <button
@@ -401,6 +441,34 @@ function StationPicker({ stations, routes, onPick }: { stations: Station[] | und
         </button>
       ))}
     </div>
+  )
+}
+
+// "Bus: 22 Ashmont Station - Ruggles Station", or "T: OL Orange Line": a line or bus to change to.
+function LineName({ id, routes }: { id: string; routes: Route[] | undefined }) {
+  const route = findRoute(routes, id)
+  return (
+    <span className="flex min-w-0 items-center gap-1.5">
+      <span className="text-sm font-semibold text-neutral-500 dark:text-neutral-400">{isSubwayRoute(id) ? 'T:' : 'Bus:'}</span>
+      <span aria-hidden>
+        <LineBadge routeId={id} routes={routes} />
+      </span>
+      <span className="min-w-0 truncate font-semibold">{route?.name ?? routeName(id, route)}</span>
+    </span>
+  )
+}
+
+// Where to catch the next ride: "Bus: Columbus Ave @ Malcolm X Blvd (near …)", then "1 min walk from Tremont St @
+// Columbus Ave", or "T stop: Park Street", then "Same station".
+function CatchPlace({ point: { off, on, walk } }: { point: CatchPoint }) {
+  return (
+    <span className="min-w-0">
+      <span className="text-sm font-semibold text-neutral-500 dark:text-neutral-400">{on.routeId ? 'T stop: ' : 'Bus: '}</span>
+      <StopName station={on} className="font-semibold" />
+      <span className="block text-sm text-neutral-500">
+        {walk ? `${walk} min walk from ${off.name}` : on.routeId ? 'Same station' : 'Same stop'}
+      </span>
+    </span>
   )
 }
 
