@@ -2,16 +2,18 @@ import { getMapKitToken, routeName, type Route, type Vehicle } from './api'
 
 // Apple's MapKit JS, pinned to one version with Subresource Integrity: the browser refuses to run the script if
 // Apple's file ever differs from the one this hash was made from, so a tampered CDN file can't run in our app.
-// (MapKit then loads its own map renderer, mk-csr.js, from the same Apple CDN; Apple versions that one itself.)
+// It's the small core loader (the full bundle, mapkit.js, has no Look Around); it then loads the libraries we ask for,
+// and its map renderer (mk-csr.js), from the same Apple CDN, under this version's path.
 // To upgrade, change the version and recompute the hash:
-//   curl -s https://cdn.apple-mapkit.com/mk/<version>/mapkit.js | openssl dgst -sha384 -binary | openssl base64 -A
-export const MAPKIT_URL = 'https://cdn.apple-mapkit.com/mk/5.81.65/mapkit.js'
-export const MAPKIT_INTEGRITY = 'sha384-y+x9sMgF6hD1fKLnlCx36fwU/SXLFs15E+QI24jtU52FsKlrCWzYk+kN0mwhq4m3'
+//   curl -s https://cdn.apple-mapkit.com/mk/<version>/mapkit.core.js | openssl dgst -sha384 -binary | openssl base64 -A
+export const MAPKIT_URL = 'https://cdn.apple-mapkit.com/mk/5.81.65/mapkit.core.js'
+export const MAPKIT_INTEGRITY = 'sha384-OnCs/HurAUQqewnwKjYlWU3GXq9/yyJ87STWxddMuQEC8B1ZWNKiAUJsUJuSyxx4'
 
 let ready: Promise<void> | undefined
 
 /**
- * Loads MapKit JS once, then sets it up to get its tokens from our API. Resolves when MapKit accepted the first token.
+ * Loads MapKit JS once, then sets it up to get its tokens from our API. Resolves when MapKit accepted the first token
+ * and loaded what the full bundle had: the map, and search (services). Look Around loads on demand (lookAround.ts).
  * A failed script load (e.g. offline) can be retried on the next call; a refused token can't (it won't fix itself).
  */
 export function loadMapKit(): Promise<void> {
@@ -23,9 +25,13 @@ export function loadMapKit(): Promise<void> {
       async: true,
     })
     script.onload = () => {
-      mapkit.addEventListener('configuration-change', (event) => event.status === 'Initialized' && resolve())
+      let waiting = 2 // the token, and the libraries, in either order
+      const step = () => --waiting === 0 && resolve()
+      mapkit.addEventListener('configuration-change', (event) => event.status === 'Initialized' && step())
+      mapkit.addEventListener('load', step)
       mapkit.addEventListener('error', (event) => reject(new Error(`MapKit: ${event.status}`)))
-      mapkit.init({ authorizationCallback: (done) => void getMapKitToken().then(done, reject) })
+      mapkit.addEventListener('load-error', () => reject(new Error('MapKit failed to load')))
+      mapkit.init({ authorizationCallback: (done) => void getMapKitToken().then(done, reject), libraries: ['full-map', 'services'] })
     }
     script.onerror = () => {
       script.remove()

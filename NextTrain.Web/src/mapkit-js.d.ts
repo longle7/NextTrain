@@ -6,8 +6,13 @@ declare namespace mapkit {
 
   const FeatureVisibility: { readonly Adaptive: string; readonly Hidden: string; readonly Visible: string }
 
-  function init(options: { authorizationCallback: (done: (token: string) => void) => void }): void
+  function init(options: { authorizationCallback: (done: (token: string) => void) => void; libraries?: string[] }): void
   function addEventListener(type: 'configuration-change' | 'error', listener: (event: { status: Status }) => void): void
+  // Libraries (https://developer.apple.com/documentation/mapkitjs/mapkit/load): load() starts loading them, then
+  // MapKit fires load or load-error with their names. (Apple's docs say load() returns a promise; 5.81's doesn't.)
+  function addEventListener(type: 'load' | 'load-error', listener: (event: { libraries: string[] }) => void): void
+  function load(libraries: string[]): void
+  const loadedLibraries: string[]
 
   class Coordinate {
     constructor(latitude: number, longitude: number)
@@ -79,6 +84,17 @@ declare namespace mapkit {
     addAnnotations(annotations: Annotation[]): Annotation[]
     removeAnnotation(annotation: Annotation): Annotation
     removeAnnotations(annotations: Annotation[]): Annotation[]
+    destroy(): void
+  }
+
+  // Street-level imagery, from the look-around library (https://developer.apple.com/documentation/mapkitjs/lookaround).
+  class LookAround {
+    constructor(parent: HTMLElement, location: Coordinate)
+    readonly element: HTMLDivElement
+    readonly readyState: 'loading' | 'complete' | 'error' | 'destroyed'
+    addEventListener(type: 'load', listener: () => void): void
+    // detail.type 'availability-error': Apple has no imagery there.
+    addEventListener(type: 'error', listener: (event: CustomEvent<{ type: string; message: string }>) => void): void
     destroy(): void
   }
 }
