@@ -3,9 +3,9 @@ import { Capacitor } from '@capacitor/core'
 import { useEffect, useState, type ReactNode } from 'react'
 import { Link } from 'react-router'
 import { analyticsBlocked, forgetAnalyticsChoice, setAnalyticsChoice, useAnalyticsChoice } from '../analytics'
-import { forgetRemembered } from '../cache'
+import { forgetRemembered, writeKey } from '../cache'
 import { api, commutePredictionsPath, forgetUserId, getRoutes, type Commute, type Prediction } from '../api'
-import { sortCommutes } from '../commutes'
+import { GET_STARTED_KEY, sortCommutes } from '../commutes'
 import { Card, dangerButton, primaryButton } from '../components'
 import { rememberLocation } from '../geo'
 import { legalPages } from '../legal'
@@ -33,6 +33,7 @@ export default function SettingsPage() {
       forgetRemembered()
       forgetAnalyticsChoice()
       forgetNotificationChoice()
+      writeKey(GET_STARTED_KEY, null)
       rememberLocation(false)
       void endLiveActivities()
       void updateWidget([]) // the Home Screen widget forgets them too

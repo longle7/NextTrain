@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { Link, useNavigate } from 'react-router'
 import { alertsFor, majorAlert, plannedFor } from '../alerts'
 import {
@@ -6,11 +6,14 @@ import {
   searchRoutes, searchStations, stationRouteIds, towardLabel, UPCOMING_REFRESH_MS, upcomingAlertsPath,
   type Alert, type Commute, type ConnectionPlan, type Prediction, type Route, type Station,
 } from '../api'
-import { commuteTiming, daysLabel, liveActivityEnd, sortCommutes, timingLabel, windowLabel } from '../commutes'
+import { readKey, writeKey } from '../cache'
+import { commuteTiming, daysLabel, GET_STARTED_KEY, getStartedDue, liveActivityEnd, sortCommutes, timingLabel, windowLabel } from '../commutes'
 import { Card, LineBadge, linkButton, primaryButton, SearchInput, secondaryButton, StationLink, Status, WarningIcon } from '../components'
 import { currentPosition, locationErrorMessage, locationRemembered, nearestStations, OUT_OF_AREA_MILES, walkLabel } from '../geo'
 import { endLiveActivities, liveActivityDetails, showLiveActivity, updateWidget, widgetCommutes } from '../liveActivity'
+import { TERMS_ACCEPTED, termsAccepted } from '../legal'
 import { declineNotifications, notificationChoice, notificationsAvailable, turnOnNotifications } from '../notifications'
+import { placeOf, suggestPlaces, type Suggestion } from '../places'
 import { clock, dateRange, departureLabel, groupDepartures, secondsAgo, STALE_AFTER_SECONDS } from '../time'
 import { adviceText } from '../transfers'
 import { failure, useNow, usePolling, useTitle } from '../usePolling'
@@ -22,29 +25,48 @@ export default function HomePage() {
   const navigate = useNavigate()
   const alerts = usePolling(getAlerts, 'alerts', ALERTS_REFRESH_MS) // one poll shared by commutes and nearby
   const [query, setQuery] = useState('')
-  const [whereTo, setWhereTo] = useState('')
-  // Stations first, then bus routes by number ("66"), then bus stops.
+  const [places, setPlaces] = useState<Suggestion[]>([])
+  // Stations first, then bus routes by number ("66"), then bus stops, then addresses and places.
   const results = stations.data ? searchStations(stations.data, query) : []
   const routeResults = routes.data ? searchRoutes(routes.data, query) : []
   // "66" means route 66, not 665 Broadway: an exact route number shows just the route.
   const exactRoute = routeResults.some((r) => (r.shortName || r.id).toLowerCase() === query.trim().toLowerCase())
   const stopResults = busStops.data && !exactRoute ? searchStations(busStops.data, query, 6) : []
-  const nothingFound = !!stations.data && !!busStops.data && results.length + routeResults.length + stopResults.length === 0
+  const placeResults = exactRoute || !query.trim() ? [] : places
+  const nothingFound = !!stations.data && !!busStops.data && results.length + routeResults.length + stopResults.length + placeResults.length === 0
   useTitle(undefined)
+
+  // Apple's addresses and places, a moment after typing stops (places.ts; MapKit loads on the first one).
+  useEffect(() => {
+    if (!query.trim()) return
+    let cancelled = false
+    const timer = setTimeout(() => void suggestPlaces(query, []).then((found) => !cancelled && setPlaces(found)), 250)
+    return () => {
+      cancelled = true
+      clearTimeout(timer)
+    }
+  }, [query])
+
+  // A place opens the trip planner to there, with where it is, so the planner needn't look it up again.
+  const planTo = async (suggestion: Suggestion) => {
+    const place = await placeOf(suggestion).catch(() => undefined)
+    const at = place ? `&lat=${place.latitude}&lon=${place.longitude}` : ''
+    navigate(`/trip?to=${encodeURIComponent(place?.name ?? suggestion.name)}${at}`)
+  }
 
   const openTopResult = () => {
     if (results[0]) navigate(`/stations/${results[0].mbtaStopId}`)
     else if (routeResults[0]) navigate(`/lines/${routeResults[0].id}`)
     else if (stopResults[0]) navigate(`/stations/${stopResults[0].mbtaStopId}`)
+    else if (placeResults[0]) void planTo(placeResults[0])
   }
 
   return (
     <>
       {/* The header shows the name; screen readers still need a page heading to start from. */}
       <h1 className="sr-only">NextTrain</h1>
-      {/* Plan a trip: TripPage finds the place and the best trains and buses there. */}
-      <SearchInput value={whereTo} onChange={setWhereTo} placeholder="Where to?" onSubmit={() => navigate(`/trip?to=${encodeURIComponent(whereTo.trim())}`)} />
-      <SearchInput value={query} onChange={setQuery} placeholder="Search stations, stops, or bus routes" onSubmit={openTopResult} />
+      {/* One search: a station, stop, or bus route opens its page; an address or place plans a trip there. */}
+      <SearchInput value={query} onChange={setQuery} placeholder="Search a station, bus, or address" onSubmit={openTopResult} />
 
       <Status error={failure(stations)} loading={!!query.trim() && !stations.data && !stations.error} />
 
@@ -60,6 +82,20 @@ export default function HomePage() {
           {stopResults.length > 0 && (
             <ResultGroup title="Bus stops">
               <StationList stations={stopResults} routes={routes.data} />
+            </ResultGroup>
+          )}
+          {placeResults.length > 0 && (
+            <ResultGroup title="Places: plan a trip">
+              <ul className="space-y-2">
+                {placeResults.map((place) => (
+                  <li key={`${place.name}|${place.detail}`}>
+                    <button onClick={() => void planTo(place)} className="block w-full rounded-xl bg-white p-4 text-left shadow-sm dark:bg-neutral-900">
+                      <span className="block font-medium">{place.name}</span>
+                      {place.detail && <span className="block text-sm text-neutral-500">{place.detail}</span>}
+                    </button>
+                  </li>
+                ))}
+              </ul>
             </ResultGroup>
           )}
         </section>
@@ -163,95 +199,45 @@ function NotificationsPrompt() {
   )
 }
 
-function GetStarted({ routes }: { routes: Route[] | undefined }) {
-  const search = () => document.querySelector<HTMLInputElement>('input[aria-label^="Search"]')?.focus() // not "Where to?"
-  // Lands on "Use my location", so the location prompt comes from the rider's own tap on it.
-  const nearby = () => {
-    const section = document.getElementById('near-you')
-    section?.scrollIntoView({ block: 'start' })
-    section?.querySelector('button')?.focus({ preventScroll: true })
-  }
-  const step = 'flex min-h-11 w-full items-center gap-3 text-left'
-  const number = (n: number) => (
-    <span aria-hidden className="grid size-7 shrink-0 place-items-center rounded-full bg-blue-600 text-sm text-white dark:bg-blue-400 dark:text-neutral-900">
-      {n}
-    </span>
-  )
+// The nudge to save a commute, for someone who has none: once a day, on up to 3 days (commutes.ts getStartedDue). Only
+// after the Terms are agreed, so it never stacks on the Welcome screen; on a first launch it follows right after.
+function GetStartedPopup() {
+  const dialog = useRef<HTMLDialogElement>(null)
+  useEffect(() => {
+    const show = () => {
+      const next = termsAccepted() ? getStartedDue(readKey(GET_STARTED_KEY), bostonDay(new Date())) : undefined
+      if (!next || !dialog.current || dialog.current.open) return
+      writeKey(GET_STARTED_KEY, next)
+      dialog.current.showModal()
+    }
+    show()
+    window.addEventListener(TERMS_ACCEPTED, show)
+    return () => window.removeEventListener(TERMS_ACCEPTED, show)
+  }, [])
   return (
-    <Card>
-      <p className="font-bold">Get started</p>
-      <ol className="mt-2 space-y-1">
-        <li>
-          <button onClick={search} className={`${step} font-semibold`}>
-            {number(1)}Search for a station, stop, or bus route
-          </button>
-        </li>
-        <li>
-          <button onClick={nearby} className={`${step} font-semibold`}>
-            {number(2)}See what's near you
-          </button>
-        </li>
-        <li>
-          {/* Not a button: the Add a commute button below is the way in. */}
-          <span className={`${step} text-neutral-600 dark:text-neutral-300`}>
-            {number(3)}Save the trip you take every day, and its next train or bus shows up here
-          </span>
-        </li>
-      </ol>
-      {/* Why bother: what a saved commute gets you, then what it looks like outside the app. */}
-      <div className="mt-3 space-y-2 border-t border-neutral-100 pt-3 dark:border-neutral-800">
-        <p className="text-sm font-semibold">Why save a commute?</p>
-        <ul className="list-disc space-y-0.5 pl-5 text-sm text-neutral-600 dark:text-neutral-300">
-          <li>Its next train or bus is right here when you open NextTrain.</li>
-          <li>A heads-up 30 minutes before it starts if there's a suspension or long delay.</li>
-          <li>A countdown on your Lock Screen while it's on, and a Home Screen widget:</li>
-        </ul>
-        <CommutePreview routes={routes} />
-        {!notificationsAvailable() && (
-          <p className="text-xs text-neutral-500">Alerts, Lock Screen, and widget are in the NextTrain iPhone app.</p>
-        )}
+    <dialog
+      ref={dialog}
+      aria-labelledby="get-started-title"
+      className="m-auto w-[calc(100%-2rem)] max-w-md rounded-2xl bg-white p-6 text-neutral-900 shadow-xl backdrop:bg-black/60 dark:bg-neutral-900 dark:text-neutral-100"
+    >
+      <div className="space-y-4">
+        <h2 id="get-started-title" className="text-xl font-bold">
+          Save your commute
+        </h2>
+        <p>Save the trip you take every day, and its next train or bus shows up right here.</p>
+        <Link to="/commutes/new" className={primaryButton}>
+          Add a commute
+        </Link>
+        <button onClick={() => dialog.current?.close()} className={`w-full justify-center ${linkButton}`}>
+          Not now
+        </button>
       </div>
-      <Link to="/commutes/new" className={`mt-3 ${primaryButton}`}>
-        Add a commute
-      </Link>
-    </Card>
+    </dialog>
   )
 }
 
-// A saved commute outside the app, with example times: the Lock Screen Live Activity and the Home Screen widget, drawn
-// like CommuteLiveActivity.swift and NextCommuteWidget.swift. One sentence for screen readers, not the pieces.
-function CommutePreview({ routes }: { routes: Route[] | undefined }) {
-  const caption = 'text-center text-xs text-neutral-500'
-  return (
-    <div
-      role="img"
-      aria-label="Example: on your Lock Screen and in a Home Screen widget, Red Line from Davis to Ashmont/Braintree, next train in 4 minutes, then 8:12 and 8:19."
-      className="grid grid-cols-[1fr_auto] gap-x-3 gap-y-1"
-    >
-      <div aria-hidden className="rounded-2xl bg-neutral-800 p-3 text-white shadow-sm dark:bg-neutral-700">
-        <div className="flex items-center justify-between gap-2">
-          <span className="flex min-w-0 items-center gap-1.5">
-            <LineBadge routeId="Red" routes={routes} />
-            <span className="truncate text-sm font-semibold">Davis</span>
-          </span>
-          <span className="text-2xl font-bold tabular-nums">4 min</span>
-        </div>
-        <p className="mt-1 truncate text-xs text-white/70">to Ashmont/Braintree</p>
-        <p className="text-xs text-white/70">Then 8:12, 8:19</p>
-      </div>
-      <div aria-hidden className="flex size-28 flex-col justify-between rounded-2xl bg-neutral-100 p-2.5 shadow-sm dark:bg-neutral-800">
-        <span className="flex min-w-0 items-center gap-1">
-          <LineBadge routeId="Red" routes={routes} />
-          <span className="truncate text-xs font-semibold">Davis</span>
-        </span>
-        <span className="text-2xl leading-none font-bold tabular-nums">4 min</span>
-        <span className="truncate text-xs text-neutral-500 dark:text-neutral-400">to Ashmont/Braintree</span>
-      </div>
-      <p aria-hidden className={caption}>Lock Screen</p>
-      <p aria-hidden className={caption}>Widget</p>
-    </div>
-  )
-}
+// "2026-10-17", in Boston: a day starts at Boston's midnight wherever the phone is set.
+const bostonDay = (date: Date) => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York' }).format(date)
 
 function Nearby({ stations, busStops, routes, alerts }: {
   stations: Station[]
@@ -442,7 +428,15 @@ function MyCommutes({ routes, alerts: subwayAlerts }: { routes: Route[] | undefi
       </div>
       {/* One placeholder card, the size of a commute, so Home doesn't jump when they arrive. */}
       <Status error={failure(commutes)} loading={!commutes.data && !commutes.error} rows={1} />
-      {commutes.data?.length === 0 && <GetStarted routes={routes} />}
+      {/* No commute yet: adding one is the thing to do here (the small "+ Add" above takes over once there's one). */}
+      {commutes.data?.length === 0 && (
+        <>
+          <Link to="/commutes/new" className={primaryButton}>
+            <span aria-hidden>+</span> Add a commute
+          </Link>
+          <GetStartedPopup />
+        </>
+      )}
       {hasCommutes && <NotificationsPrompt />}
       {/* The commute that's on (or next) in full, with its live times; the others one line each, until their turn. */}
       <ul className="space-y-2">

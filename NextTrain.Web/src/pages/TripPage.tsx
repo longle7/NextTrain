@@ -20,7 +20,11 @@ export default function TripPage() {
   const stations = usePolling(getStations, 'stations')
   const busStops = usePolling(getBusStops, '/bus-stops', undefined, { remember: false }) // ~1 MB: the browser caches it
   const [from, setFrom] = useState<Place>()
-  const [to, setTo] = useState<Place>()
+  // A place picked in Home's search comes with where it is (?to=…&lat=…&lon=…); typed text is looked up.
+  const [to, setTo] = useState<Place | undefined>(() => {
+    const [name, latitude, longitude] = [params.get('to'), Number(params.get('lat')), Number(params.get('lon'))]
+    return name && latitude && longitude ? { name, latitude, longitude } : undefined
+  })
   // From where you are, without a tap, once location has worked here (or the browser says it's allowed), as on Home.
   const [locating, setLocating] = useState(locationRemembered)
   const [locationError, setLocationError] = useState<string>()
@@ -74,7 +78,7 @@ export default function TripPage() {
         onPlace={setTo}
         stations={stations.data}
         busStops={busStops.data}
-        initialQuery={params.get('to') ?? ''}
+        initialQuery={params.get('lat') ? '' : (params.get('to') ?? '')}
       />
 
       <Status error={failure(stations) ?? failure(trips)} loading={!!path && !trips.data && !trips.error} rows={2} />
