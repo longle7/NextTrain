@@ -20,6 +20,10 @@ namespace NextTrain.Api.Services
         public Task<Station?> GetByMbtaStopIdAsync(string mbtaStopId) =>
             _dbContext.Stations.FirstOrDefaultAsync(s => s.MbtaStopId == mbtaStopId);
 
+        // The stations and stops with these IDs, by ID; unknown IDs are left out.
+        public async Task<Dictionary<string, Station>> GetByMbtaStopIdsAsync(string[] mbtaStopIds) =>
+            await _dbContext.Stations.Where(s => mbtaStopIds.Contains(s.MbtaStopId)).ToDictionaryAsync(s => s.MbtaStopId);
+
         // Every subway station, or every stop on one route (subway or bus; with a direction, only that direction's), A-Z.
         public async Task<IReadOnlyList<Station>> GetAllStationsAsync(string? routeId = null, int? directionId = null) =>
             await ServingRoute(routeId, directionId).OrderBy(s => s.Name).ToListAsync();

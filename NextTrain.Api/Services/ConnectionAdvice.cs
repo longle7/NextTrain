@@ -39,6 +39,19 @@ namespace NextTrain.Api.Services
             };
             return new ConnectionPlan(advice, trains);
         }
+
+        /// <summary>
+        /// The train (or bus) to walk to at the start of a trip, and how: Hurry when you'd have to leave within a minute
+        /// and missing it means a long wait (or none is predicted after it); otherwise NoRush, for the first one that
+        /// leaves you at least a minute. Null when none can be reached on foot.
+        /// </summary>
+        public static (Advice Advice, DateTimeOffset Departure)? StartAdvice(IEnumerable<DateTimeOffset> departures, TimeSpan walk, DateTimeOffset now)
+        {
+            var reachable = departures.Where(d => d - walk >= now).Order().ToList();
+            if (reachable.Count == 0) return null;
+            var relaxed = reachable.Cast<DateTimeOffset?>().FirstOrDefault(d => d - walk - now >= TimeSpan.FromMinutes(1));
+            return relaxed - reachable[0] < HurryGap ? (Advice.NoRush, relaxed!.Value) : (Advice.Hurry, reachable[0]);
+        }
     }
 
     [JsonConverter(typeof(JsonStringEnumConverter<Advice>))]
