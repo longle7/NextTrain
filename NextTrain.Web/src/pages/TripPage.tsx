@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { Link, useSearchParams } from 'react-router'
 import { findRoute, getBusStops, getRoutes, getStations, getTrips, ROUTES, type Route, type Station, type TripOption } from '../api'
 import { Card, LineBadge, linkButton, SearchInput, secondaryButton, Status, StopName } from '../components'
-import { currentPosition, locationErrorMessage, locationRemembered, tripStops, tripStopsParam } from '../geo'
+import { currentPosition, locationAllowed, locationErrorMessage, locationRemembered, tripStops, tripStopsParam } from '../geo'
 import { placeOf, preparePlaces, suggestPlaces, type Place, type Suggestion } from '../places'
 import { clock } from '../time'
 import { adviceText } from '../transfers'
@@ -43,11 +43,7 @@ export default function TripPage() {
     void find()
   }
   useEffect(() => {
-    if (locationRemembered()) return void find()
-    navigator.permissions
-      ?.query({ name: 'geolocation' })
-      .then((p) => p.state === 'granted' && locate())
-      .catch(() => {})
+    void locationAllowed().then((allowed) => (allowed ? find() : setLocating(false)))
   }, [])
 
   const near = (place: Place | undefined) => (place && stations.data && busStops.data ? tripStops(stations.data, busStops.data, place) : undefined)

@@ -9,7 +9,7 @@ import {
 import { readKey, writeKey } from '../cache'
 import { commuteTiming, daysLabel, GET_STARTED_KEY, getStartedDue, liveActivityEnd, sortCommutes, timingLabel, windowLabel } from '../commutes'
 import { Card, LineBadge, linkButton, primaryButton, SearchInput, secondaryButton, StationLink, Status, WarningIcon } from '../components'
-import { currentPosition, locationErrorMessage, locationRemembered, nearestStations, OUT_OF_AREA_MILES, walkLabel } from '../geo'
+import { currentPosition, locationAllowed, locationErrorMessage, locationRemembered, nearestStations, OUT_OF_AREA_MILES, walkLabel, type Point } from '../geo'
 import { endLiveActivities, liveActivityDetails, showLiveActivity, updateWidget, widgetCommutes } from '../liveActivity'
 import { TERMS_ACCEPTED, termsAccepted } from '../legal'
 import { declineNotifications, notificationChoice, notificationsAvailable, turnOnNotifications } from '../notifications'
@@ -161,7 +161,7 @@ function RouteList({ routes }: { routes: Route[] }) {
   )
 }
 
-type Located = { state: 'idle' | 'locating' } | { state: 'error'; message: string } | { state: 'found'; coords: GeolocationCoordinates }
+type Located = { state: 'idle' | 'locating' } | { state: 'error'; message: string } | { state: 'found'; coords: Point }
 
 // Bus stops farther than this aren't "near you" (about a 12-minute walk).
 const BUS_STOP_MILES = 0.5
@@ -259,13 +259,9 @@ function Nearby({ stations, busStops, routes, alerts }: {
       (error: GeolocationPositionError) => setLocation({ state: 'error', message: locationErrorMessage(error) }),
     )
 
-  // Skip the button if location was used here before, or the browser says it's allowed.
+  // No button once location is allowed (geo.ts locationAllowed): the button, and iOS's prompt, only until then.
   useEffect(() => {
-    if (locationRemembered()) return void find()
-    navigator.permissions
-      ?.query({ name: 'geolocation' })
-      .then((p) => p.state === 'granted' && locate())
-      .catch(() => {})
+    void locationAllowed().then((allowed) => (allowed ? find() : setLocation({ state: 'idle' })))
   }, [])
 
   const nearest = location.state === 'found' ? nearestStations(stations, location.coords) : []
