@@ -30,6 +30,12 @@
         public int? TransferDirectionId { get; set; }
         public int? TransferMinutes { get; set; }
 
+        // Where the rider gets off the first ride when the change is a short walk to another stop: off the 66 at
+        // Tremont St opp Roxbury Crossing Sta, a minute's walk to the 22 at Columbus Ave @ Malcolm X Blvd. Null when
+        // they change at TransferStation itself (the same station or stop), as every commute before this did.
+        public int? TransferFromStationId { get; set; }
+        public Station? TransferFromStation { get; set; }
+
         // Commute start time (e.g., 7:45 AM local).
         public TimeSpan WindowStartLocal { get; set; }
 

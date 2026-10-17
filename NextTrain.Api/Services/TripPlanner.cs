@@ -142,8 +142,7 @@ namespace NextTrain.Api.Services
             if (x.Id == y.Id) return InStationMinutes;
             if (x.Attributes is not { Latitude: { } lat1, Longitude: { } lon1 } || y.Attributes is not { Latitude: { } lat2, Longitude: { } lon2 }) return null;
             if (Math.Abs(lat1 - lat2) > 0.002) return null; // quick no: 150 m is 0.00135 degrees of latitude
-            var (dx, dy) = ((lon2 - lon1) * Math.Cos(lat1 * Math.PI / 180), lat2 - lat1);
-            var meters = Math.Sqrt(dx * dx + dy * dy) * 111_320; // flat-earth distance: plenty at this scale
+            var meters = StationRoutes.Meters(lat1, lon1, lat2, lon2);
             return meters <= ChangeWalkMeters ? (int)Math.Max(1, Math.Round(meters / 1609.34 * 1.25 * 20)) + 1 : null;
         }
 

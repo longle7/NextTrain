@@ -122,24 +122,28 @@ public class BusImportTests
     }
 
     [Fact]
-    public async Task Reimport_KeepsAStopACommuteChangesAt()
+    public async Task Reimport_KeepsTheStopsACommuteChangesAt_AndGetsOffAt()
     {
         using var db = TestDb.CreateClean();
         var mbta = Mbta();
         await new StationImportService(mbta, db).ImportStationsAsync();
         var nubian = await db.Stations.SingleAsync(s => s.MbtaStopId == "place-nubn");
         var stop1 = await db.Stations.SingleAsync(s => s.MbtaStopId == "1");
+        var stop63 = await db.Stations.SingleAsync(s => s.MbtaStopId == "63");
         db.UserCommutes.Add(new UserCommute
         {
             UserId = "u", StationId = nubian.Id, RouteId = "1", DirectionId = 0,
             TransferStationId = stop1.Id, TransferRouteId = "10", TransferDirectionId = 0, TransferMinutes = 3,
+            TransferFromStationId = stop63.Id, // gets off there and walks to stop "1" (a made-up walk; the import doesn't check)
         });
         await db.SaveChangesAsync();
 
         mbta.StopsByRouteDirection[("1", 0)] = new() { Stop("place-nubn", "Nubian") }; // stop "1" closes
+        mbta.StopsByRouteDirection[("1", 1)] = new() { Stop("place-nubn", "Nubian") }; // and stop "63"
         await new StationImportService(mbta, db).ImportStationsAsync();
 
         Assert.True(await db.Stations.AnyAsync(s => s.MbtaStopId == "1")); // a commute changes there: kept
+        Assert.True(await db.Stations.AnyAsync(s => s.MbtaStopId == "63")); // a commute gets off there: kept
     }
 
     [Fact]

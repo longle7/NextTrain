@@ -213,6 +213,9 @@ namespace NextTrain.Api.Migrations
                     b.Property<int?>("TransferDirectionId")
                         .HasColumnType("int");
 
+                    b.Property<int?>("TransferFromStationId")
+                        .HasColumnType("int");
+
                     b.Property<int?>("TransferMinutes")
                         .HasColumnType("int");
 
@@ -241,6 +244,8 @@ namespace NextTrain.Api.Migrations
 
                     b.HasIndex("StationId");
 
+                    b.HasIndex("TransferFromStationId");
+
                     b.HasIndex("TransferStationId");
 
                     b.HasIndex("UserId");
@@ -256,12 +261,19 @@ namespace NextTrain.Api.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
+                    b.HasOne("NextTrain.Core.Domain.Station", "TransferFromStation")
+                        .WithMany()
+                        .HasForeignKey("TransferFromStationId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.HasOne("NextTrain.Core.Domain.Station", "TransferStation")
                         .WithMany()
                         .HasForeignKey("TransferStationId")
                         .OnDelete(DeleteBehavior.Restrict);
 
                     b.Navigation("Station");
+
+                    b.Navigation("TransferFromStation");
 
                     b.Navigation("TransferStation");
                 });
