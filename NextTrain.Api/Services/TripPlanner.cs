@@ -77,8 +77,15 @@ namespace NextTrain.Api.Services
             TripStop StopAt(Stop s) =>
                 TripStop.From(stations.GetValueOrDefault(s.Id) ?? new Station { MbtaStopId = s.Id, Name = stops[s.Way][s.Index].Attributes.Name });
 
+            // The same stops by another route (Green Line branches share track) are the same trip: the earliest stays.
             var options = await Task.WhenAll(best.Select(c => LiveAsync(mbta, c, StopAt, now)));
-            return [.. options.OfType<TripOption>().OrderBy(o => o.Arrival).Take(Options)];
+            return
+            [
+                .. options.OfType<TripOption>()
+                    .OrderBy(o => o.Arrival)
+                    .DistinctBy(o => string.Join(">", o.Legs.Select(l => $"{l.From.Id}>{l.To.Id}")))
+                    .Take(Options)
+            ];
         }
 
         // Live times for one way there, or null if they don't line up (nothing predicted, or no connection yet).

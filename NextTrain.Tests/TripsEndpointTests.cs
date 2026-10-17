@@ -158,6 +158,23 @@ public class TripsEndpointTests : IDisposable
         Assert.Equal("place-kencl", trip.Legs[0].From.Id);
     }
 
+    [Fact]
+    public async Task TheSameStopsOnAnotherBranch_AreOneTrip_TheEarliest()
+    {
+        using (var db = TestDb.Open())
+        {
+            foreach (var s in db.Stations.Where(s => s.MbtaStopId == "place-kencl" || s.MbtaStopId == "place-gover")) s.RouteId = "Green-B,Green-C";
+            db.SaveChanges();
+        }
+        _mbta.StopsByRouteDirection[("Green-C", 1)] = _mbta.StopsByRouteDirection[("Green-B", 1)];
+        _mbta.PredictionsByStop["place-kencl"].Add(FakeMbtaClient.Prediction("Green-C", 1, At("12:05"), "c1"));
+        _mbta.PredictionsByStop["place-gover"].Add(FakeMbtaClient.Prediction("Green-C", 1, null, "c1", At("12:14")));
+
+        var trip = Assert.Single(await Trips("place-kencl:4", "place-gover:3"));
+
+        Assert.Equal(("Green-C", "12:05", "12:17"), (trip.Legs[0].RouteId, Clock(trip.Legs[0].Departure), Clock(trip.Arrival)));
+    }
+
     [Theory]
     [InlineData("from=a:1,b:1,c:1,d:1,e:1,f:1,g:1,h:1,i:1&to=place-gover:3")] // more than 8 stops
     [InlineData("from=place-kencl:16&to=place-gover:3")] // more than 15 minutes' walk
