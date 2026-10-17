@@ -224,7 +224,7 @@ function StreetView({ station: { mbtaStopId, name, latitude, longitude } }: { st
         ref={dialog}
         aria-label={label}
         onClose={() => box.current?.append(...full.current!.childNodes)}
-        className="m-0 size-full max-h-none max-w-none bg-black p-0 backdrop:bg-black"
+        className="m-0 size-full max-h-none max-w-none bg-black p-0 pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] backdrop:bg-black"
       >
         <div ref={full} className="size-full" />
         <button

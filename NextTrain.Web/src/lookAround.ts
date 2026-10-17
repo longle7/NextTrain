@@ -32,13 +32,14 @@ const library = () =>
  */
 export function showLookAround(host: HTMLElement, stopId: string, latitude: number, longitude: number, done: (shown: boolean) => void) {
   let live = true
-  library().then(
-    () => {
+  library()
+    .then(() => {
       if (!live) return
       if (parked?.stopId === stopId) host.append(parked.view.element)
       else {
         parked?.view.destroy()
-        const view = new mapkit.LookAround(host, new mapkit.Coordinate(latitude, longitude))
+        parked = undefined
+        const view = new mapkit.LookAround(host, new mapkit.Coordinate(latitude, longitude)) // throws outside https
         view.addEventListener('error', (event) => {
           if (event.detail.type === 'availability-error') remember(NONE, [...(remembered<string[]>(NONE)?.data ?? []), stopId])
           view.destroy()
@@ -50,9 +51,8 @@ export function showLookAround(host: HTMLElement, stopId: string, latitude: numb
       if (view.readyState === 'complete') return done(true)
       view.addEventListener('load', () => live && done(true))
       view.addEventListener('error', () => live && done(false))
-    },
-    () => live && done(false),
-  )
+    })
+    .catch(() => live && done(false))
   return () => {
     live = false
     if (parked?.stopId === stopId) parked.view.element.remove()
