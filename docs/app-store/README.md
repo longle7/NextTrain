@@ -107,19 +107,22 @@ No account, no ads, no tracking. Your commutes are saved under a random ID, dela
 Live data comes from the MBTA. NextTrain is an independent app and isn't affiliated with or endorsed by the MBTA.
 ```
 
-**What's New in Version 1.3** (4,000 max). Riders are updating from 1.0, so this covers 1.2's buses too:
+**What's New in Version 1.4** (4,000 max). 1.3 is approved; 1.4 adds the trip planner and the rest of #99–#101:
 
 ```
 Buses are here, plus a lot more for your daily commute.
 
 - Buses: all 150 MBTA routes, Silver Line included. Search by number ("66", "SL1"), see stops near you, and save a bus commute.
-- Transfer advice: add where you change lines, and NextTrain tells you whether to hurry for this train or take the next one.
+- Trip planner: search any address on Home and get the best train or bus there, with at most one change, and whether to hurry or relax.
+- Transfer advice: add where you change, even to a bus a short walk away, and NextTrain tells you whether to hurry for this train or take the next one.
+- Bus stops show a nearby landmark, like "(near Taco Bell)", so you know which side of the street to stand on, plus Apple's street view of the stop.
 - Delay alerts: get notified when a suspension, closure, or long delay hits one of your commutes.
 - Widget: your next train on your Home Screen and Lock Screen.
+- Live Activity: your commute counts down on the Lock Screen and in the Dynamic Island, moving on to the next train by itself.
 - Map: switch between Subway and Bus, show only inbound or outbound trains, and tap any stop to save it as a commute.
 - Scheduled times late at night and early in the morning, when nothing is predicted yet.
 - Planned changes for the next two weeks on each line, and elevator and escalator outages at each station.
-- A calmer map, an easier start, and many smaller fixes.
+- One search for stations, buses, and addresses; location asked only once; a calmer map; and many smaller fixes.
 ```
 
 What's New only shows for updates, so it's asked for from 1.3 on (1.0 is the first release).
@@ -157,6 +160,8 @@ No login or account is needed, and there is nothing to set up.
 - Lines tab: each line's status; open a line to see its trains move along the diagram.
 - Map tab: every train live on Apple Maps; tap a train for its destination and, where the MBTA reports it, how crowded each car is.
 - Commutes: Home -> Add a commute. Saved commutes are private to the device (stored under a random ID, not shared with anyone).
+- Trip planner: type an address or place in Home's search and pick it under "Places". The address is looked up by Apple (MapKit); our server only receives the IDs of nearby stops and walking minutes, with no user ID, and stores nothing.
+- Bus stop pages show Apple's Look Around street view of the stop, and each bus stop names a nearby landmark (from OpenStreetMap, credited in Settings).
 - Data deletion: Settings -> Delete my data removes saved commutes from our server and clears local data. Help & support is in Settings.
 - Live Activities (version 1.1 and later): Settings -> Preview Live Activity, then lock the phone.
 - Buses (version 1.2 and later): search a route number such as "66" or "SL1", or open Lines -> Buses. On the Map, the Bus switch shows one route's streets, stops, and live buses. Tap a bus stop for its next buses.
