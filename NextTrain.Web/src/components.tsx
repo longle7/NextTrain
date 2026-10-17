@@ -158,6 +158,7 @@ export function SearchInput({ value, onChange, placeholder, onSubmit }: {
   return (
     <form
       role="search"
+      aria-label={placeholder} // Home has two searches ("Where to?" and stations): each landmark needs its own name
       onSubmit={(e) => {
         e.preventDefault()
         onSubmit?.()
