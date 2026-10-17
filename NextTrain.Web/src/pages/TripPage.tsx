@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { Link, useSearchParams } from 'react-router'
 import { findRoute, getBusStops, getRoutes, getStations, getTrips, ROUTES, type Route, type Station, type TripOption } from '../api'
 import { Card, LineBadge, linkButton, SearchInput, secondaryButton, Status, StopName } from '../components'
-import { currentPosition, locationErrorMessage, locationRemembered, tripStops, tripStopsParam } from '../geo'
+import { currentPosition, locationAllowed, locationErrorMessage, locationRemembered, tripStops, tripStopsParam } from '../geo'
 import { placeOf, preparePlaces, suggestPlaces, type Place, type Suggestion } from '../places'
 import { clock } from '../time'
 import { adviceText } from '../transfers'
@@ -20,7 +20,11 @@ export default function TripPage() {
   const stations = usePolling(getStations, 'stations')
   const busStops = usePolling(getBusStops, '/bus-stops', undefined, { remember: false }) // ~1 MB: the browser caches it
   const [from, setFrom] = useState<Place>()
-  const [to, setTo] = useState<Place>()
+  // A place picked in Home's search comes with where it is (?to=…&lat=…&lon=…); typed text is looked up.
+  const [to, setTo] = useState<Place | undefined>(() => {
+    const [name, latitude, longitude] = [params.get('to'), Number(params.get('lat')), Number(params.get('lon'))]
+    return name && latitude && longitude ? { name, latitude, longitude } : undefined
+  })
   // From where you are, without a tap, once location has worked here (or the browser says it's allowed), as on Home.
   const [locating, setLocating] = useState(locationRemembered)
   const [locationError, setLocationError] = useState<string>()
@@ -39,11 +43,7 @@ export default function TripPage() {
     void find()
   }
   useEffect(() => {
-    if (locationRemembered()) return void find()
-    navigator.permissions
-      ?.query({ name: 'geolocation' })
-      .then((p) => p.state === 'granted' && locate())
-      .catch(() => {})
+    void locationAllowed().then((allowed) => (allowed ? find() : setLocating(false)))
   }, [])
 
   const near = (place: Place | undefined) => (place && stations.data && busStops.data ? tripStops(stations.data, busStops.data, place) : undefined)
@@ -74,7 +74,7 @@ export default function TripPage() {
         onPlace={setTo}
         stations={stations.data}
         busStops={busStops.data}
-        initialQuery={params.get('to') ?? ''}
+        initialQuery={params.get('lat') ? '' : (params.get('to') ?? '')}
       />
 
       <Status error={failure(stations) ?? failure(trips)} loading={!!path && !trips.data && !trips.error} rows={2} />

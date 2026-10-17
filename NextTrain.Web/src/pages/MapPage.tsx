@@ -6,7 +6,7 @@ import {
 } from '../api'
 import { directionOf, showsDirection, type Direction } from '../direction'
 import { LineBadge, linkButton, primaryButton, SearchInput, secondaryButton, Status, StopName } from '../components'
-import { boundsOf, locationErrorMessage, locationRemembered, nearestStations, OUT_OF_AREA_MILES, rememberLocation } from '../geo'
+import { boundsOf, currentPosition, locationAllowed, locationErrorMessage, nearestStations, OUT_OF_AREA_MILES } from '../geo'
 import { keepLabels, loadMapKit, stationElement, trainCallout, trainElement, updateTrainElement, userElement, type Preview } from '../mapkit'
 import { lastMapView, rememberMapView } from '../mapSession'
 import { decodePolyline } from '../polyline'
@@ -447,10 +447,9 @@ export default function MapPage() {
   // where it is, and nothing is said.
   const findMe = (move: boolean) => {
     if (!map) return
-    navigator.geolocation.getCurrentPosition(
-      ({ coords }) => {
+    currentPosition().then(
+      (coords) => {
         setLocating(false)
-        rememberLocation(true)
         const nearest = stations.data && nearestStations(stations.data, coords, 1)[0]
         if (nearest && nearest.miles > OUT_OF_AREA_MILES) {
           if (move) setLocateMessage("You're outside the MBTA area.")
@@ -470,19 +469,17 @@ export default function MapPage() {
         me.current.coordinate = here
         if (move) map.setRegionAnimated(new mapkit.CoordinateRegion(here, new mapkit.CoordinateSpan(0.012, 0.012)), animate())
       },
-      (error) => {
+      (error: GeolocationPositionError) => {
         setLocating(false)
-        if (error.code === error.PERMISSION_DENIED) rememberLocation(false)
         if (move) setLocateMessage(locationErrorMessage(error))
       },
-      { maximumAge: 30_000, timeout: 15_000 },
     )
   }
 
-  // Your dot, without a tap, once you've used your location here.
+  // Your dot, without a tap, once location is allowed (geo.ts locationAllowed).
   const showMe = useEffectEvent(() => findMe(false))
   useEffect(() => {
-    if (map && locationRemembered()) showMe()
+    if (map) void locationAllowed().then((allowed) => allowed && showMe())
   }, [map])
 
   return (

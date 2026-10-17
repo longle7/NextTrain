@@ -1,7 +1,9 @@
+import { Capacitor } from '@capacitor/core'
+import { Geolocation } from '@capacitor/geolocation'
 import type { Station } from './api'
 import { readKey, writeKey } from './cache'
 
-interface Point {
+export interface Point {
   latitude: number
   longitude: number
 }
@@ -34,21 +36,47 @@ export const locationRemembered = () => readKey(LOCATION_KEY) === 'on'
 /** Remembers that location works, or forgets it (permission refused, Delete my data) so the button comes back. */
 export const rememberLocation = (on: boolean) => writeKey(LOCATION_KEY, on ? 'on' : null)
 
-/** Where the phone is, once, remembering whether location works. Rejects with a GeolocationPositionError. */
-export const currentPosition = () =>
-  new Promise<GeolocationCoordinates>((resolve, reject) =>
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        rememberLocation(true)
-        resolve(position.coords)
-      },
-      (error) => {
-        if (error.code === error.PERMISSION_DENIED) rememberLocation(false)
-        reject(error)
-      },
-      { maximumAge: 60_000, timeout: 15_000 },
-    ),
+/**
+ * Where the phone is, once, remembering whether location works. Rejects with a GeolocationPositionError (its code
+ * says whether location is off). In the iPhone app it asks iOS through Capacitor's plugin, under the app's own
+ * permission: the web view's own geolocation asks again ("localhost would like to use your location") every launch.
+ */
+export const currentPosition = (): Promise<Point> =>
+  (Capacitor.isNativePlatform() ? nativePosition() : webPosition()).then(
+    (coords) => {
+      rememberLocation(true)
+      return coords
+    },
+    (error: GeolocationPositionError) => {
+      if (error.code === error.PERMISSION_DENIED) rememberLocation(false)
+      throw error
+    },
   )
+
+const OPTIONS = { maximumAge: 60_000, timeout: 15_000 }
+
+const webPosition = () =>
+  new Promise<Point>((resolve, reject) => navigator.geolocation.getCurrentPosition((p) => resolve(p.coords), reject, OPTIONS))
+
+// The plugin's failures as the web's errors: location turned off for NextTrain, or no fix (off, indoors, too slow).
+const nativePosition = () =>
+  Geolocation.getCurrentPosition(OPTIONS).then(
+    (p): Point => ({ latitude: p.coords.latitude, longitude: p.coords.longitude }),
+    async () => {
+      const denied = (await Geolocation.checkPermissions().catch(() => undefined))?.location === 'denied'
+      throw { code: denied ? 1 : 2, PERMISSION_DENIED: 1, POSITION_UNAVAILABLE: 2, TIMEOUT: 3, message: '' } as GeolocationPositionError
+    },
+  )
+
+/**
+ * Whether location is already allowed, so Home, the Map, and the trip planner find you without a tap or a prompt:
+ * iOS's answer in the iPhone app; on the website, location having worked here before or the browser saying so.
+ */
+export async function locationAllowed(): Promise<boolean> {
+  if (Capacitor.isNativePlatform()) return (await Geolocation.checkPermissions().catch(() => undefined))?.location === 'granted'
+  if (locationRemembered()) return true
+  return (await navigator.permissions?.query({ name: 'geolocation' }).catch(() => undefined))?.state === 'granted'
+}
 
 /** What to tell someone when the phone can't give us their location. */
 export const locationErrorMessage = (error: GeolocationPositionError) =>

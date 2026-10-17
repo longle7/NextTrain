@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { api, ApiError, getMapKitToken, getTrips, NETWORK_MESSAGE, searchStations, TIMEOUT_MESSAGE, type Station } from './api'
+import { api, ApiError, connectionsPath, getMapKitToken, getTrips, NETWORK_MESSAGE, searchStations, TIMEOUT_MESSAGE, type Commute, type Station } from './api'
 
 const station = (name: string): Station => ({
   mbtaStopId: name, name, latitude: 0, longitude: 0, routeId: 'Red', averageWeekdayBoardings: null, isAccessible: null,
@@ -96,5 +96,22 @@ describe('api: requests that get no answer', () => {
     const body = JSON.stringify({ title: 'Validation failed', errors: { WindowEnd: ['End must be after start.'] } })
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(body, { status: 400 })))
     await expect(api('/commutes')).rejects.toMatchObject({ status: 400, message: 'End must be after start.' })
+  })
+})
+
+describe('connectionsPath', () => {
+  const commute: Commute = {
+    id: 1, mbtaStopId: '1308', stationName: 'Harvard St @ Beacon St', routeId: '66', directionId: 1,
+    windowStart: '07:45:00', windowEnd: '08:15:00', activeDays: 'Mon',
+    transferStopId: '1222', transferRouteId: '22', transferDirectionId: 1, transferMinutes: 2,
+  }
+
+  it('times the first ride where the rider gets off when the change is a walk', () => {
+    expect(connectionsPath({ ...commute, transferFromStopId: '1323' })).toBe(
+      '/connections?from=1308&route=66&direction=1&via=1222&toRoute=22&toDirection=1&minutes=2&off=1323')
+  })
+
+  it('leaves off out for a change at the same stop, as before', () => {
+    expect(connectionsPath(commute)).not.toContain('off=')
   })
 })

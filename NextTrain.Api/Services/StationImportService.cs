@@ -144,6 +144,7 @@ namespace NextTrain.Api.Services
                 var goneIds = gone.Select(s => s.Id).ToList();
                 var inUse = await _dbContext.UserCommutes.Where(c => goneIds.Contains(c.StationId)).Select(c => c.StationId)
                     .Concat(_dbContext.UserCommutes.Where(c => c.TransferStationId != null && goneIds.Contains(c.TransferStationId.Value)).Select(c => c.TransferStationId!.Value))
+                    .Concat(_dbContext.UserCommutes.Where(c => c.TransferFromStationId != null && goneIds.Contains(c.TransferFromStationId.Value)).Select(c => c.TransferFromStationId!.Value))
                     .ToListAsync();
                 _dbContext.Stations.RemoveRange(gone.Where(s => !inUse.Contains(s.Id)));
             }

@@ -95,12 +95,17 @@ export interface Commute {
   transferRouteId?: string
   transferDirectionId?: number
   transferMinutes?: number // to get from one platform to the other
+  // Where the rider gets off when the change is a short walk to the transfer stop (off the 66 at Tremont St @ Columbus
+  // Ave, onto the 22 at Columbus Ave @ Malcolm X Blvd); absent when they change where they get off.
+  transferFromStopId?: string
+  transferFromStationName?: string
   stationLandmark?: string // the boarding stop's landmark, at a bus stop that has one ("Taco Bell")
 }
 
 export type CommuteInput = Pick<
   Commute,
-  'mbtaStopId' | 'routeId' | 'directionId' | 'windowStart' | 'windowEnd' | 'activeDays' | 'transferStopId' | 'transferRouteId' | 'transferDirectionId' | 'transferMinutes'
+  | 'mbtaStopId' | 'routeId' | 'directionId' | 'windowStart' | 'windowEnd' | 'activeDays'
+  | 'transferStopId' | 'transferRouteId' | 'transferDirectionId' | 'transferMinutes' | 'transferFromStopId'
 >
 
 /** Which second-line train each of the next first-line trains makes (GET /connections), and what that means. */
@@ -140,7 +145,7 @@ export const connectionsPath = (c: Commute) =>
   c.transferStopId && c.transferRouteId && c.transferDirectionId !== undefined
     ? `/connections?from=${encodeURIComponent(c.mbtaStopId)}&route=${encodeURIComponent(c.routeId)}&direction=${c.directionId}` +
       `&via=${encodeURIComponent(c.transferStopId)}&toRoute=${encodeURIComponent(c.transferRouteId)}&toDirection=${c.transferDirectionId}` +
-      `&minutes=${c.transferMinutes ?? 3}`
+      `&minutes=${c.transferMinutes ?? 3}${c.transferFromStopId ? `&off=${encodeURIComponent(c.transferFromStopId)}` : ''}`
     : undefined
 
 /**

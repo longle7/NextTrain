@@ -1,14 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, useLocation } from 'react-router'
-import { readKey, writeKey } from './cache'
+import { writeKey } from './cache'
 import { AppLogo, primaryButton } from './components'
-import { EFFECTIVE_DATE } from './legal'
+import { ACCEPTED_KEY, EFFECTIVE_DATE, TERMS_ACCEPTED, termsAccepted } from './legal'
 
-// Which version of the Terms this device agreed to. A new EFFECTIVE_DATE (legal.ts) asks again.
-const ACCEPTED_KEY = 'nexttrain.termsAccepted'
 const LEGAL_PAGES = ['/terms', '/privacy', '/cookies', '/support'] // readable before agreeing
-
-const accepted = () => readKey(ACCEPTED_KEY) === EFFECTIVE_DATE // storage blocked: ask each visit, never assume agreement
 
 /**
  * First launch (and whenever the Terms change): what NextTrain is, the key limits (MBTA estimates, not affiliated),
@@ -20,7 +16,7 @@ const accepted = () => readKey(ACCEPTED_KEY) === EFFECTIVE_DATE // storage block
  */
 export default function Welcome() {
   const { pathname } = useLocation()
-  const [agreed, setAgreed] = useState(accepted)
+  const [agreed, setAgreed] = useState(termsAccepted)
   const dialog = useRef<HTMLDialogElement>(null)
   const open = !agreed && !LEGAL_PAGES.includes(pathname)
 
@@ -36,6 +32,7 @@ export default function Welcome() {
   const agree = () => {
     writeKey(ACCEPTED_KEY, EFFECTIVE_DATE)
     setAgreed(true)
+    window.dispatchEvent(new Event(TERMS_ACCEPTED))
   }
 
   if (agreed) return null

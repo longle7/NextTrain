@@ -26,6 +26,13 @@ namespace NextTrain.Api.Services
         public static string[] BusRouteIds(this Station s) =>
             (s.BusRoutes ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries).Select(p => p.Split(':')[0]).Distinct().ToArray();
 
+        // Straight-line meters between two points: a flat-earth distance, plenty for a walk between stops.
+        public static double Meters(double lat1, double lon1, double lat2, double lon2)
+        {
+            var (dx, dy) = ((lon2 - lon1) * Math.Cos(lat1 * Math.PI / 180), lat2 - lat1);
+            return Math.Sqrt(dx * dx + dy * dy) * 111_320;
+        }
+
         // Whether the bus route stops here: in any direction, or in the given one.
         public static bool ServesBus(this Station s, string routeId, int? directionId = null) =>
             (s.BusRoutes ?? "").Split(',').Any(p => directionId is null ? p.StartsWith(routeId + ":") : p == $"{routeId}:{directionId}");
