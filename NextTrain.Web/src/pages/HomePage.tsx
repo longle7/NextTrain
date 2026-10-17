@@ -413,28 +413,34 @@ function MyCommutes({ routes, alerts: subwayAlerts }: { routes: Route[] | undefi
 
   return (
     <section className="space-y-2">
-      <div className="flex items-center justify-between px-1">
-        <h2 className="text-lg font-bold">Your commutes</h2>
-        {!!commutes.data?.length && (
-          <Link to="/commutes/new" className={linkButton}>
-            {/* Heard as "Add a commute"; the name still contains the visible "Add" (WCAG 2.5.3). */}
-            <span aria-hidden>+&nbsp;</span>Add<span className="sr-only"> a commute</span>
-          </Link>
-        )}
-      </div>
+      {/* With none yet, the Add a commute button below says it all: no heading over it, so Near you's first station
+          fits above the tab bar even on an iPhone SE. */}
+      {commutes.data?.length !== 0 && (
+        <div className="flex items-center justify-between px-1">
+          <h2 className="text-lg font-bold">Your commutes</h2>
+          {!!commutes.data?.length && (
+            <Link to="/commutes/new" className={linkButton}>
+              {/* Heard as "Add a commute"; the name still contains the visible "Add" (WCAG 2.5.3). */}
+              <span aria-hidden>+&nbsp;</span>Add<span className="sr-only"> a commute</span>
+            </Link>
+          )}
+        </div>
+      )}
       {/* One placeholder card, the size of a commute, so Home doesn't jump when they arrive. */}
       <Status error={failure(commutes)} loading={!commutes.data && !commutes.error} rows={1} />
       {/* No commute yet: adding one is the thing to do here (the small "+ Add" above takes over once there's one). */}
       {commutes.data?.length === 0 && (
         <>
+          <GetStartedPopup />
           <Link to="/commutes/new" className={primaryButton}>
             <span aria-hidden>+</span> Add a commute
           </Link>
-          <GetStartedPopup />
         </>
       )}
       {hasCommutes && <NotificationsPrompt />}
-      {/* The commute that's on (or next) in full, with its live times; the others one line each, until their turn. */}
+      {/* The commute that's on (or next) in full, with its live times; the others one line each, until their turn. Only
+          with commutes: an empty list would still take its gap below the Add a commute button, and Near you is next. */}
+      {hasCommutes && (
       <ul className="space-y-2">
         {sorted?.map((commute, i) => {
           const route = routes?.find((r) => r.id === commute.routeId)
@@ -459,6 +465,7 @@ function MyCommutes({ routes, alerts: subwayAlerts }: { routes: Route[] | undefi
           )
         })}
       </ul>
+      )}
     </section>
   )
 }

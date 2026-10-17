@@ -214,9 +214,10 @@ function CommuteForm({ existing, initialStopId, initialRouteId }: { existing: Co
                 <div className="min-w-0 space-y-1">
                   <p className="flex flex-wrap items-center gap-x-1.5 gap-y-1">
                     {catchPoint.walk ? (
-                      <>
+                      // One inline sentence, not flex items: the row's gap would put a space before the comma.
+                      <span>
                         Get off at <strong>{catchPoint.off.name}</strong>, walk {catchPoint.walk} min to <strong>{catchPoint.on.name}</strong> for
-                      </>
+                      </span>
                     ) : (
                       <>
                         Change at <strong>{catchPoint.on.name}</strong> to
