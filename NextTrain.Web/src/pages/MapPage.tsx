@@ -1,11 +1,11 @@
 import { useEffect, useEffectEvent, useMemo, useRef, useState, type ReactNode } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router'
 import {
-  api, busGroups, busRouteIds, findRoute, getRoutes, getStations, ROUTES, searchRoutes, stationRouteIds, towardLabel,
+  api, busGroups, busRouteIds, findRoute, getRoutes, getStations, ROUTES, searchRoutes, stationRouteIds, stopTitle, towardLabel,
   type Car, type Prediction, type Route, type RouteShape, type Station, type Vehicle,
 } from '../api'
 import { directionOf, showsDirection, type Direction } from '../direction'
-import { LineBadge, linkButton, primaryButton, SearchInput, secondaryButton, Status } from '../components'
+import { LineBadge, linkButton, primaryButton, SearchInput, secondaryButton, Status, StopName } from '../components'
 import { boundsOf, locationErrorMessage, locationRemembered, nearestStations, OUT_OF_AREA_MILES, rememberLocation } from '../geo'
 import { keepLabels, loadMapKit, stationElement, trainCallout, trainElement, updateTrainElement, userElement, type Preview } from '../mapkit'
 import { lastMapView, rememberMapView } from '../mapSession'
@@ -920,9 +920,11 @@ function StationPreview({ station, at, routes, bus, shown, onPointerEnter, onPoi
   const routeId = served?.length === 1 ? served[0] : undefined
 
   return (
-    <MarkerCard id="station-preview" role="dialog" label={station.name} {...at} onPointerEnter={onPointerEnter} onPointerLeave={onPointerLeave}>
+    <MarkerCard id="station-preview" role="dialog" label={stopTitle(station.name, station.landmark)} {...at} onPointerEnter={onPointerEnter} onPointerLeave={onPointerLeave}>
       <div>
-        <p className="font-semibold">{station.name}</p>
+        <p>
+          <StopName station={station} className="font-semibold" />
+        </p>
         {/* Each side of a street is its own stop: say which way this one goes (on a route's map, just that route). */}
         {!station.routeId && <p className="text-xs text-neutral-500">{towardLabel(onlyRoute(station, routeId), routes)}</p>}
       </div>

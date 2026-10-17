@@ -23,6 +23,7 @@ export interface Station {
   busRoutes?: string | null // bus routes and the directions they stop here in: "1:0,741:1"
   averageWeekdayBoardings: number | null
   isAccessible: boolean | null // step-free wheelchair access; null when MBTA has no information
+  landmark?: string | null // a bus stop's nearest big, recognizable place ("Taco Bell"); absent at stations
 }
 
 export interface Prediction {
@@ -94,6 +95,7 @@ export interface Commute {
   transferRouteId?: string
   transferDirectionId?: number
   transferMinutes?: number // to get from one platform to the other
+  stationLandmark?: string // the boarding stop's landmark, at a bus stop that has one ("Taco Bell")
 }
 
 export type CommuteInput = Pick<
@@ -222,6 +224,12 @@ export const getStations = fetchOnce<Station[]>('/stations')
 export const getBusStops = fetchOnce<Station[], Omit<Station, 'routeId' | 'averageWeekdayBoardings'>[]>('/bus-stops', (stops) =>
   stops.map((s) => ({ ...s, routeId: '', averageWeekdayBoardings: null })),
 )
+
+/**
+ * A stop's name with its landmark, for plain text (the Live Activity, the page title): "Harvard St @ Beacon St (near
+ * Taco Bell)". Both sides of a street share a name; the landmark tells riders which one.
+ */
+export const stopTitle = (name: string, landmark?: string | null) => (landmark ? `${name} (near ${landmark})` : name)
 
 /** A station's subway lines; none at a bus-only stop. */
 export const stationRouteIds = (station: Station) => (station.routeId ? station.routeId.split(',') : [])

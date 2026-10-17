@@ -93,6 +93,19 @@ function friendlyError(error: Error): string {
 /** A station's name and its line badges, linking to its departures. `hideRoute` drops the line you're already on. */
 const MAX_BUS_BADGES = 3
 
+/**
+ * A stop's name, then its landmark in gray: "Harvard St @ Beacon St (near Taco Bell)". Both sides of a street share a
+ * name; the landmark tells riders which one. Subway stations have none.
+ */
+export function StopName({ station, className = 'font-medium' }: { station: Pick<Station, 'name' | 'landmark'>; className?: string }) {
+  return (
+    <>
+      <span className={className}>{station.name}</span>
+      {station.landmark && <span className="font-normal text-neutral-500 dark:text-neutral-400"> (near {station.landmark})</span>}
+    </>
+  )
+}
+
 export function StationLink({ station, routes, hideRoute, detail }: {
   station: Station
   routes: Route[] | undefined
@@ -108,7 +121,7 @@ export function StationLink({ station, routes, hideRoute, detail }: {
   return (
     <Link to={`/stations/${station.mbtaStopId}`} className="flex min-h-11 flex-1 items-center justify-between gap-2 py-1 hover:underline">
       <span>
-        <span className="font-medium">{station.name}</span>
+        <StopName station={station} />
         {station.isAccessible && (
           <span className="ml-1.5 inline-flex align-[-2px] text-blue-600 dark:text-blue-400">
             <AccessibleIcon className="size-4" />

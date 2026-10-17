@@ -29,6 +29,11 @@ it('labels Green Line branches like the app does', () => {
   expect(liveActivityDetails({ ...commute, routeId: 'Green-B' }, undefined, [], new Date(0), undefined).lineName).toBe('GL B')
 })
 
+it("names a bus stop with its landmark, so the Lock Screen says which side of the street", () => {
+  const stop = { ...commute, mbtaStopId: '1308', stationName: 'Harvard St @ Beacon St', routeId: '66', stationLandmark: 'Taco Bell' }
+  expect(liveActivityDetails(stop, undefined, [], new Date(0), undefined).stationName).toBe('Harvard St @ Beacon St (near Taco Bell)')
+})
+
 it('gives the Home Screen widget each commute with its window, days, badge, colors, and destination', () => {
   expect(widgetCommutes([commute, { ...commute, id: 8, routeId: 'Green-B', directionId: 0 }], [red])).toEqual([
     {

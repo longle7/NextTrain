@@ -1,7 +1,7 @@
 import { Link, useParams } from 'react-router'
 import { alertsFor, majorAlert } from '../alerts'
 import {
-  ALERTS_REFRESH_MS, api, ApiError, busRouteIds, getAlerts, getRoutes, isSubwayRoute, ROUTES, stationRouteIds, towardLabel,
+  ALERTS_REFRESH_MS, api, ApiError, busRouteIds, getAlerts, getRoutes, isSubwayRoute, ROUTES, stationRouteIds, stopTitle, towardLabel,
   type Alert, type Prediction, type Route, type Station,
 } from '../api'
 import { AccessibleIcon, AlertBanner, Card, LineBadge, LoadingText, NotFound, secondaryButton, Status } from '../components'
@@ -31,7 +31,7 @@ export default function StationPage() {
   const accessPath = `${stationPath}/access`
   const access = usePolling(() => (station.data?.routeId ? api<Alert[]>(accessPath) : Promise.resolve<Alert[]>([])), `${accessPath}|${!!station.data?.routeId}`, ALERTS_REFRESH_MS)
   const notFound = station.error instanceof ApiError && station.error.status === 404
-  useTitle(notFound ? 'Stop not found' : station.data?.name)
+  useTitle(notFound ? 'Stop not found' : station.data && stopTitle(station.data.name, station.data.landmark))
 
   const groups = predictions.data ? groupDepartures(predictions.data, now) : []
   // Trains and buses under their own headings at a station that has both.
@@ -54,7 +54,11 @@ export default function StationPage() {
   return (
     <>
       <div>
-        <h1 className="text-2xl font-bold">{station.data?.name ?? <LoadingText className="h-7 w-48" />}</h1>
+        <h1 className="text-2xl font-bold">
+          {station.data?.name ?? <LoadingText className="h-7 w-48" />}
+          {/* Both sides of a street share a name: the landmark says which stop this is. */}
+          {station.data?.landmark && <span className="text-lg font-normal text-neutral-500 dark:text-neutral-400"> (near {station.data.landmark})</span>}
+        </h1>
         <div className="mt-1 flex flex-wrap gap-1">
           {station.data &&
             [...stationRouteIds(station.data), ...busIds].map((id) => <LineBadge key={id} routeId={id} routes={routes.data} />)}
