@@ -8,7 +8,7 @@ import {
 } from '../api'
 import { commuteTiming, daysLabel, liveActivityEnd, sortCommutes, timingLabel, windowLabel } from '../commutes'
 import { Card, LineBadge, linkButton, primaryButton, SearchInput, secondaryButton, StationLink, Status, WarningIcon } from '../components'
-import { locationErrorMessage, locationRemembered, nearestStations, OUT_OF_AREA_MILES, rememberLocation, walkLabel } from '../geo'
+import { currentPosition, locationErrorMessage, locationRemembered, nearestStations, OUT_OF_AREA_MILES, walkLabel } from '../geo'
 import { endLiveActivities, liveActivityDetails, showLiveActivity, updateWidget, widgetCommutes } from '../liveActivity'
 import { declineNotifications, notificationChoice, notificationsAvailable, turnOnNotifications } from '../notifications'
 import { clock, dateRange, departureLabel, groupDepartures, secondsAgo, STALE_AFTER_SECONDS } from '../time'
@@ -22,6 +22,7 @@ export default function HomePage() {
   const navigate = useNavigate()
   const alerts = usePolling(getAlerts, 'alerts', ALERTS_REFRESH_MS) // one poll shared by commutes and nearby
   const [query, setQuery] = useState('')
+  const [whereTo, setWhereTo] = useState('')
   // Stations first, then bus routes by number ("66"), then bus stops.
   const results = stations.data ? searchStations(stations.data, query) : []
   const routeResults = routes.data ? searchRoutes(routes.data, query) : []
@@ -41,6 +42,8 @@ export default function HomePage() {
     <>
       {/* The header shows the name; screen readers still need a page heading to start from. */}
       <h1 className="sr-only">NextTrain</h1>
+      {/* Plan a trip: TripPage finds the place and the best trains and buses there. */}
+      <SearchInput value={whereTo} onChange={setWhereTo} placeholder="Where to?" onSubmit={() => navigate(`/trip?to=${encodeURIComponent(whereTo.trim())}`)} />
       <SearchInput value={query} onChange={setQuery} placeholder="Search stations, stops, or bus routes" onSubmit={openTopResult} />
 
       <Status error={failure(stations)} loading={!!query.trim() && !stations.data && !stations.error} />
@@ -161,7 +164,7 @@ function NotificationsPrompt() {
 }
 
 function GetStarted({ routes }: { routes: Route[] | undefined }) {
-  const search = () => document.querySelector<HTMLInputElement>('input[type="search"]')?.focus()
+  const search = () => document.querySelector<HTMLInputElement>('input[aria-label^="Search"]')?.focus() // not "Where to?"
   // Lands on "Use my location", so the location prompt comes from the rider's own tap on it.
   const nearby = () => {
     const section = document.getElementById('near-you')
@@ -265,21 +268,14 @@ function Nearby({ stations, busStops, routes, alerts }: {
     find()
   }
   const find = () =>
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        rememberLocation(true)
-        setLocation({ state: 'found', coords: position.coords })
-      },
-      (error) => {
-        if (error.code === error.PERMISSION_DENIED) rememberLocation(false)
-        setLocation({ state: 'error', message: locationErrorMessage(error) })
-      },
-      { maximumAge: 60_000, timeout: 15_000 },
+    currentPosition().then(
+      (coords) => setLocation({ state: 'found', coords }),
+      (error: GeolocationPositionError) => setLocation({ state: 'error', message: locationErrorMessage(error) }),
     )
 
   // Skip the button if location was used here before, or the browser says it's allowed.
   useEffect(() => {
-    if (locationRemembered()) return find()
+    if (locationRemembered()) return void find()
     navigator.permissions
       ?.query({ name: 'geolocation' })
       .then((p) => p.state === 'granted' && locate())

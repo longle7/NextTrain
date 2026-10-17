@@ -25,6 +25,23 @@ declare namespace mapkit {
     toCoordinateRegion(): CoordinateRegion
   }
 
+  // Address and place search (places.ts).
+  interface SearchAutocompleteResult {
+    displayLines: string[]
+    coordinate?: Coordinate // missing for some results; search() then finds it
+  }
+  interface Place {
+    name: string
+    formattedAddress?: string
+    coordinate: Coordinate
+  }
+  class Search {
+    static readonly RegionPriority: { Default: string; Required: string }
+    constructor(options?: { region?: CoordinateRegion; regionPriority?: string; includeQueries?: boolean; limitToCountries?: string })
+    autocomplete(query: string, callback: (error: Error | null, data: { results: SearchAutocompleteResult[] }) => void): number
+    search(query: string | SearchAutocompleteResult, callback: (error: Error | null, data: { places: Place[] }) => void): number
+  }
+
   class Style {
     constructor(options: { strokeColor?: string; strokeOpacity?: number; lineWidth?: number; lineJoin?: string; lineCap?: string })
   }

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { api, ApiError, getMapKitToken, NETWORK_MESSAGE, searchStations, TIMEOUT_MESSAGE, type Station } from './api'
+import { api, ApiError, getMapKitToken, getTrips, NETWORK_MESSAGE, searchStations, TIMEOUT_MESSAGE, type Station } from './api'
 
 const station = (name: string): Station => ({
   mbtaStopId: name, name, latitude: 0, longitude: 0, routeId: 'Red', averageWeekdayBoardings: null, isAccessible: null,
@@ -52,6 +52,21 @@ describe('getMapKitToken', () => {
   it('throws an ApiError when the server refuses', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('{}', { status: 403 })))
     await expect(getMapKitToken()).rejects.toMatchObject({ status: 403 })
+  })
+})
+
+describe('getTrips', () => {
+  afterEach(() => vi.unstubAllGlobals())
+
+  it("asks for trips without the user ID, and passes on the API's message", async () => {
+    const fetch = vi.fn().mockResolvedValue(new Response('[]', { status: 200 }))
+    vi.stubGlobal('fetch', fetch)
+    expect(await getTrips('/trips?from=1308:4&to=place-gover:3')).toEqual([])
+    const [url, init] = fetch.mock.calls[0]
+    expect(url).toBe('/api/trips?from=1308:4&to=place-gover:3')
+    expect(init.headers).toBeUndefined() // no X-User-Id
+    fetch.mockResolvedValue(new Response(JSON.stringify({ errors: { from: ['Bad stops.'] } }), { status: 400 }))
+    await expect(getTrips('/trips?from=x&to=y')).rejects.toMatchObject({ status: 400, message: 'Bad stops.' })
   })
 })
 
