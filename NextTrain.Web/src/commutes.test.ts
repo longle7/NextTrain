@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { commuteTiming, daysLabel, liveActivityEnd, sortCommutes, stepNumbers, timingLabel } from './commutes'
+import { commuteTiming, daysLabel, getStartedDue, liveActivityEnd, sortCommutes, stepNumbers, timingLabel } from './commutes'
 
 // Tuesday 29 Sep 2026, 7:50 AM device time.
 const now = new Date(2026, 8, 29, 7, 50)
@@ -72,5 +72,15 @@ describe('stepNumbers', () => {
     expect(stepNumbers([true, true, true])).toEqual([2, 3, 4])
     expect(stepNumbers([false, true, true])).toEqual([undefined, 2, 3]) // one line: no "Which line?"
     expect(stepNumbers([false, false, true])).toEqual([undefined, undefined, 2]) // no stop picked yet
+  })
+})
+
+describe('getStartedDue', () => {
+  it('shows once a day, on up to 3 days, saving the count and the day', () => {
+    expect(getStartedDue(null, '2026-10-17')).toBe('1|2026-10-17') // first time ever
+    expect(getStartedDue('1|2026-10-17', '2026-10-17')).toBeUndefined() // not again today
+    expect(getStartedDue('1|2026-10-17', '2026-10-18')).toBe('2|2026-10-18')
+    expect(getStartedDue('2|2026-10-18', '2026-10-21')).toBe('3|2026-10-21') // the days needn't be in a row
+    expect(getStartedDue('3|2026-10-21', '2026-10-22')).toBeUndefined() // never a fourth time
   })
 })

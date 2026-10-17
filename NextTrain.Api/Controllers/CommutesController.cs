@@ -32,6 +32,10 @@ namespace NextTrain.Api.Controllers
         // How long a transfer allows to change platforms when the rider doesn't say.
         public const int DefaultTransferMinutes = 3;
 
+        // The farthest a change may be on foot, straight line: a 5-minute walk at the app's walking speed (geo.ts
+        // walkMinutes) is about 320 m, plus a margin so a stop the app offers is never refused here.
+        public const double TransferWalkMeters = 400;
+
         private readonly NextTrainDbContext _db;
         private readonly IMbtaClient _mbta;
 
@@ -48,6 +52,7 @@ namespace NextTrain.Api.Controllers
             var commutes = await _db.UserCommutes
                 .Include(c => c.Station)
                 .Include(c => c.TransferStation)
+                .Include(c => c.TransferFromStation)
                 .Where(c => c.UserId == userId)
                 .OrderBy(c => c.WindowStartLocal)
                 .ToListAsync();
@@ -132,6 +137,7 @@ namespace NextTrain.Api.Controllers
             _db.UserCommutes
                 .Include(c => c.Station)
                 .Include(c => c.TransferStation)
+                .Include(c => c.TransferFromStation)
                 .FirstOrDefaultAsync(c => c.Id == id && c.UserId == userId);
 
         // Validates the request against the database and copies it onto the commute.
@@ -164,7 +170,7 @@ namespace NextTrain.Api.Controllers
                 ModelState.AddModelError(nameof(request.ActiveDays), "ActiveDays must be a comma-separated list of Mon, Tue, Wed, Thu, Fri, Sat, Sun.");
             }
 
-            var transfer = await TryTransferAsync(station, request);
+            var (transfer, transferFrom) = await TryTransferAsync(station, request);
 
             if (!ModelState.IsValid)
             {
@@ -183,28 +189,42 @@ namespace NextTrain.Api.Controllers
             commute.TransferRouteId = transfer is null ? null : request.TransferRouteId;
             commute.TransferDirectionId = transfer is null ? null : request.TransferDirectionId;
             commute.TransferMinutes = transfer is null ? null : request.TransferMinutes ?? DefaultTransferMinutes;
+            commute.TransferFromStation = transferFrom;
+            commute.TransferFromStationId = transferFrom?.Id;
             return true;
         }
 
-        // A change of line partway: where, onto which route, and which way, all or none. The station has to come later
-        // on the first route than where the rider boards (MBTA's stop order that way), and the second route has to
-        // stop there going the chosen way. Returns the station, or null for no transfer (or an invalid one).
-        private async Task<Station?> TryTransferAsync(Station? boarding, CommuteRequest request)
+        // A change of line partway: where, onto which route, and which way, all or none; and, when it's a short walk to
+        // another stop, where the rider gets off the first ride (TransferFromStopId). Where they get off has to come
+        // later on the first route than where they board (MBTA's stop order that way), at most a 5-minute walk from
+        // the transfer stop, and the second route has to stop there going the chosen way. Returns the transfer stop
+        // and the stop they get off at (null when it's the same), or nulls for no transfer (or an invalid one).
+        private async Task<(Station? Transfer, Station? From)> TryTransferAsync(Station? boarding, CommuteRequest request)
         {
             if (request.TransferStopId is null && request.TransferRouteId is null && request.TransferDirectionId is null)
             {
-                return null;
+                return (null, null);
             }
             if (request.TransferStopId is null || request.TransferRouteId is null || request.TransferDirectionId is null)
             {
                 ModelState.AddModelError(nameof(request.TransferStopId), "A transfer needs a station, a route, and a direction.");
-                return null;
+                return (null, null);
             }
 
             var transfer = await _db.Stations.FirstOrDefaultAsync(s => s.MbtaStopId == request.TransferStopId);
+            var walks = request.TransferFromStopId is not null && request.TransferFromStopId != request.TransferStopId;
+            var from = walks ? await _db.Stations.FirstOrDefaultAsync(s => s.MbtaStopId == request.TransferFromStopId) : null;
             if (transfer is null)
             {
                 ModelState.AddModelError(nameof(request.TransferStopId), $"Unknown station '{request.TransferStopId}'.");
+            }
+            else if (walks && from is null)
+            {
+                ModelState.AddModelError(nameof(request.TransferFromStopId), $"Unknown station '{request.TransferFromStopId}'.");
+            }
+            else if (from is not null && StationRoutes.Meters(from.Latitude, from.Longitude, transfer.Latitude, transfer.Longitude) > TransferWalkMeters)
+            {
+                ModelState.AddModelError(nameof(request.TransferFromStopId), $"{transfer.Name} is more than a 5-minute walk from {from.Name}.");
             }
             else if (request.TransferRouteId == request.RouteId)
             {
@@ -217,13 +237,15 @@ namespace NextTrain.Api.Controllers
             else if (boarding is not null && ModelState.IsValid)
             {
                 var order = (await _mbta.GetStopDtosAsync(request.RouteId, request.DirectionId)).Select(s => s.Id).ToList();
-                var from = order.IndexOf(boarding.MbtaStopId);
-                if (from < 0 || order.IndexOf(transfer.MbtaStopId) <= from)
+                var getOff = from ?? transfer; // where the first ride has to stop
+                var boardsAt = order.IndexOf(boarding.MbtaStopId);
+                if (boardsAt < 0 || order.IndexOf(getOff.MbtaStopId) <= boardsAt)
                 {
-                    ModelState.AddModelError(nameof(request.TransferStopId), $"{transfer.Name} isn't on that route after {boarding.Name}.");
+                    ModelState.AddModelError(from is null ? nameof(request.TransferStopId) : nameof(request.TransferFromStopId),
+                        $"{getOff.Name} isn't on that route after {boarding.Name}.");
                 }
             }
-            return transfer;
+            return (transfer, from);
         }
     }
 
@@ -238,10 +260,12 @@ namespace NextTrain.Api.Controllers
         [MaxLength(50)] string? TransferStopId = null,
         [RegularExpression(StationRoutes.RouteIdPattern)] string? TransferRouteId = null,
         [Range(0, 1)] int? TransferDirectionId = null,
-        [Range(1, 10)] int? TransferMinutes = null);
+        [Range(1, 10)] int? TransferMinutes = null,
+        [MaxLength(50)] string? TransferFromStopId = null);
 
     // The Transfer* fields are left out of the JSON for a commute without one, so it reads exactly as before; so is
-    // StationLandmark (a bus stop's "Taco Bell") where there's none, as at every subway station.
+    // StationLandmark (a bus stop's "Taco Bell") where there's none, as at every subway station. TransferFrom* is where
+    // the rider gets off when the change is a walk to another stop; absent when they change where they get off.
     public record CommuteResponse(
         int Id,
         string MbtaStopId,
@@ -256,7 +280,9 @@ namespace NextTrain.Api.Controllers
         [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? TransferRouteId = null,
         [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] int? TransferDirectionId = null,
         [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] int? TransferMinutes = null,
-        [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? StationLandmark = null)
+        [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? StationLandmark = null,
+        [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? TransferFromStopId = null,
+        [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? TransferFromStationName = null)
     {
         public static CommuteResponse From(UserCommute c) => new(
             c.Id,
@@ -272,6 +298,8 @@ namespace NextTrain.Api.Controllers
             c.TransferRouteId,
             c.TransferDirectionId,
             c.TransferMinutes,
-            c.Station.Landmark);
+            c.Station.Landmark,
+            c.TransferFromStation?.MbtaStopId,
+            c.TransferFromStation?.Name);
     }
 }

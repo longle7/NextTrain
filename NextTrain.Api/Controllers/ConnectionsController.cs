@@ -16,7 +16,8 @@ namespace NextTrain.Api.Controllers
         // GET /connections?from=place-pktrm&route=Green-D&direction=1&via=place-gover&toRoute=Blue&toDirection=1&minutes=3
         // Three MBTA calls, each cached 10 seconds and shared with everyone asking the same thing: the first line's next
         // trains at the boarding stop, when those trains reach the transfer station, and the second line's departures
-        // from there.
+        // from there. `off`: where the first ride is left when the change is a short walk to `via` (off the 66 at
+        // Tremont St opp Roxbury Crossing, onto the 22 at Columbus Ave @ Malcolm X Blvd); `via` itself without it.
         [HttpGet]
         public async Task<ConnectionPlan> Get(
             [FromServices] IMbtaClient mbta,
@@ -27,10 +28,11 @@ namespace NextTrain.Api.Controllers
             [FromQuery, Required, RegularExpression(StationRoutes.StopIdPattern)] string via,
             [FromQuery, Required, RegularExpression(StationRoutes.RouteIdPattern)] string toRoute,
             [FromQuery, Range(0, 1)] int toDirection,
-            [FromQuery, Range(1, 10)] int minutes = 3)
+            [FromQuery, Range(1, 10)] int minutes = 3,
+            [FromQuery, RegularExpression(StationRoutes.StopIdPattern)] string? off = null)
         {
             var now = clock.GetUtcNow();
-            var firstLeg = await LegTimes.RidesAsync(mbta, from, route, direction, via, now);
+            var firstLeg = await LegTimes.RidesAsync(mbta, from, route, direction, off ?? via, now);
             var secondLeg = await LegTimes.DeparturesAsync(mbta, via, toRoute, toDirection, now);
             return ConnectionAdvice.Plan(firstLeg, secondLeg.Select(p => p.Attributes.DepartureTime!.Value), TimeSpan.FromMinutes(minutes));
         }

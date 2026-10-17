@@ -27,14 +27,21 @@ public class TransferEndpointTests : IDisposable
             db.Stations.AddRange(
                 new Station { MbtaStopId = "place-kencl", Name = "Kenmore", Latitude = 42.3489, Longitude = -71.0951, RouteId = "Green-B" },
                 new Station { MbtaStopId = "place-pktrm", Name = "Park Street", Latitude = 42.3564, Longitude = -71.0624, RouteId = "Green-B,Red" },
-                new Station { MbtaStopId = "place-gover", Name = "Government Center", Latitude = 42.3597, Longitude = -71.0592, RouteId = "Blue,Green-B" });
+                new Station { MbtaStopId = "place-gover", Name = "Government Center", Latitude = 42.3597, Longitude = -71.0592, RouteId = "Blue,Green-B" },
+                // A walking change, from MBTA's real stops: off the 66 at Tremont St @ Columbus Ave, about 80 m to the 22
+                // at Columbus Ave @ Malcolm X Blvd. Columbus Ave @ Cedar St is the 22 too, but about 410 m away.
+                new Station { MbtaStopId = "1308", Name = "Harvard St @ Beacon St", Latitude = 42.342499, Longitude = -71.121845, RouteId = "", BusRoutes = "66:1" },
+                new Station { MbtaStopId = "1323", Name = "Tremont St @ Columbus Ave", Latitude = 42.331479, Longitude = -71.095333, RouteId = "", BusRoutes = "66:1" },
+                new Station { MbtaStopId = "1222", Name = "Columbus Ave @ Malcolm X Blvd", Latitude = 42.331191, Longitude = -71.094468, RouteId = "", BusRoutes = "22:1" },
+                new Station { MbtaStopId = "1221", Name = "Columbus Ave @ Cedar St", Latitude = 42.328012, Longitude = -71.096921, RouteId = "", BusRoutes = "22:1" });
             db.SaveChanges();
         }
-        // The B branch eastbound, in riding order.
+        // The B branch eastbound, and the 66 toward Nubian, in riding order.
         _mbta.StopsByRouteDirection[("Green-B", 1)] = new()
         {
             new MbtaStopDto { Id = "place-kencl" }, new MbtaStopDto { Id = "place-pktrm" }, new MbtaStopDto { Id = "place-gover" },
         };
+        _mbta.StopsByRouteDirection[("66", 1)] = new() { new MbtaStopDto { Id = "1308" }, new MbtaStopDto { Id = "1323" } };
 
         _factory = TestDb.Api(b => b.ConfigureTestServices(services =>
             services.AddSingleton<IMbtaClient>(_mbta).AddSingleton<TimeProvider>(new FixedClock(Noon))));
@@ -89,6 +96,68 @@ public class TransferEndpointTests : IDisposable
         var response = await client.PostAsJsonAsync("/commutes", Transfer(via, toRoute, toDirection, minutes, from));
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    // The 66 from Harvard St @ Beacon St, getting off at `off` and walking to `via` for the 22.
+    private static CommuteRequest WalkingChange(string off = "1323", string via = "1222") =>
+        new("1308", "66", 1, new TimeOnly(7, 45), new TimeOnly(8, 15), "Mon,Tue,Wed,Thu,Fri", via, "22", 1, 3, off);
+
+    [Fact]
+    public async Task AWalkingChange_RoundTrips_WithWhereYouGetOff()
+    {
+        using var client = Client();
+
+        Assert.Equal(HttpStatusCode.Created, (await client.PostAsJsonAsync("/commutes", WalkingChange())).StatusCode);
+        var commute = (await client.GetFromJsonAsync<List<CommuteResponse>>("/commutes"))!.Single();
+
+        Assert.Equal(("1323", "Tremont St @ Columbus Ave", "1222", "Columbus Ave @ Malcolm X Blvd", "22"),
+            (commute.TransferFromStopId, commute.TransferFromStationName, commute.TransferStopId, commute.TransferStationName, commute.TransferRouteId));
+
+        // Changing where you get off is the same as no walk: nothing extra is stored or sent.
+        var sameStop = Transfer() with { TransferFromStopId = "place-gover" };
+        Assert.Equal(HttpStatusCode.OK, (await client.PutAsJsonAsync($"/commutes/{commute.Id}", sameStop)).StatusCode);
+        Assert.DoesNotContain("transferFrom", await client.GetStringAsync($"/commutes/{commute.Id}"));
+    }
+
+    [Theory]
+    [InlineData("1323", "1221")]  // more than a 5-minute walk apart
+    [InlineData("1308", "1222")]  // getting off where you board
+    [InlineData("nowhere", "1222")] // unknown stop
+    public async Task AnInvalidWalkingChange_Returns400(string off, string via)
+    {
+        using var client = Client();
+
+        Assert.Equal(HttpStatusCode.BadRequest, (await client.PostAsJsonAsync("/commutes", WalkingChange(off, via))).StatusCode);
+    }
+
+    [Fact]
+    public async Task Connections_WithOff_TimeTheFirstRideWhereYouGetOff_ThenTheWalk()
+    {
+        _mbta.PredictionsByStop["1308"] = new()
+        {
+            FakeMbtaClient.Prediction("66", 1, "2026-10-10T12:02:00-04:00", "a"),
+            FakeMbtaClient.Prediction("66", 1, "2026-10-10T12:14:00-04:00", "b"),
+        };
+        _mbta.PredictionsByStop["1323"] = new()
+        {
+            FakeMbtaClient.Prediction("66", 1, null, "a", "2026-10-10T12:20:00-04:00"),
+            FakeMbtaClient.Prediction("66", 1, null, "b", "2026-10-10T12:32:00-04:00"),
+        };
+        _mbta.PredictionsByStop["1222"] = new()
+        {
+            FakeMbtaClient.Prediction("22", 1, "2026-10-10T12:24:00-04:00", "c"),
+            FakeMbtaClient.Prediction("22", 1, "2026-10-10T12:50:00-04:00", "d"),
+        };
+        using var client = _factory.CreateClient();
+        const string ride = "/connections?from=1308&route=66&direction=1&via=1222&toRoute=22&toDirection=1&minutes=3";
+
+        var plan = (await client.GetFromJsonAsync<ConnectionPlan>(ride + "&off=1323"))!;
+        var withoutOff = (await client.GetFromJsonAsync<ConnectionPlan>(ride))!;
+
+        // Off at 12:20, three minutes' walk, the 12:24 22. Miss this bus and the next makes only the 12:50: hurry.
+        Assert.Equal(Advice.Hurry, plan.Advice);
+        Assert.Equal(new[] { "12:24", "12:50" }, plan.Trains.Select(t => t.Connection!.Value.ToOffset(TimeSpan.FromHours(-4)).ToString("HH:mm")));
+        Assert.Equal(Advice.Unknown, withoutOff.Advice); // the 66 doesn't stop at the 22's stop: no times without `off`
     }
 
     [Fact]

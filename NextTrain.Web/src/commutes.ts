@@ -5,6 +5,18 @@ import { clock } from './time'
 export const WEEK = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 const BY_DATE_DAY = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] // Date.getDay() order
 
+// How many days Home's Get started pop-up has shown, and the last one: "2|2026-10-17".
+export const GET_STARTED_KEY = 'nexttrain.getStarted'
+
+/**
+ * Whether Home's Get started pop-up is due for someone with no commute: at most once a day, on up to 3 days. `stored`
+ * is what was saved at the last showing; returns what to save now, or undefined when it isn't due.
+ */
+export function getStartedDue(stored: string | null, today: string): string | undefined {
+  const [shown, day] = (stored ?? '').split('|')
+  return Number(shown || 0) < 3 && day !== today ? `${Number(shown || 0) + 1}|${today}` : undefined
+}
+
 /** A commute starting within this long counts as "soon" and gets live departures. */
 const SOON_MS = 60 * 60_000
 
