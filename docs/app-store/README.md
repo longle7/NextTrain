@@ -107,7 +107,7 @@ No account, no ads, no tracking. Your commutes are saved under a random ID, dela
 Live data comes from the MBTA. NextTrain is an independent app and isn't affiliated with or endorsed by the MBTA.
 ```
 
-**What's New in Version 1.3** (4,000 max). Riders are updating from 1.0, so this covers 1.2's buses too:
+**What's New in Version 1.4** (4,000 max). 1.3 is approved; 1.4 adds the trip planner and the rest of #99–#101:
 
 ```
 Buses are here, plus a lot more for your daily commute.
