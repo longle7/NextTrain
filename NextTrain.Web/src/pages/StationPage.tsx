@@ -191,7 +191,7 @@ function Departures({ groups, routes, now }: { groups: ReturnType<typeof groupDe
  * A bus stop's street view (Apple Look Around, see lookAround.ts), gone if Apple has none there. Full screen moves the
  * same view into a dialog, so nothing reloads; closing it (or Escape) puts it back.
  */
-function StreetView({ station: { mbtaStopId, name, latitude, longitude } }: { station: Station }) {
+function StreetView({ station: { mbtaStopId, name, landmark, latitude, longitude } }: { station: Station }) {
   const [state, setState] = useState<'loading' | 'shown' | 'none'>(() => (hasStreetView(mbtaStopId) ? 'loading' : 'none'))
   const box = useRef<HTMLDivElement>(null)
   const full = useRef<HTMLDivElement>(null)
@@ -203,7 +203,7 @@ function StreetView({ station: { mbtaStopId, name, latitude, longitude } }: { st
   }, [mbtaStopId, latitude, longitude])
 
   if (state === 'none') return null
-  const label = `Street view at ${name}`
+  const label = `Street view at ${stopTitle(name, landmark)}`
   return (
     <section aria-label={label} className="relative">
       <div ref={box} className="aspect-video overflow-hidden rounded-xl bg-neutral-200 shadow-sm dark:bg-neutral-800" />
