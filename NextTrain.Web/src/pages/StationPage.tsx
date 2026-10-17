@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router'
 import { alertsFor, majorAlert } from '../alerts'
 import {
@@ -5,6 +6,7 @@ import {
   type Alert, type Prediction, type Route, type Station,
 } from '../api'
 import { AccessibleIcon, AlertBanner, Card, LineBadge, LoadingText, NotFound, secondaryButton, Status } from '../components'
+import { hasStreetView, showLookAround } from '../lookAround'
 import { agoLabel, clock, departureLabel, groupDepartures, noTrainsMessage, secondsAgo, STALE_AFTER_SECONDS } from '../time'
 import { failure, useNow, usePolling, useTitle } from '../usePolling'
 
@@ -75,6 +77,9 @@ export default function StationPage() {
           <p className="mt-0.5 pl-6.5 text-sm text-neutral-500">No elevator or escalator outages reported</p>
         )}
       </div>
+
+      {/* What the stop looks like from the street, to find the right side. */}
+      {station.data && busOnly && <StreetView key={stopId} station={station.data} />}
 
       <div className="grid grid-cols-2 gap-2">
         {/* Apple Maps walking directions from where you are (opens the Maps app on iPhone). */}
@@ -175,5 +180,63 @@ function Departures({ groups, routes, now }: { groups: ReturnType<typeof groupDe
         )
       })}
     </ul>
+  )
+}
+
+/**
+ * A bus stop's street view (Apple Look Around, see lookAround.ts), gone if Apple has none there. Full screen moves the
+ * same view into a dialog, so nothing reloads; closing it (or Escape) puts it back.
+ */
+function StreetView({ station: { mbtaStopId, name, latitude, longitude } }: { station: Station }) {
+  const [state, setState] = useState<'loading' | 'shown' | 'none'>(() => (hasStreetView(mbtaStopId) ? 'loading' : 'none'))
+  const box = useRef<HTMLDivElement>(null)
+  const full = useRef<HTMLDivElement>(null)
+  const dialog = useRef<HTMLDialogElement>(null)
+  useEffect(() => {
+    const host = box.current
+    if (!host) return
+    return showLookAround(host, mbtaStopId, latitude, longitude, (shown) => setState(shown ? 'shown' : 'none'))
+  }, [mbtaStopId, latitude, longitude])
+
+  if (state === 'none') return null
+  const label = `Street view at ${name}`
+  return (
+    <section aria-label={label} className="relative">
+      <div ref={box} className="aspect-video overflow-hidden rounded-xl bg-neutral-200 shadow-sm dark:bg-neutral-800" />
+      {state === 'loading' && (
+        <div role="status" aria-label="Loading street view" className="absolute inset-0 rounded-xl bg-neutral-200 motion-safe:animate-pulse dark:bg-neutral-800" />
+      )}
+      {state === 'shown' && (
+        <button
+          onClick={() => {
+            dialog.current!.showModal()
+            full.current!.append(...box.current!.childNodes)
+          }}
+          className="absolute right-2 bottom-2 flex min-h-11 items-center gap-1.5 rounded-full bg-black/60 px-3 text-sm font-semibold text-white active:opacity-70"
+        >
+          <svg viewBox="0 0 24 24" className="size-4 fill-none stroke-current stroke-2" aria-hidden>
+            <path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" />
+          </svg>
+          Full screen
+        </button>
+      )}
+      <dialog
+        ref={dialog}
+        aria-label={label}
+        onClose={() => box.current?.append(...full.current!.childNodes)}
+        className="m-0 size-full max-h-none max-w-none bg-black p-0 backdrop:bg-black"
+      >
+        <div ref={full} className="size-full" />
+        <button
+          onClick={() => dialog.current!.close()}
+          aria-label="Close full screen"
+          className="absolute top-[calc(env(safe-area-inset-top)+0.75rem)] left-3 grid size-11 place-items-center rounded-full bg-black/60 text-white active:opacity-70"
+        >
+          <svg viewBox="0 0 24 24" className="size-6 fill-none stroke-current stroke-2" aria-hidden>
+            <path d="M6 6l12 12M18 6 6 18" />
+          </svg>
+        </button>
+      </dialog>
+    </section>
   )
 }
