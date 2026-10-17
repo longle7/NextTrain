@@ -24,7 +24,7 @@ it('leaves the subtitle empty without a stop, and falls back to the route ID bef
 })
 
 it('pins MapKit to an exact https version with a SHA-384 integrity hash', () => {
-  expect(MAPKIT_URL).toMatch(/^https:\/\/cdn\.apple-mapkit\.com\/mk\/\d+\.\d+\.\d+\/mapkit\.js$/) // no "5.x.x"
+  expect(MAPKIT_URL).toMatch(/^https:\/\/cdn\.apple-mapkit\.com\/mk\/\d+\.\d+\.\d+\/mapkit\.core\.js$/) // no "5.x.x"
   expect(MAPKIT_INTEGRITY).toMatch(/^sha384-[A-Za-z0-9+/]{64}$/)
 })
 

@@ -91,7 +91,8 @@ export default function PrivacyPage() {
           <li>
             <strong>Apple Maps</strong> draws the map. Map images load from Apple's servers, which receive your IP address
             and the part of the map you're viewing (after you tap the locate button, that's the area around you). Your exact
-            location isn't sent: the blue dot is placed on your device.{' '}
+            location isn't sent: the blue dot is placed on your device. Opening a bus stop's page loads Apple's street view
+            (Look Around) of it, which sends Apple that stop's location.{' '}
             <ExternalLink href="https://www.apple.com/legal/privacy/">Apple's privacy policy</ExternalLink>
           </li>
           <li>
