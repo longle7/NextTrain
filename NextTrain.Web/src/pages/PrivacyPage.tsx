@@ -36,6 +36,11 @@ export default function PrivacyPage() {
             any time; the rest of NextTrain keeps working.
           </li>
           <li>
+            <strong>Trip planning.</strong> An address or place you type goes to Apple, to find where it is (see Apple Maps
+            below). The stations and stops near each end of your trip are found on your device: our server only gets
+            their IDs and the walk to each, without your NextTrain ID, and stores nothing.
+          </li>
+          <li>
             <strong>Analytics, only if you allow it, and only on the website.</strong> If you choose Allow in the cookie
             notice, the website uses Google Analytics to count which pages are viewed, with the page, a rough location
             (city and country, which Google works out from your IP address; Google Analytics doesn't store IP addresses),

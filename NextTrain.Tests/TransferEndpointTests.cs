@@ -43,11 +43,6 @@ public class TransferEndpointTests : IDisposable
     // The predictions below are around noon on Saturday, October 10, 2026, in Boston.
     private static readonly DateTimeOffset Noon = DateTimeOffset.Parse("2026-10-10T12:00:00-04:00");
 
-    private class FixedClock(DateTimeOffset now) : TimeProvider
-    {
-        public override DateTimeOffset GetUtcNow() => now.ToUniversalTime();
-    }
-
     public void Dispose() => _factory.Dispose();
 
     private HttpClient Client()

@@ -15,6 +15,7 @@ import SettingsPage from './pages/SettingsPage'
 import StationPage from './pages/StationPage'
 import SupportPage from './pages/SupportPage'
 import TermsPage from './pages/TermsPage'
+import TripPage from './pages/TripPage'
 import { lastMapView } from './mapSession'
 
 // The map loads Apple's MapKit JS (about 240 KB), so it loads only when opened: a faster first launch.
@@ -52,6 +53,7 @@ function Pages() {
             <Route path="/lines/:routeId" element={<LinePage />} />
             <Route path="/stations/:stopId" element={<StationPage />} />
             <Route path="/map" element={<MapPage />} />
+            <Route path="/trip" element={<TripPage />} />
             <Route path="/commutes/new" element={<CommutePage />} />
             <Route path="/commutes/:id" element={<CommutePage />} />
             <Route path="/settings" element={<SettingsPage />} />

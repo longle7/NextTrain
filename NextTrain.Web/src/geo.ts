@@ -34,6 +34,22 @@ export const locationRemembered = () => readKey(LOCATION_KEY) === 'on'
 /** Remembers that location works, or forgets it (permission refused, Delete my data) so the button comes back. */
 export const rememberLocation = (on: boolean) => writeKey(LOCATION_KEY, on ? 'on' : null)
 
+/** Where the phone is, once, remembering whether location works. Rejects with a GeolocationPositionError. */
+export const currentPosition = () =>
+  new Promise<GeolocationCoordinates>((resolve, reject) =>
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        rememberLocation(true)
+        resolve(position.coords)
+      },
+      (error) => {
+        if (error.code === error.PERMISSION_DENIED) rememberLocation(false)
+        reject(error)
+      },
+      { maximumAge: 60_000, timeout: 15_000 },
+    ),
+  )
+
 /** What to tell someone when the phone can't give us their location. */
 export const locationErrorMessage = (error: GeolocationPositionError) =>
   error.code === error.PERMISSION_DENIED
@@ -61,7 +77,27 @@ export function boundsOf(points: [number, number][], margin = 0.08) {
 export function walkLabel(miles: number): string {
   const distance = `${miles < 0.1 ? '<0.1' : miles.toFixed(1)} mi`
   if (miles > 1.5) return `${distance} away`
-  // ponytail: streets run ~1.25x the straight line, walking ~3 mph; use a routing API if this misleads.
-  const minutes = Math.max(1, Math.round(miles * 1.25 * 20))
-  return `${distance} · ${minutes} min walk`
+  return `${distance} · ${walkMinutes(miles)} min walk`
 }
+
+/** Minutes to walk a straight-line distance. */
+// ponytail: streets run ~1.25x the straight line, walking ~3 mph; use a routing API if this misleads.
+export const walkMinutes = (miles: number) => Math.max(1, Math.round(miles * 1.25 * 20))
+
+// A trip starts (or ends) at a station or stop within this of the place: about a 12-minute walk.
+export const TRIP_STOP_MILES = 0.5
+
+/**
+ * Where a trip from (or to) a place can start (or end): up to 8 subway stations and bus stops within TRIP_STOP_MILES,
+ * nearest first. The closest 3 stations always count, even when bus stops are closer: downtown, 8 bus stops can sit
+ * nearer than the T.
+ */
+export function tripStops(stations: Station[], busStops: Station[], here: Point) {
+  const near = (list: Station[], count: number) => nearestStations(list, here, count).filter((n) => n.miles <= TRIP_STOP_MILES)
+  const subway = near(stations, 3)
+  return [...subway, ...near(busStops, 8 - subway.length)]
+}
+
+/** The stops as GET /trips takes them: "1308:4,place-cool:7", each with its minutes' walk. */
+export const tripStopsParam = (stops: { station: Station; miles: number }[]) =>
+  stops.map(({ station, miles }) => `${station.mbtaStopId}:${walkMinutes(miles)}`).join(',')

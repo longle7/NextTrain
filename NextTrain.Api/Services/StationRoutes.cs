@@ -13,7 +13,12 @@ namespace NextTrain.Api.Services
         public const string RouteIdListPattern = "^[A-Za-z0-9-]{1,20}(,[A-Za-z0-9-]{1,20}){0,19}$";
 
         // MBTA stop IDs: "place-pktrm", "66", "door-dwnxg-101arch". Same reason.
-        public const string StopIdPattern = "^[A-Za-z0-9._-]{1,50}$";
+        private const string StopId = "[A-Za-z0-9._-]{1,50}";
+        public const string StopIdPattern = "^" + StopId + "$";
+
+        // Stops and the minutes' walk to each (GET /trips): "1308:4,place-cool:7", up to 8 stops, 0-15 minutes each.
+        private const string StopWalk = StopId + ":(1[0-5]|[0-9])";
+        public const string StopWalkListPattern = "^" + StopWalk + "(," + StopWalk + "){0,7}$";
 
         public static string[] SubwayRouteIds(this Station s) => s.RouteId.Split(',', StringSplitOptions.RemoveEmptyEntries);
 

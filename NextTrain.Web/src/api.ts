@@ -109,6 +109,31 @@ export interface ConnectionPlan {
   trains: { departure: string; arrival: string; connection: string | null }[]
 }
 
+/** A way from one place to another with live times (GET /trips): one ride, or two with a change between. */
+export interface TripOption {
+  arrival: string // at the destination, walking included
+  leaveIn: number // minutes until you set off
+  startAdvice: 'Hurry' | 'NoRush' // Hurry: leave now, the next one is a long wait
+  transferAdvice: ConnectionPlan | null // the change's, as GET /connections has it
+  walkToFirst: number // minutes
+  walkFromLast: number
+  legs: TripLeg[]
+}
+
+export interface TripLeg {
+  routeId: string
+  directionId: number
+  from: TripStop
+  to: TripStop
+  departure: string // from `from`
+  arrival: string // at `to`
+}
+
+export interface TripStop {
+  id: string
+  name: string
+}
+
 /** A commute with a transfer's connections, or undefined for one ride. */
 export const connectionsPath = (c: Commute) =>
   c.transferStopId && c.transferRouteId && c.transferDirectionId !== undefined
@@ -148,10 +173,17 @@ async function request(url: string, init?: RequestInit): Promise<Response> {
 }
 
 export async function api<T>(path: string, init?: RequestInit): Promise<T> {
-  const response = await request(`${API_URL}${path}`, {
+  return json<T>(await request(`${API_URL}${path}`, {
     ...init,
     headers: { 'Content-Type': 'application/json', 'X-User-Id': userId(), ...init?.headers },
-  })
+  }))
+}
+
+// Trips between the stops near two places (GET /trips?from=1308:4,place-cool:7&to=place-gover:3: stop ID and minutes'
+// walk). No X-User-Id, like the map token: the server gets nearby stops and walks, not who's asking, and stores nothing.
+export const getTrips = async (path: string) => json<TripOption[]>(await request(`${API_URL}${path}`))
+
+async function json<T>(response: Response): Promise<T> {
   if (!response.ok) {
     // ASP.NET problem details: { title, errors: { Field: ["message"] } }
     const problem = await response.json().catch(() => undefined)
