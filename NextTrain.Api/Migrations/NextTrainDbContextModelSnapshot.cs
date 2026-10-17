@@ -147,6 +147,10 @@ namespace NextTrain.Api.Migrations
                     b.Property<bool?>("IsAccessible")
                         .HasColumnType("bit");
 
+                    b.Property<string>("Landmark")
+                        .HasMaxLength(60)
+                        .HasColumnType("nvarchar(60)");
+
                     b.Property<double>("Latitude")
                         .HasColumnType("float");
 

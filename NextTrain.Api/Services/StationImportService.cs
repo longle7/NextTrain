@@ -22,7 +22,8 @@ namespace NextTrain.Api.Services
     ///   1. Ask MBTA for each bus route's stops, per direction (each side of the street is its own stop).
     ///   2. MergeBusStops: one row per stop, its routes and directions in BusRoutes ("1:0,741:1").
     ///   3. A subway station that buses also stop at (South Station: SL1) only gets BusRoutes; its RouteId stays
-    ///      subway-only, because older app versions read it. Every other bus stop is a row with an empty RouteId.
+    ///      subway-only, because older app versions read it. Every other bus stop is a row with an empty RouteId, and
+    ///      its landmark ("Taco Bell", from an embedded data file) so riders can tell same-named stops apart.
     ///   4. Bus stops MBTA stopped listing are deleted, unless a saved commute uses one.
     /// Running it again is always safe.
     /// </summary>
@@ -38,6 +39,10 @@ namespace NextTrain.Api.Services
         // Station ID -> average weekday boardings, from the embedded MBTA ridership snapshot.
         // ponytail: static Fall 2024 snapshot, refresh the JSON when MBTA publishes a new season.
         private static readonly Dictionary<string, int> Ridership = LoadRidership();
+
+        // Bus stop ID -> its landmark, picked from OpenStreetMap by tools/landmarks/build.mjs ("1308" -> "Taco Bell").
+        // ponytail: a snapshot, refreshed by rerunning that script; a closed store stays until then.
+        private static readonly Dictionary<string, string> Landmarks = LoadLandmarks();
 
         private readonly IMbtaClient _mbtaClient;
         private readonly NextTrainDbContext _dbContext;
@@ -77,7 +82,7 @@ namespace NextTrain.Api.Services
                 if (existingById.TryGetValue(station.MbtaStopId, out var existing))
                 {
                     Update(existing, station.Name, station.Latitude, station.Longitude, station.IsAccessible,
-                        station.RouteId, existing.BusRoutes, station.AverageWeekdayBoardings);
+                        station.RouteId, existing.BusRoutes, station.AverageWeekdayBoardings, existing.Landmark);
                 }
                 else
                 {
@@ -115,18 +120,18 @@ namespace NextTrain.Api.Services
                 {
                     // A subway station buses also stop at: record its buses, leave everything else as the subway has it.
                     Update(existing, existing.Name, existing.Latitude, existing.Longitude, existing.IsAccessible,
-                        existing.RouteId, stop.BusRoutes, existing.AverageWeekdayBoardings);
+                        existing.RouteId, stop.BusRoutes, existing.AverageWeekdayBoardings, existing.Landmark);
                 }
                 else
                 {
-                    Update(existing, stop.Name, stop.Latitude, stop.Longitude, stop.IsAccessible, "", stop.BusRoutes, null);
+                    Update(existing, stop.Name, stop.Latitude, stop.Longitude, stop.IsAccessible, "", stop.BusRoutes, null, stop.Landmark);
                 }
             }
 
             var listed = busStops.Select(s => s.MbtaStopId).ToHashSet();
             foreach (var station in existingById.Values.Where(s => s.RouteId != "" && s.BusRoutes != null && !listed.Contains(s.MbtaStopId)))
             {
-                Update(station, station.Name, station.Latitude, station.Longitude, station.IsAccessible, station.RouteId, null, station.AverageWeekdayBoardings);
+                Update(station, station.Name, station.Latitude, station.Longitude, station.IsAccessible, station.RouteId, null, station.AverageWeekdayBoardings, station.Landmark);
             }
 
             // Bus stops MBTA no longer lists. Skipped if MBTA listed under half the stops we have: more likely a bad
@@ -149,12 +154,12 @@ namespace NextTrain.Api.Services
         // Copies new values onto a stored station, and touches UpdatedAtUtc only if something changed: thousands of
         // bus stops, and most days nothing changes.
         private static void Update(Station s, string name, double latitude, double longitude, bool? isAccessible,
-            string routeId, string? busRoutes, int? boardings)
+            string routeId, string? busRoutes, int? boardings, string? landmark)
         {
             if (s.Name == name && s.Latitude == latitude && s.Longitude == longitude && s.IsAccessible == isAccessible &&
-                s.RouteId == routeId && s.BusRoutes == busRoutes && s.AverageWeekdayBoardings == boardings) return;
-            (s.Name, s.Latitude, s.Longitude, s.IsAccessible, s.RouteId, s.BusRoutes, s.AverageWeekdayBoardings) =
-                (name, latitude, longitude, isAccessible, routeId, busRoutes, boardings);
+                s.RouteId == routeId && s.BusRoutes == busRoutes && s.AverageWeekdayBoardings == boardings && s.Landmark == landmark) return;
+            (s.Name, s.Latitude, s.Longitude, s.IsAccessible, s.RouteId, s.BusRoutes, s.AverageWeekdayBoardings, s.Landmark) =
+                (name, latitude, longitude, isAccessible, routeId, busRoutes, boardings, landmark);
             s.UpdatedAtUtc = DateTime.UtcNow;
         }
 
@@ -165,6 +170,15 @@ namespace NextTrain.Api.Services
             return json.RootElement.GetProperty("averageWeekdayBoardings")
                 .EnumerateObject()
                 .ToDictionary(p => p.Name, p => p.Value.GetInt32());
+        }
+
+        private static Dictionary<string, string> LoadLandmarks()
+        {
+            using var stream = typeof(StationImportService).Assembly.GetManifestResourceStream("landmarks.json")!;
+            using var json = JsonDocument.Parse(stream);
+            return json.RootElement.GetProperty("landmarks")
+                .EnumerateObject()
+                .ToDictionary(p => p.Name, p => p.Value.GetString()!);
         }
 
         /// <summary>
@@ -203,6 +217,7 @@ namespace NextTrain.Api.Services
             IsAccessible = stop.Attributes.WheelchairBoarding switch { 1 => true, 2 => false, _ => null },
             RouteId = routeId,
             BusRoutes = busRoutes,
+            Landmark = routeId == "" ? Landmarks.GetValueOrDefault(stop.Id) : null, // a station's name is its landmark
             CreatedAtUtc = DateTime.UtcNow
         };
     }

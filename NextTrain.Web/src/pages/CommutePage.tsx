@@ -7,7 +7,7 @@ import {
 } from '../api'
 import { forget } from '../cache'
 import { stepNumbers, WEEK } from '../commutes'
-import { Card, dangerButton, LineBadge, linkButton, NotFound, primaryButton, SearchInput, secondaryButton, Status } from '../components'
+import { Card, dangerButton, LineBadge, linkButton, NotFound, primaryButton, SearchInput, secondaryButton, Status, StopName } from '../components'
 import { usePolling, useTitle } from '../usePolling'
 
 // /commutes/new (optionally ?station=place-pktrm&route=Red, e.g. from the map) and /commutes/:id
@@ -130,7 +130,9 @@ function CommuteForm({ existing, initialStopId, initialRouteId }: { existing: Co
         {station ? (
           <Card>
             <div className="flex items-center justify-between gap-2">
-              <span className="font-semibold">{station.name}</span>
+              <span>
+                <StopName station={station} className="font-semibold" />
+              </span>
               <button onClick={() => pickStation('')} className={linkButton}>
                 Change<span className="sr-only"> station</span>
               </button>
@@ -385,7 +387,7 @@ function StationPicker({ stations, routes, onPick }: { stations: Station[] | und
           <Card>
             <span className="flex items-center justify-between gap-2">
               <span>
-                <span className="font-medium">{s.name}</span>
+                <StopName station={s} />
                 {/* Both sides of a street have a stop with the same name: this says which one. */}
                 {!s.routeId && <span className="block text-sm text-neutral-500">{towardLabel(s, routes)}</span>}
               </span>

@@ -13,6 +13,7 @@ import { endLiveActivities, liveActivitiesAvailable, liveActivityDetails, showLi
 import { forgetNotificationChoice, notificationChoice, notificationsAvailable, notificationsBlocked, turnOffNotifications, turnOnNotifications } from '../notifications'
 import { groupDepartures } from '../time'
 import { useTitle } from '../usePolling'
+import { ExternalLink } from './LegalLayout'
 
 export default function SettingsPage() {
   const [deletion, setDeletion] = useState<'idle' | 'deleting' | 'done' | 'failed'>('idle')
@@ -91,7 +92,9 @@ export default function SettingsPage() {
         {/* The MassDOT developer license requires clearly acknowledging MassDOT as the provider of the data. */}
         Transit data provided by the Massachusetts Department of Transportation (MassDOT) and the MBTA. NextTrain is an
         independent app and isn't affiliated with or endorsed by MassDOT or the MBTA. MBTA is a trademark of MassDOT, used
-        here only to describe the service. Maps by Apple.
+        here only to describe the service. Maps by Apple.{' '}
+        {/* OpenStreetMap's license (ODbL) asks for this credit wherever its data shows. */}
+        Bus stop landmarks © <ExternalLink href="https://www.openstreetmap.org/copyright">OpenStreetMap contributors</ExternalLink>.
       </p>
     </>
   )

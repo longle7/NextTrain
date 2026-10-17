@@ -1,5 +1,5 @@
 import { Capacitor, registerPlugin, type PluginListenerHandle } from '@capacitor/core'
-import { api, API_URL, lineLabel, type Alert, type Commute, type Route } from './api'
+import { api, API_URL, lineLabel, stopTitle, type Alert, type Commute, type Route } from './api'
 
 // The iPhone app's Live Activity: a commute's next trains on the Lock Screen and in the Dynamic Island.
 // The native side is ios/App/App/LiveActivityPlugin.swift; on the website every call does nothing.
@@ -107,7 +107,7 @@ export function liveActivityDetails(
 ): LiveActivityDetails {
   return {
     commuteId: commute.id,
-    stationName: commute.stationName,
+    stationName: stopTitle(commute.stationName, commute.stationLandmark), // "Harvard St @ Beacon St (near Taco Bell)"
     destination: route?.directionDestinations[commute.directionId] ?? '',
     lineName: lineLabel(commute.routeId, route),
     lineColor: route?.color ?? '#7C878E',
