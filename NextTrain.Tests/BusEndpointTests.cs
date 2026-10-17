@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
+using System.Text.Json;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
@@ -28,7 +29,7 @@ public class BusEndpointTests : IDisposable
                 new Station { MbtaStopId = "place-sstat", Name = "South Station", Latitude = 42.352271, Longitude = -71.055242, RouteId = "Red", BusRoutes = "741:1" },
                 new Station { MbtaStopId = "place-alfcl", Name = "Alewife", Latitude = 42.3958, Longitude = -71.1418, RouteId = "Red" },
                 new Station { MbtaStopId = "17091", Name = "Terminal A", Latitude = 42.3657439, Longitude = -71.0174617, RouteId = "", BusRoutes = "741:1" },
-                new Station { MbtaStopId = "1", Name = "Washington St opp Ruggles St", Latitude = 42.33, Longitude = -71.08, RouteId = "", BusRoutes = "1:0" });
+                new Station { MbtaStopId = "1", Name = "Washington St opp Ruggles St", Latitude = 42.33, Longitude = -71.08, RouteId = "", BusRoutes = "1:0", Landmark = "Dunkin'" });
             db.SaveChanges();
         }
 
@@ -116,7 +117,10 @@ public class BusEndpointTests : IDisposable
         var stops = (await response.Content.ReadFromJsonAsync<List<BusStopResponse>>())!;
 
         Assert.Equal(new[] { "17091", "1" }, stops.Select(s => s.MbtaStopId)); // A-Z by name; South Station is in /stations
-        Assert.Equal(new BusStopResponse("17091", "Terminal A", 42.36574, -71.01746, "741:1", null), stops[0]);
+        Assert.Equal(new BusStopResponse("17091", "Terminal A", 42.36574, -71.01746, "741:1", null, null), stops[0]);
+        Assert.Equal("Dunkin'", stops[1].Landmark); // so riders can tell same-named stops apart
+        using var json = JsonDocument.Parse(await _client.GetStringAsync("/bus-stops"));
+        Assert.False(json.RootElement[0].TryGetProperty("landmark", out _)); // left out where there's none
         Assert.Equal("public, max-age=3600", response.Headers.CacheControl?.ToString());
     }
 

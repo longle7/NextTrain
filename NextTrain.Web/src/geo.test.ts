@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { Station } from './api'
-import { boundsOf, distanceMiles, locationRemembered, nearestStations, rememberLocation, walkLabel } from './geo'
+import { boundsOf, distanceMiles, locationRemembered, nearestStations, rememberLocation, tripStops, tripStopsParam, walkLabel, walkMinutes } from './geo'
 
 const station = (mbtaStopId: string, latitude: number, longitude: number): Station => ({
   mbtaStopId, name: mbtaStopId, latitude, longitude, routeId: 'Red', averageWeekdayBoardings: null, isAccessible: null,
@@ -72,5 +72,30 @@ describe('remembered location', () => {
     vi.stubGlobal('localStorage', { getItem: () => { throw new Error('blocked') }, setItem: () => { throw new Error('blocked') } })
     rememberLocation(true)
     expect(locationRemembered()).toBe(false)
+  })
+})
+
+describe('tripStops', () => {
+  // Bus stops 0.05 mi apart going north from Park Street, so the nth is n/20 mi away.
+  const busStop = (n: number) => ({ ...station(`bus${n}`, 42.3564 + (n / 20) * 0.01449, -71.0624), routeId: '', busRoutes: '1:0' })
+  const busStops = Array.from({ length: 12 }, (_, i) => busStop(i + 1))
+  const here = { latitude: 42.3570, longitude: -71.0624 } // just north of Park Street, nearer bus1 than the station
+
+  it('keeps the T stations even when bus stops are closer, then the nearest bus stops, 8 in all', () => {
+    const stops = tripStops([alewife, parkStreet, governmentCenter], busStops, here)
+    expect(stops.map((n) => n.station.mbtaStopId)).toEqual(['place-pktrm', 'place-gover', 'bus1', 'bus2', 'bus3', 'bus4', 'bus5', 'bus6'])
+  })
+
+  it('leaves out stops more than half a mile away', () => {
+    const stops = tripStops([alewife], busStops, here)
+    expect(stops.map((n) => n.station.mbtaStopId)).toEqual(['bus1', 'bus2', 'bus3', 'bus4', 'bus5', 'bus6', 'bus7', 'bus8'])
+    expect(tripStops([alewife], [], { latitude: 42.2, longitude: -71.3 })).toEqual([])
+  })
+
+  it('sends each stop with the minutes walkLabel would show', () => {
+    expect(walkMinutes(0)).toBe(1)
+    expect(walkMinutes(0.4)).toBe(10) // as in "0.4 mi · 10 min walk"
+    expect(walkMinutes(0.5)).toBe(13)
+    expect(tripStopsParam([{ station: parkStreet, miles: 0.02 }, { station: busStop(1), miles: 0.4 }])).toBe('place-pktrm:1,bus1:10')
   })
 })

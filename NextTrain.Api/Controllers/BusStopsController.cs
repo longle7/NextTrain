@@ -1,3 +1,4 @@
+using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Caching.Memory;
 using NextTrain.Api.Services;
@@ -27,10 +28,13 @@ namespace NextTrain.Api.Controllers
         }
     }
 
-    // BusRoutes: "route:direction" pairs, e.g. "1:0,741:1". Coordinates to 5 decimals (about a meter).
-    public record BusStopResponse(string MbtaStopId, string Name, double Latitude, double Longitude, string BusRoutes, bool? IsAccessible)
+    // BusRoutes: "route:direction" pairs, e.g. "1:0,741:1". Coordinates to 5 decimals (about a meter). Landmark: the
+    // nearest big, recognizable place ("Taco Bell"), left out where there's none.
+    public record BusStopResponse(
+        string MbtaStopId, string Name, double Latitude, double Longitude, string BusRoutes, bool? IsAccessible,
+        [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? Landmark)
     {
         public static BusStopResponse From(Station s) =>
-            new(s.MbtaStopId, s.Name, Math.Round(s.Latitude, 5), Math.Round(s.Longitude, 5), s.BusRoutes ?? "", s.IsAccessible);
+            new(s.MbtaStopId, s.Name, Math.Round(s.Latitude, 5), Math.Round(s.Longitude, 5), s.BusRoutes ?? "", s.IsAccessible, s.Landmark);
     }
 }

@@ -23,6 +23,7 @@ export interface Station {
   busRoutes?: string | null // bus routes and the directions they stop here in: "1:0,741:1"
   averageWeekdayBoardings: number | null
   isAccessible: boolean | null // step-free wheelchair access; null when MBTA has no information
+  landmark?: string | null // a bus stop's nearest big, recognizable place ("Taco Bell"); absent at stations
 }
 
 export interface Prediction {
@@ -94,6 +95,7 @@ export interface Commute {
   transferRouteId?: string
   transferDirectionId?: number
   transferMinutes?: number // to get from one platform to the other
+  stationLandmark?: string // the boarding stop's landmark, at a bus stop that has one ("Taco Bell")
 }
 
 export type CommuteInput = Pick<
@@ -105,6 +107,32 @@ export type CommuteInput = Pick<
 export interface ConnectionPlan {
   advice: 'Unknown' | 'NoRush' | 'Hurry' | 'Normal'
   trains: { departure: string; arrival: string; connection: string | null }[]
+}
+
+/** A way from one place to another with live times (GET /trips): one ride, or two with a change between. */
+export interface TripOption {
+  arrival: string // at the destination, walking included
+  leaveIn: number // minutes until you set off
+  startAdvice: 'Hurry' | 'NoRush' // Hurry: leave now, the next one is a long wait
+  transferAdvice: ConnectionPlan | null // the change's, as GET /connections has it
+  walkToFirst: number // minutes
+  walkFromLast: number
+  legs: TripLeg[]
+}
+
+export interface TripLeg {
+  routeId: string
+  directionId: number
+  from: TripStop
+  to: TripStop
+  departure: string // from `from`
+  arrival: string // at `to`
+}
+
+export interface TripStop {
+  id: string
+  name: string
+  landmark?: string // a bus stop's nearest big place ("Taco Bell")
 }
 
 /** A commute with a transfer's connections, or undefined for one ride. */
@@ -146,10 +174,17 @@ async function request(url: string, init?: RequestInit): Promise<Response> {
 }
 
 export async function api<T>(path: string, init?: RequestInit): Promise<T> {
-  const response = await request(`${API_URL}${path}`, {
+  return json<T>(await request(`${API_URL}${path}`, {
     ...init,
     headers: { 'Content-Type': 'application/json', 'X-User-Id': userId(), ...init?.headers },
-  })
+  }))
+}
+
+// Trips between the stops near two places (GET /trips?from=1308:4,place-cool:7&to=place-gover:3: stop ID and minutes'
+// walk). No X-User-Id, like the map token: the server gets nearby stops and walks, not who's asking, and stores nothing.
+export const getTrips = async (path: string) => json<TripOption[]>(await request(`${API_URL}${path}`))
+
+async function json<T>(response: Response): Promise<T> {
   if (!response.ok) {
     // ASP.NET problem details: { title, errors: { Field: ["message"] } }
     const problem = await response.json().catch(() => undefined)
@@ -222,6 +257,12 @@ export const getStations = fetchOnce<Station[]>('/stations')
 export const getBusStops = fetchOnce<Station[], Omit<Station, 'routeId' | 'averageWeekdayBoardings'>[]>('/bus-stops', (stops) =>
   stops.map((s) => ({ ...s, routeId: '', averageWeekdayBoardings: null })),
 )
+
+/**
+ * A stop's name with its landmark, for plain text (the Live Activity, the page title): "Harvard St @ Beacon St (near
+ * Taco Bell)". Both sides of a street share a name; the landmark tells riders which one.
+ */
+export const stopTitle = (name: string, landmark?: string | null) => (landmark ? `${name} (near ${landmark})` : name)
 
 /** A station's subway lines; none at a bus-only stop. */
 export const stationRouteIds = (station: Station) => (station.routeId ? station.routeId.split(',') : [])

@@ -6,8 +6,13 @@ declare namespace mapkit {
 
   const FeatureVisibility: { readonly Adaptive: string; readonly Hidden: string; readonly Visible: string }
 
-  function init(options: { authorizationCallback: (done: (token: string) => void) => void }): void
+  function init(options: { authorizationCallback: (done: (token: string) => void) => void; libraries?: string[] }): void
   function addEventListener(type: 'configuration-change' | 'error', listener: (event: { status: Status }) => void): void
+  // Libraries (https://developer.apple.com/documentation/mapkitjs/mapkit/load): load() starts loading them, then
+  // MapKit fires load or load-error with their names. (Apple's docs say load() returns a promise; 5.81's doesn't.)
+  function addEventListener(type: 'load' | 'load-error', listener: (event: { libraries: string[] }) => void): void
+  function load(libraries: string[]): void
+  const loadedLibraries: string[]
 
   class Coordinate {
     constructor(latitude: number, longitude: number)
@@ -23,6 +28,23 @@ declare namespace mapkit {
   class BoundingRegion {
     constructor(northLatitude: number, eastLongitude: number, southLatitude: number, westLongitude: number)
     toCoordinateRegion(): CoordinateRegion
+  }
+
+  // Address and place search (places.ts).
+  interface SearchAutocompleteResult {
+    displayLines: string[]
+    coordinate?: Coordinate // missing for some results; search() then finds it
+  }
+  interface Place {
+    name: string
+    formattedAddress?: string
+    coordinate: Coordinate
+  }
+  class Search {
+    static readonly RegionPriority: { Default: string; Required: string }
+    constructor(options?: { region?: CoordinateRegion; regionPriority?: string; includeQueries?: boolean; limitToCountries?: string })
+    autocomplete(query: string, callback: (error: Error | null, data: { results: SearchAutocompleteResult[] }) => void): number
+    search(query: string | SearchAutocompleteResult, callback: (error: Error | null, data: { places: Place[] }) => void): number
   }
 
   class Style {
@@ -79,6 +101,17 @@ declare namespace mapkit {
     addAnnotations(annotations: Annotation[]): Annotation[]
     removeAnnotation(annotation: Annotation): Annotation
     removeAnnotations(annotations: Annotation[]): Annotation[]
+    destroy(): void
+  }
+
+  // Street-level imagery, from the look-around library (https://developer.apple.com/documentation/mapkitjs/lookaround).
+  class LookAround {
+    constructor(parent: HTMLElement, location: Coordinate)
+    readonly element: HTMLDivElement
+    readonly readyState: 'loading' | 'complete' | 'error' | 'destroyed'
+    addEventListener(type: 'load', listener: () => void): void
+    // detail.type 'availability-error': Apple has no imagery there.
+    addEventListener(type: 'error', listener: (event: CustomEvent<{ type: string; message: string }>) => void): void
     destroy(): void
   }
 }

@@ -44,6 +44,21 @@ public class BusImportTests
     }
 
     [Fact]
+    public void MergeBusStops_GivesEachSideOfAStreetItsLandmark_AndSubwayStationsNone()
+    {
+        // Route 66's two "Harvard St @ Beacon St" stops, from the embedded landmarks.json.
+        var stops = StationImportService.MergeBusStops(new[]
+        {
+            ("66", 0, Stop("1308", "Harvard St @ Beacon St", 42.342499, -71.121845)),
+            ("66", 1, Stop("1372", "Harvard St @ Beacon St", 42.341909, -71.121143)),
+        });
+        Assert.Equal(new[] { "Taco Bell", "Trader Joe's" }, stops.Select(s => s.Landmark));
+
+        // A station's name is its landmark: none on a subway stop, even one the file knows.
+        Assert.Null(Assert.Single(StationImportService.MergeStops(new[] { ("Green-C", Stop("1308", "Harvard St @ Beacon St")) })).Landmark);
+    }
+
+    [Fact]
     public async Task Import_AddsBusStops_GivesSubwayStationsTheirBuses_AndKeepsSubwayRoutesSubwayOnly()
     {
         using var db = TestDb.CreateClean();

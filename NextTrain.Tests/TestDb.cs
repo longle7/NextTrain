@@ -41,3 +41,9 @@ public static class TestDb
         return db;
     }
 }
+
+/// <summary>A clock stopped at `now`, for the API's TimeProvider.</summary>
+public class FixedClock(DateTimeOffset now) : TimeProvider
+{
+    public override DateTimeOffset GetUtcNow() => now.ToUniversalTime();
+}

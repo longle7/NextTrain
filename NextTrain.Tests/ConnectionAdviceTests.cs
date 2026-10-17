@@ -74,4 +74,33 @@ public class ConnectionAdviceTests
 
         Assert.Equal(new[] { At(2), At(10), At(20) }, plan.Trains.Select(t => t.Departure));
     }
+
+    [Fact]
+    public void StartAdvice_NoRush_ForTheFirstTrainYouCanWalkToWithAMinuteToSpare()
+    {
+        // A 5-minute walk: the 12:03 is gone by the time you get there; for the 12:08, leave in 3 minutes.
+        Assert.Equal((Advice.NoRush, At(8)), ConnectionAdvice.StartAdvice([At(3), At(8), At(20)], TimeSpan.FromMinutes(5), Noon));
+    }
+
+    [Fact]
+    public void StartAdvice_Hurry_WhenYouMustLeaveNowAndTheNextIsALongWait()
+    {
+        Assert.Equal((Advice.Hurry, At(5.5)), ConnectionAdvice.StartAdvice([At(5.5), At(16)], TimeSpan.FromMinutes(5), Noon));
+        // Nothing predicted after it: no telling how long the wait is.
+        Assert.Equal((Advice.Hurry, At(5.5)), ConnectionAdvice.StartAdvice([At(5.5)], TimeSpan.FromMinutes(5), Noon));
+    }
+
+    [Fact]
+    public void StartAdvice_NoRush_ForTheNextOneWhenItComesSoonAfter()
+    {
+        // The 12:05:30 means leaving now; the 12:09 is only a few minutes later, so take that one.
+        Assert.Equal((Advice.NoRush, At(9)), ConnectionAdvice.StartAdvice([At(5.5), At(9)], TimeSpan.FromMinutes(5), Noon));
+    }
+
+    [Fact]
+    public void StartAdvice_Null_WhenNothingCanBeReachedOnFoot()
+    {
+        Assert.Null(ConnectionAdvice.StartAdvice([At(2)], TimeSpan.FromMinutes(5), Noon));
+        Assert.Null(ConnectionAdvice.StartAdvice([], TimeSpan.FromMinutes(5), Noon));
+    }
 }
