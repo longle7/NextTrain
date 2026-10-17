@@ -36,7 +36,7 @@ public class TripsEndpointTests : IDisposable
                 new Station { MbtaStopId = "place-sstat", Name = "South Station", Latitude = 42.3523, Longitude = -71.0552, RouteId = "Red" },
                 new Station { MbtaStopId = "43a", Name = "Tremont St @ Charles St", Latitude = 42.3520, Longitude = -71.0680, RouteId = "", BusRoutes = "43:0" },
                 // About 100 m north of Park Street: close enough to walk over and change.
-                new Station { MbtaStopId = "B1", Name = "Tremont St @ Park St", Latitude = 42.3573, Longitude = -71.0624, RouteId = "", BusRoutes = "43:0" });
+                new Station { MbtaStopId = "B1", Name = "Tremont St @ Park St", Latitude = 42.3573, Longitude = -71.0624, RouteId = "", BusRoutes = "43:0", Landmark = "AMC Boston Common" });
             db.SaveChanges();
         }
 
@@ -138,6 +138,7 @@ public class TripsEndpointTests : IDisposable
         Assert.Equal(new[] { ("43", "43a", "B1", "12:03", "12:08"), ("Red", "place-pktrm", "place-sstat", "12:14", "12:18") },
             trip.Legs.Select(l => (l.RouteId, l.From.Id, l.To.Id, Clock(l.Departure), Clock(l.Arrival))));
         Assert.Equal(("Tremont St @ Park St", Advice.NoRush, 1), (trip.Legs[0].To.Name, trip.StartAdvice, trip.LeaveIn));
+        Assert.Equal(("AMC Boston Common", null), (trip.Legs[0].To.Landmark, trip.Legs[1].From.Landmark)); // a station has none
     }
 
     [Fact]

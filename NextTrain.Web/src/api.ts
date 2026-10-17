@@ -132,6 +132,7 @@ export interface TripLeg {
 export interface TripStop {
   id: string
   name: string
+  landmark?: string // a bus stop's nearest big place ("Taco Bell")
 }
 
 /** A commute with a transfer's connections, or undefined for one ride. */

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { Link, useSearchParams } from 'react-router'
-import { findRoute, getBusStops, getRoutes, getStations, getTrips, ROUTES, type Route, type Station, type TripOption, type TripStop } from '../api'
-import { Card, LineBadge, linkButton, SearchInput, secondaryButton, Status } from '../components'
+import { findRoute, getBusStops, getRoutes, getStations, getTrips, ROUTES, type Route, type Station, type TripOption } from '../api'
+import { Card, LineBadge, linkButton, SearchInput, secondaryButton, Status, StopName } from '../components'
 import { currentPosition, locationErrorMessage, locationRemembered, tripStops, tripStopsParam } from '../geo'
 import { placeOf, preparePlaces, suggestPlaces, type Place, type Suggestion } from '../places'
 import { clock } from '../time'
@@ -211,17 +211,17 @@ function TripCard({ trip, routes, from, stops }: { trip: TripOption; routes: Rou
       </p>
       <ol className="mt-3 space-y-3">
         <Step badge={<LineBadge routeId={first.routeId} routes={routes} />}>
-          Board at <StopName stop={first.from} />, {clock(first.departure)}
+          Board at <StopName station={first.from} className="font-bold" />, {clock(first.departure)}
           <span className="block text-sm text-neutral-500">
             {[toward(first) && `to ${toward(first)}`, `${trip.walkToFirst} min walk`].filter(Boolean).join(' · ')}
           </span>
         </Step>
         {second && (
           <Step badge={<LineBadge routeId={second.routeId} routes={routes} />}>
-            Change at <StopName stop={first.to} />
+            Change at <StopName station={first.to} className="font-bold" />
             {second.from.id !== first.to.id && (
               <>
-                , walk to <StopName stop={second.from} />
+                , walk to <StopName station={second.from} className="font-bold" />
               </>
             )}
             , {clock(second.departure)}
@@ -236,7 +236,7 @@ function TripCard({ trip, routes, from, stops }: { trip: TripOption; routes: Rou
           </Step>
         )}
         <Step>
-          Get off at <StopName stop={last.to} />, {clock(last.arrival)}
+          Get off at <StopName station={last.to} className="font-bold" />, {clock(last.arrival)}
           <span className="block text-sm text-neutral-500">Then a {trip.walkFromLast} min walk</span>
         </Step>
       </ol>
@@ -261,9 +261,4 @@ function Step({ badge, children }: { badge?: ReactNode; children: ReactNode }) {
       <span className="min-w-0">{children}</span>
     </li>
   )
-}
-
-// Every stop name in a trip goes through here.
-function StopName({ stop }: { stop: TripStop }) {
-  return <strong>{stop.name}</strong>
 }

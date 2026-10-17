@@ -1,3 +1,4 @@
+using System.Text.Json.Serialization;
 using NextTrain.Core.Domain;
 using NextTrain.Core.Services;
 
@@ -173,9 +174,10 @@ namespace NextTrain.Api.Services
     // One ride: the train (or bus) to catch at From, and when it gets to To.
     public record TripLeg(string RouteId, int DirectionId, TripStop From, TripStop To, DateTimeOffset Departure, DateTimeOffset Arrival);
 
-    // A stop as a trip shows it. Every leg's stops are made here.
-    public record TripStop(string Id, string Name)
+    // A stop as a trip shows it. Every leg's stops are made here. Landmark: a bus stop's "Taco Bell", left out where
+    // there's none, so riders know which side of the street to stand on.
+    public record TripStop(string Id, string Name, [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? Landmark = null)
     {
-        public static TripStop From(Station s) => new(s.MbtaStopId, s.Name);
+        public static TripStop From(Station s) => new(s.MbtaStopId, s.Name, s.Landmark);
     }
 }
