@@ -36,16 +36,17 @@ export default function HomePage() {
   const nothingFound = !!stations.data && !!busStops.data && results.length + routeResults.length + stopResults.length + placeResults.length === 0
   useTitle(undefined)
 
-  // Apple's addresses and places, a moment after typing stops (places.ts; MapKit loads on the first one).
+  // Apple's addresses and places, a moment after typing stops (places.ts; MapKit loads on the first one). Not for a
+  // route number, whose places aren't shown.
   useEffect(() => {
-    if (!query.trim()) return
+    if (!query.trim() || exactRoute) return
     let cancelled = false
     const timer = setTimeout(() => void suggestPlaces(query, []).then((found) => !cancelled && setPlaces(found)), 250)
     return () => {
       cancelled = true
       clearTimeout(timer)
     }
-  }, [query])
+  }, [query, exactRoute])
 
   // A place opens the trip planner to there, with where it is, so the planner needn't look it up again.
   const planTo = async (suggestion: Suggestion) => {
@@ -337,11 +338,13 @@ function Nearby({ stations, busStops, routes, alerts }: {
 
 // The closest station's next train each way (or bus stop's next buses), right on Home: the answer when you're already there.
 const NEARBY_ROWS = 6
+// A glance, refreshed every 20 seconds (the countdown ticks in between); the station's own page refreshes every 10.
+const NEARBY_REFRESH_MS = 20_000
 
 function NextTrains({ station, routes, alerts }: { station: Station; routes: Route[] | undefined; alerts: Alert[] | undefined }) {
   const now = useNow()
   const path = `/stations/${encodeURIComponent(station.mbtaStopId)}/predictions?schedules=true`
-  const predictions = usePolling(() => api<Prediction[]>(path), path, 10_000)
+  const predictions = usePolling(() => api<Prediction[]>(path), path, NEARBY_REFRESH_MS)
   const groups = predictions.data ? groupDepartures(predictions.data, now, 1) : []
   const alert = alerts && majorAlert(alertsFor(alerts, { routeIds: stationRouteIds(station), stopId: station.mbtaStopId }))
 
@@ -597,9 +600,9 @@ function CommuteDepartures({ commute, route, routes, alert, liveActivity }: {
   const now = useNow()
   const path = `${commutePredictionsPath(commute)}&schedules=true`
   const predictions = usePolling(() => api<Prediction[]>(path), path, 10_000)
-  // With a change of line: which connection the next trains make, and whether to hurry.
+  // With a change of line: which connection the next trains make, and whether to hurry. Advice in minutes, so every 20 seconds.
   const connections = connectionsPath(commute)
-  const plan = usePolling(() => (connections ? api<ConnectionPlan>(connections) : Promise.resolve(undefined)), connections ?? 'no-transfer', 10_000, {
+  const plan = usePolling(() => (connections ? api<ConnectionPlan>(connections) : Promise.resolve(undefined)), connections ?? 'no-transfer', 20_000, {
     remember: false, // old advice misleads
   })
   const advice = plan.data && commute.transferRouteId && commute.transferStationName

@@ -1,5 +1,7 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Memory;
 using NextTrain.Api.Services;
+using NextTrain.Core.Domain;
 using NextTrain.Core.Services;
 
 namespace NextTrain.Tests;
@@ -68,7 +70,7 @@ public class StationImportTests
 
         await new StationImportService(mbta, db).ImportStationsAsync();
 
-        var lookup = new StationLookupService(db);
+        var lookup = new StationLookupService(db, new MemoryCache(new MemoryCacheOptions()));
         Assert.Equal(2, (await lookup.GetAllStationsAsync("Red")).Count);
         Assert.Equal("place-pktrm", Assert.Single(await lookup.GetAllStationsAsync("Green-B")).MbtaStopId);
         Assert.Empty(await lookup.GetAllStationsAsync("Green")); // no partial matches
@@ -82,5 +84,24 @@ public class StationImportTests
         var alewife = await lookup.GetByMbtaStopIdAsync("place-alfcl");
         Assert.Equal("Alewife Renamed", alewife!.Name);
         Assert.NotNull(alewife.UpdatedAtUtc);
+    }
+
+    [Fact]
+    public async Task Lookup_KeepsAStationFoundByItsId_ButNotUnknownOrDifferentlyCasedIds()
+    {
+        using var db = TestDb.CreateClean();
+        db.Stations.Add(new Station { MbtaStopId = "place-alfcl", Name = "Alewife", RouteId = "Red" });
+        db.SaveChanges();
+        var cache = new MemoryCache(new MemoryCacheOptions());
+        var lookup = new StationLookupService(db, cache);
+
+        await lookup.GetByMbtaStopIdAsync("place-alfcl");
+        await lookup.GetByMbtaStopIdAsync("PLACE-ALFCL"); // found where the database ignores case, but not kept
+        await lookup.GetByMbtaStopIdAsync("place-nowhere");
+        await db.Stations.ExecuteDeleteAsync();
+
+        Assert.Equal("Alewife", (await lookup.GetByMbtaStopIdAsync("place-alfcl"))?.Name); // from memory
+        Assert.Null(await lookup.GetByMbtaStopIdAsync("PLACE-ALFCL"));
+        Assert.Equal(1, cache.Count);
     }
 }

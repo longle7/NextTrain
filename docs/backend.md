@@ -61,11 +61,16 @@ All caching happens in `MbtaClient.GetCachedAsync`, keyed by MBTA URL.
 
 | Data | Cached for | Why |
 |---|---|---|
-| Predictions, vehicles | 10 seconds | Matches the app's refresh rate |
+| Predictions | 15 seconds | Every other 10-second poll is answered from memory |
+| Vehicles | 10 seconds | Trains move on every map refresh |
 | Alerts | 1 minute | They change over minutes |
+| Schedules | 10 minutes | The window starts at the last 10-minute mark; departures already gone are dropped |
 | Routes, line order, shapes | 1 hour | Almost never change |
 
-Failures are never cached, so the next request tries MBTA again.
+Requests that arrive while a fetch is running share it. A failure is kept for 5 seconds, so during an MBTA outage
+each URL is tried at most every 5 seconds. Stations looked up by ID (`StationLookupService`) stay in memory for
+10 minutes. `/routes`, `/stations` and `/bus-stops` send `Cache-Control` for an hour, and CORS preflights are cached
+for 10 minutes (`Access-Control-Max-Age`).
 
 ## Errors
 

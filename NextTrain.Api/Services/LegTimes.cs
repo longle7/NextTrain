@@ -4,8 +4,8 @@ namespace NextTrain.Api.Services
 {
     /// <summary>
     /// Live times for one ride: the next trains (or buses) on a route one way from a stop, and when they reach a later
-    /// stop. Shared by transfer advice (/connections) and trip planning (/trips). Each MBTA call is cached 10 seconds
-    /// and shared with everyone asking the same thing.
+    /// stop. Shared by transfer advice (/connections) and trip planning (/trips). Each MBTA call is a stop and a route,
+    /// cached 15 seconds and shared with everyone asking about that stop and route.
     /// </summary>
     public static class LegTimes
     {
@@ -24,8 +24,11 @@ namespace NextTrain.Api.Services
             var departures = (await DeparturesAsync(mbta, stopId, routeId, directionId, after)).Take(count).ToList();
             if (departures.Count == 0) return [];
 
-            var arrivals = (await mbta.GetTripPredictionsAsync(toStopId, string.Join(",", departures.Select(p => p.Relationships.Trip.Data.Id))))
-                .Where(p => (p.Attributes.ArrivalTime ?? p.Attributes.DepartureTime) is not null)
+            // The route's predictions at the later stop, for these trains: the same call as anyone boarding there, so it's
+            // usually cached, where asking for these trips by ID would be a call of their own.
+            var trips = departures.Select(p => p.Relationships.Trip.Data.Id).ToHashSet();
+            var arrivals = (await mbta.GetPredictionsAsync(toStopId, routeId))
+                .Where(p => trips.Contains(p.Relationships.Trip.Data.Id) && (p.Attributes.ArrivalTime ?? p.Attributes.DepartureTime) is not null)
                 .GroupBy(p => p.Relationships.Trip.Data.Id)
                 .ToDictionary(g => g.Key, g => g.Min(p => (p.Attributes.ArrivalTime ?? p.Attributes.DepartureTime)!.Value));
             return [.. departures

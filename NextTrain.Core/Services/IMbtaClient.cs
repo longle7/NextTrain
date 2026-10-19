@@ -13,9 +13,6 @@
         // MBTA only populates the stop's route relationship when filtering by one route.
         Task<IReadOnlyList<MbtaStopDto>> GetStopDtosAsync(string routeId, int? directionId = null);
 
-        // Gets the given trips' predictions at a station (comma-separated trip IDs): when those trains get there.
-        Task<IReadOnlyList<MbtaPredictionDto>> GetTripPredictionsAsync(string mbtaStopId, string tripIds);
-
         // Gets predictions at a station (parent IDs like "place-pktrm" include all platforms)
         // for a comma-separated list of routes (e.g., "Orange,Red").
         Task<IReadOnlyList<MbtaPredictionDto>> GetPredictionsAsync(string mbtaStopId, string routeIds);

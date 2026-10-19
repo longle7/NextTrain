@@ -38,12 +38,14 @@ export const preparePlaces = () => void searcher().catch(() => {})
 /**
  * Matches for what's typed: stations and stops by name first (from the lists the app already has), then Apple's
  * addresses and places. Typed text goes to Apple; the station match stays on the device. Without MapKit (offline, or
- * no map on this server) stations still match.
+ * no map on this server) stations still match. Apple only from 3 characters: fewer match too much to be useful, and
+ * each ask counts against Apple's daily MapKit allowance.
  */
 export async function suggestPlaces(query: string, stops: Station[]): Promise<Suggestion[]> {
   const stations = searchStations(stops, query, 3).map((s): Suggestion => ({
     name: s.name, detail: s.routeId ? 'Station' : 'Bus stop', place: { name: s.name, latitude: s.latitude, longitude: s.longitude },
   }))
+  if (query.trim().length < 3) return stations
   const apple = await searcher()
     .then((s) => new Promise<mapkit.SearchAutocompleteResult[]>((resolve, reject) =>
       s.autocomplete(query, (error, data) => (error ? reject(error) : resolve(data.results)))))

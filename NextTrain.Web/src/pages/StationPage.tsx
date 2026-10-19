@@ -11,6 +11,7 @@ import { agoLabel, clock, departureLabel, groupDepartures, noTrainsMessage, seco
 import { failure, useNow, usePolling, useTitle } from '../usePolling'
 
 const REFRESH_MS = 10_000
+const ACCESS_REFRESH_MS = 5 * 60_000
 
 export default function StationPage() {
   const { stopId = '' } = useParams()
@@ -23,15 +24,17 @@ export default function StationPage() {
   const predictionsPath = `${stationPath}/predictions?bus=true&schedules=true`
   const predictions = usePolling(() => api<Prediction[]>(predictionsPath), predictionsPath, REFRESH_MS)
 
-  const alerts = usePolling(getAlerts, 'alerts', ALERTS_REFRESH_MS)
+  const busOnly = station.data?.routeId === ''
+  // The subway's alerts, shared with Home and Lines; a bus-only stop's are all in its routes' bus alerts below.
+  const alerts = usePolling(busOnly ? () => Promise.resolve<Alert[]>([]) : getAlerts, busOnly ? 'alerts|bus-stop' : 'alerts', ALERTS_REFRESH_MS, { remember: !busOnly })
   // Bus alerts only come per route (too many to load them all): this stop's routes.
   const busIds = station.data ? busRouteIds(station.data) : []
   const busAlertsPath = `/alerts?routes=${encodeURIComponent(busIds.join(','))}`
   const busAlerts = usePolling(() => (busIds.length ? api<Alert[]>(busAlertsPath) : Promise.resolve([])), busAlertsPath, ALERTS_REFRESH_MS)
-  const busOnly = station.data?.routeId === ''
-  // Elevator and escalator outages (MBTA leaves them out of the usual alerts). A bus stop has none.
+  // Elevator and escalator outages (MBTA leaves them out of the usual alerts), every 5 minutes: they last hours. A bus
+  // stop has none.
   const accessPath = `${stationPath}/access`
-  const access = usePolling(() => (station.data?.routeId ? api<Alert[]>(accessPath) : Promise.resolve<Alert[]>([])), `${accessPath}|${!!station.data?.routeId}`, ALERTS_REFRESH_MS)
+  const access = usePolling(() => (station.data?.routeId ? api<Alert[]>(accessPath) : Promise.resolve<Alert[]>([])), `${accessPath}|${!!station.data?.routeId}`, ACCESS_REFRESH_MS)
   const notFound = station.error instanceof ApiError && station.error.status === 404
   useTitle(notFound ? 'Stop not found' : station.data && stopTitle(station.data.name, station.data.landmark))
 

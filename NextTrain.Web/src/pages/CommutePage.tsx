@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react'
+import { useMemo, useState, type ReactNode } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router'
 import {
   api, ApiError, busDirections, busRouteIds, findRoute, getBusStops, getRoutes, getStations, isSubwayRoute, lineLabel, ROUTES, routeName,
@@ -32,8 +32,12 @@ function CommuteForm({ existing, initialStopId, initialRouteId }: { existing: Co
   const routes = usePolling(getRoutes, ROUTES)
   const stations = usePolling(getStations, 'stations')
   const busStops = usePolling(getBusStops, '/bus-stops', undefined, { remember: false }) // ~1 MB: the browser caches it
-  // Stations first, so a search for "Harvard" offers the station before the bus stops near it.
-  const allStops = stations.data && busStops.data ? [...stations.data, ...busStops.data] : stations.data
+  // Stations first, so a search for "Harvard" offers the station before the bus stops near it. Joined once, not on
+  // every keystroke: there are ~7,000.
+  const allStops = useMemo(
+    () => (stations.data && busStops.data ? [...stations.data, ...busStops.data] : stations.data),
+    [stations.data, busStops.data],
+  )
 
   const [stopId, setStopId] = useState(existing?.mbtaStopId ?? initialStopId)
   const [routeId, setRouteId] = useState(existing?.routeId ?? initialRouteId) // used only if the stop serves it
@@ -54,7 +58,8 @@ function CommuteForm({ existing, initialStopId, initialRouteId }: { existing: Co
   const [confirmed, setConfirmed] = useState(!!existing?.transferStopId)
 
   const station = allStops?.find((s) => s.mbtaStopId === stopId)
-  const stationRoutes = station ? [...stationRouteIds(station), ...busRouteIds(station)] : []
+  // The same list until the stop changes, so the change options below aren't worked out again on every render.
+  const stationRoutes = useMemo(() => (station ? [...stationRouteIds(station), ...busRouteIds(station)] : []), [station])
   // A single-line station needs no choice.
   const chosenRouteId = stationRoutes.includes(routeId) ? routeId : stationRoutes.length === 1 ? stationRoutes[0] : undefined
   const route = findRoute(routes.data, chosenRouteId ?? '')
@@ -72,9 +77,13 @@ function CommuteForm({ existing, initialStopId, initialRouteId }: { existing: Co
   const nameOf = (id: string) => routeName(id, findRoute(routes.data, id))
   const badgeOf = (id: string) => lineLabel(id, findRoute(routes.data, id)) // "22", "OL"
   const boardingAt = ride.data?.findIndex((s) => s.mbtaStopId === station?.mbtaStopId) ?? -1
-  const options = changes && ride.data && boardingAt >= 0 && allStops && chosenRouteId
-    ? changeOptions(ride.data.slice(boardingAt + 1), allStops, chosenRouteId)
-    : undefined
+  // Every later stop against every stop: worked out when the ride changes, not on each keystroke of "Which bus or line?".
+  const options = useMemo(
+    () => (changes && ride.data && boardingAt >= 0 && allStops && chosenRouteId
+      ? changeOptions(ride.data.slice(boardingAt + 1), allStops, chosenRouteId)
+      : undefined),
+    [changes, ride.data, boardingAt, allStops, chosenRouteId],
+  )
   // The T first, then buses by number; typing "22" (or "orange") narrows them.
   const reachable = [...(options?.keys() ?? [])]
     .sort((a, b) => Number(!isSubwayRoute(a)) - Number(!isSubwayRoute(b)) || badgeOf(a).localeCompare(badgeOf(b), undefined, { numeric: true }))

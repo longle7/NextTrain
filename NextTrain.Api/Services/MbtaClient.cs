@@ -15,8 +15,13 @@ namespace NextTrain.Api.Services
     /// </summary>
     public class MbtaClient : IMbtaClient
     {
-        // Matches the web app's 10s refresh. Needs an MBTA API key under load (keyless limit is 20 requests/minute).
-        public static readonly TimeSpan PredictionCacheDuration = TimeSpan.FromSeconds(10);
+        // A bit longer than the app's 10 s refresh, so one rider's every other poll is answered from memory: half the
+        // MBTA calls, for times at most 15 s old (the app counts down from them on its own). Needs an MBTA API key under
+        // load (keyless limit is 20 requests/minute).
+        public static readonly TimeSpan PredictionCacheDuration = TimeSpan.FromSeconds(15);
+
+        // Matches the map's 10 s refresh, so trains move on every one.
+        public static readonly TimeSpan VehicleCacheDuration = TimeSpan.FromSeconds(10);
 
         // Route names and colors almost never change.
         public static readonly TimeSpan RouteCacheDuration = TimeSpan.FromHours(1);
@@ -24,8 +29,12 @@ namespace NextTrain.Api.Services
         // Alerts change within minutes, not seconds.
         public static readonly TimeSpan AlertCacheDuration = TimeSpan.FromMinutes(1);
 
-        // The timetable doesn't change; the window moves on each minute (see ScheduleWindow).
-        public static readonly TimeSpan ScheduleCacheDuration = TimeSpan.FromMinutes(1);
+        // The timetable doesn't change; the window moves on every 10 minutes (see ScheduleWindow).
+        public static readonly TimeSpan ScheduleCacheDuration = TimeSpan.FromMinutes(10);
+
+        // A failed call is remembered this long: during an MBTA outage each URL is tried every few seconds, not on
+        // every request (each of which would try three times).
+        public static readonly TimeSpan FailureCacheDuration = TimeSpan.FromSeconds(5);
 
         private static readonly TimeZoneInfo Boston = TimeZoneInfo.FindSystemTimeZoneById("America/New_York");
 
@@ -51,40 +60,36 @@ namespace NextTrain.Api.Services
 
         public async Task<IReadOnlyList<MbtaStopDto>> GetStopDtosAsync(string routeId, int? directionId = null)
         {
-            // Returned in line order. Cached like routes: stations almost never change.
+            // Returned in line order. Cached like routes: stations almost never change. Only the fields we read.
             var payload = await GetCachedAsync<MbtaResponse<MbtaStopDto>>(
                 $"https://api-v3.mbta.com/stops?filter[route]={Uri.EscapeDataString(routeId)}" +
-                (directionId is null ? "" : $"&filter[direction_id]={directionId}"), RouteCacheDuration);
+                (directionId is null ? "" : $"&filter[direction_id]={directionId}") +
+                "&fields[stop]=name,latitude,longitude,wheelchair_boarding", RouteCacheDuration);
 
             return payload.Data;
         }
 
         public async Task<IReadOnlyList<MbtaPredictionDto>> GetPredictionsAsync(string mbtaStopId, string routeIds)
         {
+            // Only the times and direction (MBTA sends about a dozen fields); the route and trip come regardless.
             var url = $"https://api-v3.mbta.com/predictions?filter[stop]={Uri.EscapeDataString(mbtaStopId)}" +
-                      $"&filter[route]={Uri.EscapeDataString(routeIds)}";
+                      $"&filter[route]={Uri.EscapeDataString(routeIds)}&fields[prediction]=arrival_time,departure_time,direction_id";
 
             var payload = await GetCachedAsync<MbtaResponse<MbtaPredictionDto>>(url, PredictionCacheDuration);
             return payload.Data;
         }
 
-        public async Task<IReadOnlyList<MbtaPredictionDto>> GetTripPredictionsAsync(string mbtaStopId, string tripIds)
-        {
-            var payload = await GetCachedAsync<MbtaResponse<MbtaPredictionDto>>(
-                $"https://api-v3.mbta.com/predictions?filter[stop]={Uri.EscapeDataString(mbtaStopId)}&filter[trip]={Uri.EscapeDataString(tripIds)}",
-                PredictionCacheDuration);
-            return payload.Data;
-        }
-
         public async Task<IReadOnlyList<MbtaScheduledDeparture>> GetSchedulesAsync(string mbtaStopId, string routeIds)
         {
-            var (date, from, to) = ScheduleWindow(DateTimeOffset.UtcNow);
+            var now = DateTimeOffset.UtcNow;
+            var (date, from, to) = ScheduleWindow(now);
             var payload = await GetCachedAsync<MbtaResponse<MbtaPredictionDto>>(
                 $"https://api-v3.mbta.com/schedules?filter[stop]={Uri.EscapeDataString(mbtaStopId)}" +
                 $"&filter[route]={Uri.EscapeDataString(routeIds)}&filter[date]={date}&filter[min_time]={from}&filter[max_time]={to}" +
                 "&sort=departure_time&fields[schedule]=departure_time,direction_id,pickup_type", ScheduleCacheDuration);
             return payload.Data
-                .Where(s => s.Attributes.DepartureTime is not null && s.Attributes.PickupType != 1)
+                // The window starts up to 10 minutes ago: only trips still to come.
+                .Where(s => s.Attributes.DepartureTime >= now && s.Attributes.PickupType != 1)
                 .Select(s => new MbtaScheduledDeparture(s.Relationships.Route.Data.Id, s.Attributes.DirectionId, s.Attributes.DepartureTime!.Value))
                 .ToList();
         }
@@ -92,13 +97,13 @@ namespace NextTrain.Api.Services
         /// <summary>
         /// The next three hours of MBTA's timetable, in its terms: a service date and times on it. A service day runs
         /// from about 3 AM to the last trips after midnight, which MBTA writes past 24:00 (1:30 AM is "25:30" on the day
-        /// before).
+        /// before). It starts on the last 10 minutes, so everyone asking within those 10 minutes shares one cached answer.
         /// </summary>
         public static (string Date, string From, string To) ScheduleWindow(DateTimeOffset now)
         {
             var local = TimeZoneInfo.ConvertTime(now, Boston);
             var afterMidnight = local.Hour < 3;
-            var minutes = (afterMidnight ? 24 * 60 : 0) + local.Hour * 60 + local.Minute;
+            var minutes = (afterMidnight ? 24 * 60 : 0) + local.Hour * 60 + local.Minute / 10 * 10;
             static string Time(int m) => $"{m / 60:00}:{m % 60:00}";
             return ((afterMidnight ? local.AddDays(-1) : local).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture), Time(minutes), Time(minutes + 180));
         }
@@ -122,7 +127,7 @@ namespace NextTrain.Api.Services
             var payload = await GetCachedAsync<MbtaIncludeResponseDto>(
                 $"https://api-v3.mbta.com/vehicles?{filter}&include=stop&fields[stop]=name" +
                 "&fields[vehicle]=latitude,longitude,bearing,direction_id,current_status,carriages,occupancy_status,occupancy_percentage",
-                PredictionCacheDuration);
+                VehicleCacheDuration);
 
             // Vehicles report a platform stop; its parent_station is the station the app knows.
             var stops = payload.Included.ToDictionary(s => s.Id);
@@ -237,14 +242,22 @@ namespace NextTrain.Api.Services
         }
 
         // The cache, keyed by URL: the first request fetches from MBTA; everyone else within `duration` gets the same
-        // answer from memory. So 1,000 people watching Park Street cost MBTA one request every 10 seconds.
-        // Failures are not cached: GetOrCreateAsync stores nothing when the fetch throws (GetFromJsonAsync throws on
-        // a non-success status), so the next request retries.
-        private async Task<T> GetCachedAsync<T>(string url, TimeSpan duration) where T : new() =>
-            await _cache.GetOrCreateAsync(url, async entry =>
-            {
-                entry.AbsoluteExpirationRelativeToNow = duration;
-                return await _httpClient.GetFromJsonAsync<T>(url, JsonOptions) ?? new T();
-            }) ?? new T();
+        // answer from memory. So 1,000 people watching Park Street cost MBTA one request every 15 seconds.
+        // The fetch itself is cached, not just its answer, so requests arriving while it's under way (a trip's legs,
+        // asked for all at once) wait for it rather than each asking MBTA. A failed fetch (GetFromJsonAsync throws on a
+        // non-success status; a timeout cancels) is kept for FailureCacheDuration, then the next request retries.
+        private Task<T> GetCachedAsync<T>(string url, TimeSpan duration) where T : new()
+        {
+            if (_cache.TryGetValue(url, out Task<T>? cached)) return cached!;
+            var fetch = FetchAsync<T>(url);
+            _cache.Set(url, fetch, duration);
+            // Synchronously, so it's done before anyone awaiting the fetch resumes.
+            fetch.ContinueWith(failed => _cache.Set(url, failed, FailureCacheDuration),
+                TaskContinuationOptions.NotOnRanToCompletion | TaskContinuationOptions.ExecuteSynchronously);
+            return fetch;
+        }
+
+        private async Task<T> FetchAsync<T>(string url) where T : new() =>
+            await _httpClient.GetFromJsonAsync<T>(url, JsonOptions) ?? new T();
     }
 }

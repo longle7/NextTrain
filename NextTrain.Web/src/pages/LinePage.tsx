@@ -1,7 +1,7 @@
 import { Link, useParams, useSearchParams } from 'react-router'
 import { alertsFor } from '../alerts'
 import {
-  ALERTS_REFRESH_MS, api, findRoute, getAlerts, getRoutes, isSubwayRoute, ROUTES, routeName, UPCOMING_REFRESH_MS, upcomingAlertsPath,
+  ALERTS_REFRESH_MS, api, BUS_VEHICLES_REFRESH_MS, findRoute, getAlerts, getRoutes, isSubwayRoute, ROUTES, routeName, UPCOMING_REFRESH_MS, upcomingAlertsPath,
   type Alert, type Station, type Vehicle,
 } from '../api'
 import { AlertBanner, Card, LineBadge, LoadingText, NotFound, secondaryButton, Status, StationLink } from '../components'
@@ -43,7 +43,7 @@ export default function LinePage() {
   const vehicles = usePolling(
     () => (lineOrder ? api<Vehicle[]>(vehiclesPath) : Promise.resolve<Vehicle[]>([])),
     `${vehiclesPath}|${lineOrder}`,
-    lineOrder ? 10_000 : undefined,
+    lineOrder ? (bus ? BUS_VEHICLES_REFRESH_MS : 10_000) : undefined,
     { remember: false }, // old train positions mislead
   )
   const notFound = !!routes.data && !route // e.g. /lines/Purple: no such line or route

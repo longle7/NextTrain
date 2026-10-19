@@ -178,10 +178,19 @@ async function request(url: string, init?: RequestInit): Promise<Response> {
   }
 }
 
+// The API is on another origin (the website and the iPhone app both), so a request with a custom header or a JSON
+// Content-Type is sent twice: a CORS preflight, then the request. Only your commutes and /me need to know who's
+// asking, and only a body needs a type, so every other GET (train times, alerts, every poll) goes out once.
+const OWN_DATA = /^\/(commutes|me)(\/|\?|$)/
+
 export async function api<T>(path: string, init?: RequestInit): Promise<T> {
   return json<T>(await request(`${API_URL}${path}`, {
     ...init,
-    headers: { 'Content-Type': 'application/json', 'X-User-Id': userId(), ...init?.headers },
+    headers: {
+      ...(init?.body !== undefined ? { 'Content-Type': 'application/json' } : {}),
+      ...(OWN_DATA.test(path) ? { 'X-User-Id': userId() } : {}),
+      ...init?.headers,
+    },
   }))
 }
 
@@ -244,8 +253,10 @@ function fetchOnce<T, R = T>(path: string, shape?: (data: R) => T): () => Promis
     }))
 }
 
-// Alerts change within minutes; pages poll them once a minute.
-export const ALERTS_REFRESH_MS = 60_000
+// Alerts change over minutes (the API keeps them for one); pages poll them every two.
+export const ALERTS_REFRESH_MS = 2 * 60_000
+// Where the buses are: every 20 seconds (trains every 10). A bus covers a block or so in that time.
+export const BUS_VEHICLES_REFRESH_MS = 20_000
 export const getAlerts = () => api<Alert[]>('/alerts')
 // Planned changes (the next two weeks): the subway's, or some bus routes'. They change slowly.
 export const UPCOMING_REFRESH_MS = 10 * 60_000
@@ -255,6 +266,8 @@ export const upcomingAlertsPath = (busRoutes?: string) => (busRoutes ? `/alerts/
 export const ROUTES = '/routes?type=all'
 export const getRoutes = fetchOnce<Route[]>(ROUTES)
 export const getStations = fetchOnce<Station[]>('/stations')
+// The subway's tracks, for the map: once a session, however often the Map tab is opened.
+export const getSubwayShapes = fetchOnce<RouteShape[]>('/routes/shapes')
 
 // Every bus stop that isn't a subway station (~6,600), as Stations, so search and "Near you" treat them alike.
 // Searched on the device: your location never leaves the phone. Too big to keep in the offline cache (usePolling's

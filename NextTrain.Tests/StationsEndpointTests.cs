@@ -43,11 +43,13 @@ public class StationsEndpointTests : IDisposable
     }
 
     [Fact]
-    public async Task GetAll_FiltersByRoute_SortedByName()
+    public async Task GetAll_FiltersByRoute_SortedByName_AndPhonesMayKeepItAnHour()
     {
-        var stations = await _client.GetFromJsonAsync<List<Station>>("/stations?route=Red");
+        var response = await _client.GetAsync("/stations?route=Red");
+        var stations = await response.Content.ReadFromJsonAsync<List<Station>>();
 
         Assert.Equal(new[] { "Alewife", "Park Street" }, stations!.Select(s => s.Name));
+        Assert.Equal("public, max-age=3600", response.Headers.CacheControl?.ToString());
     }
 
     [Theory]
@@ -132,7 +134,7 @@ public class StationsEndpointTests : IDisposable
     }
 
     [Theory]
-    [InlineData("2026-10-10T08:27:00Z", "2026-10-10", "04:27", "07:27")] // 4:27 AM: today, before the first trains
+    [InlineData("2026-10-10T08:27:00Z", "2026-10-10", "04:20", "07:20")] // 4:27 AM: today, before the first trains, from 4:20
     [InlineData("2026-10-10T05:30:00Z", "2026-10-09", "25:30", "28:30")] // 1:30 AM: still Friday's service day
     [InlineData("2026-10-11T03:30:00Z", "2026-10-10", "23:30", "26:30")] // 11:30 PM: the window runs past midnight
     [InlineData("2026-01-15T12:00:00Z", "2026-01-15", "07:00", "10:00")] // winter: Eastern Standard Time
@@ -149,6 +151,7 @@ public class StationsEndpointTests : IDisposable
         var response = await _client.GetAsync("/stations/place-pktrm/predictions");
 
         Assert.Equal(HttpStatusCode.ServiceUnavailable, response.StatusCode);
+        Assert.True(response.Headers.CacheControl?.NoStore); // never kept, even where the answer would be
     }
 
     [Fact]

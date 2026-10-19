@@ -128,6 +128,7 @@ public class DelayNotifierTests
         _mbta.Alerts.Add(Alert("red", "SUSPENSION", 7));
 
         await notifier.RunOnceAsync(MondayMorning.AddHours(2));
+        await notifier.RunOnceAsync(new DateTimeOffset(2026, 10, 12, 23, 45, 0, TimeSpan.FromHours(-4))); // half an hour on is past midnight
 
         Assert.Empty(_apns.Sent);
     }
@@ -146,7 +147,7 @@ public class DelayNotifierTests
     }
 
     [Fact]
-    public async Task SentNotifications_AreForgottenAfterAWeek()
+    public async Task SentNotifications_AreForgottenAfterAWeek_OnTheHour()
     {
         var notifier = Seed();
         using (var db = TestDb.Open())
@@ -157,7 +158,9 @@ public class DelayNotifierTests
             db.SaveChanges();
         }
 
-        await notifier.RunOnceAsync(MondayMorning);
+        await notifier.RunOnceAsync(MondayMorning); // 7:45
+        using (var before = TestDb.Open()) Assert.Equal(2, before.SentNotifications.Count());
+        await notifier.RunOnceAsync(MondayMorning.AddMinutes(15)); // 8:00
 
         using var after = TestDb.Open();
         Assert.Equal(["recent"], after.SentNotifications.Select(n => n.AlertId));

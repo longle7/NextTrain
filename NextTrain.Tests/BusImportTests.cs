@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Memory;
 using NextTrain.Api.Services;
 using NextTrain.Core.Domain;
 using NextTrain.Core.Services;
@@ -72,7 +73,7 @@ public class BusImportTests
         Assert.Equal(("", "1:0,1:1"), (nubian.RouteId, nubian.BusRoutes));
         Assert.Null((await db.Stations.SingleAsync(s => s.MbtaStopId == "place-alfcl")).BusRoutes);
 
-        var lookup = new StationLookupService(db);
+        var lookup = new StationLookupService(db, new MemoryCache(new MemoryCacheOptions()));
         Assert.Equal(new[] { "Alewife", "South Station" }, (await lookup.GetAllStationsAsync()).Select(s => s.Name)); // subway only
         Assert.Equal(new[] { "1", "63", "place-nubn" }, (await lookup.GetAllStationsAsync("1")).Select(s => s.MbtaStopId).Order());
         Assert.Equal(new[] { "1", "place-nubn" }, (await lookup.GetAllStationsAsync("1", 0)).Select(s => s.MbtaStopId).Order());

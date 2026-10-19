@@ -60,10 +60,18 @@ export const liveActivitiesAvailable = async () =>
 /** Starts or updates this commute's Live Activity, and ends any other: one commute shows at a time. */
 export const showLiveActivity = (details: LiveActivityDetails) => (native ? quietly(plugin.show(details)) : Promise.resolve(false))
 
-/** Ends the Live Activity, and tells our API to stop updating it. */
+// Whether our API may hold a Live Activity's push token, so ending asks it to stop only then (Home ends them on every
+// visit with no commute on). True at launch, since one sent before the app closed may still be live: at most one
+// DELETE per launch. In memory, not on the device, so no new stored key.
+let tokenSent = true
+
+/** Ends the Live Activity, and tells our API to stop updating it, if it was. */
 export const endLiveActivities = () => {
   if (!native) return Promise.resolve(false)
-  api('/me/live-activity', { method: 'DELETE' }).catch(() => {})
+  if (tokenSent) {
+    tokenSent = false
+    api('/me/live-activity', { method: 'DELETE' }).catch(() => {}) // missed: the API stops at the window's end anyway
+  }
   return quietly(plugin.endAll())
 }
 
@@ -75,14 +83,23 @@ export function sendLiveActivityTokens() {
   if (!native) return
   plugin
     .addListener('pushToken', (activity) => {
+      tokenSent = true
       api('/me/live-activity', { method: 'PUT', body: JSON.stringify(activity) }).catch(() => {}) // the next token retries
     })
     .catch(() => {})
 }
 
+// What the widget was last given, so Home (on every visit) only redraws it, and has it refetch times, after a change.
+let widgetSent: string | undefined
+
 /** Gives the Home Screen widget your commutes (none after Delete my data). The widget fetches their times itself. */
-export const updateWidget = (commutes: WidgetCommute[]) =>
-  native ? quietly(plugin.setWidgetCommutes({ apiUrl: API_URL, commutes })) : Promise.resolve(false)
+export async function updateWidget(commutes: WidgetCommute[]) {
+  const json = JSON.stringify(commutes)
+  if (!native || json === widgetSent) return false
+  const sent = await quietly(plugin.setWidgetCommutes({ apiUrl: API_URL, commutes }))
+  if (sent) widgetSent = json
+  return sent
+}
 
 /** Each commute as the widget shows it: the same line badge, colors, and destination as the Live Activity. */
 export function widgetCommutes(commutes: Commute[], routes: Route[]): WidgetCommute[] {

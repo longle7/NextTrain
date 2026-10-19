@@ -46,7 +46,61 @@ public class MbtaClientTests
         Assert.Equal("Red", p.Relationships.Route.Data.Id);
 
         Assert.Equal(2, handler.Urls.Count);
-        Assert.Contains("filter[stop]=place-pktrm&filter[route]=Green-B,Red", Uri.UnescapeDataString(handler.Urls[0]));
+        Assert.Contains("filter[stop]=place-pktrm&filter[route]=Green-B,Red&fields[prediction]=arrival_time,departure_time,direction_id",
+            Uri.UnescapeDataString(handler.Urls[0]));
+    }
+
+    // Answers once told to: with `json`, or a 503 when it's null. Counts requests.
+    private class GateHandler(string? json) : HttpMessageHandler
+    {
+        public TaskCompletionSource Open { get; } = new();
+        public int Requests;
+
+        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct)
+        {
+            Interlocked.Increment(ref Requests);
+            await Open.Task;
+            return json is null
+                ? new HttpResponseMessage(HttpStatusCode.ServiceUnavailable)
+                : new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(json, Encoding.UTF8, "application/json") };
+        }
+    }
+
+    // The cache's clock, moved by hand.
+    private class TestClock : Microsoft.Extensions.Internal.ISystemClock
+    {
+        public DateTimeOffset UtcNow { get; set; } = DateTimeOffset.UtcNow;
+    }
+
+    [Fact]
+    public async Task RequestsWhileAFetchIsUnderWay_ShareIt()
+    {
+        var handler = new GateHandler("{\"data\":[]}");
+        var client = new MbtaClient(new HttpClient(handler), new ConfigurationBuilder().Build(), new MemoryCache(new MemoryCacheOptions()));
+
+        var asked = Enumerable.Range(0, 3).Select(_ => client.GetPredictionsAsync("place-pktrm", "Red")).ToList();
+        handler.Open.SetResult();
+        await Task.WhenAll(asked);
+
+        Assert.Equal(1, handler.Requests);
+    }
+
+    [Fact]
+    public async Task AFailure_IsKeptFiveSeconds_NotAsLongAsAnAnswer()
+    {
+        var handler = new GateHandler(null);
+        handler.Open.SetResult();
+        var clock = new TestClock();
+        var client = new MbtaClient(new HttpClient(handler), new ConfigurationBuilder().Build(),
+            new MemoryCache(new MemoryCacheOptions { Clock = clock }));
+
+        await Assert.ThrowsAsync<HttpRequestException>(client.GetSubwayRoutesAsync);
+        await Assert.ThrowsAsync<HttpRequestException>(client.GetSubwayRoutesAsync); // MBTA isn't asked again at once
+        Assert.Equal(1, handler.Requests);
+
+        clock.UtcNow += MbtaClient.FailureCacheDuration + TimeSpan.FromSeconds(1); // well short of the routes' hour
+        await Assert.ThrowsAsync<HttpRequestException>(client.GetSubwayRoutesAsync);
+        Assert.Equal(2, handler.Requests);
     }
 
     [Fact]
