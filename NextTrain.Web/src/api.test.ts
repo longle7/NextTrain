@@ -70,6 +70,34 @@ describe('getTrips', () => {
   })
 })
 
+describe('api: headers (each one makes the browser send a CORS preflight first)', () => {
+  afterEach(() => vi.unstubAllGlobals())
+
+  const headersFor = async (path: string, init?: RequestInit) => {
+    const fetch = vi.fn().mockResolvedValue(new Response('[]', { status: 200 }))
+    vi.stubGlobal('fetch', fetch)
+    await api(path, init)
+    return fetch.mock.calls[0][1].headers as Record<string, string>
+  }
+
+  it.each(['/stations/place-pktrm/predictions?schedules=true', '/alerts', '/vehicles', '/connections?from=1', '/mechanics', '/commutesx'])(
+    'sends a plain GET for %s: no user ID, no Content-Type',
+    async (path) => {
+      expect(await headersFor(path)).toEqual({})
+    },
+  )
+
+  it.each(['/commutes', '/commutes/5', '/me', '/me/live-activity', '/me?x=1'])('sends the user ID to %s, which owns data', async (path) => {
+    expect(Object.keys(await headersFor(path))).toEqual(['X-User-Id'])
+  })
+
+  it('types a JSON body', async () => {
+    const headers = await headersFor('/commutes', { method: 'POST', body: '{}' })
+    expect(headers['Content-Type']).toBe('application/json')
+    expect(headers['X-User-Id']).toBeTruthy()
+  })
+})
+
 describe('api: requests that get no answer', () => {
   afterEach(() => vi.unstubAllGlobals())
 

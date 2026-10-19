@@ -44,7 +44,10 @@ export function remember(key: string, data: unknown) {
   if (data === undefined) return
   try {
     localStorage.setItem(PREFIX + key, JSON.stringify({ data, at: Date.now() }))
-    const entries = cacheKeys().map((k): [string, number] => [k, (JSON.parse(localStorage.getItem(k) ?? '{}') as Entry<unknown>).at ?? 0])
+    // Reading every entry's age means parsing all of them (the station and route lists too): only when over the limit.
+    const keys = cacheKeys()
+    if (keys.length <= MAX_ENTRIES) return
+    const entries = keys.map((k): [string, number] => [k, (JSON.parse(localStorage.getItem(k) ?? '{}') as Entry<unknown>).at ?? 0])
     for (const k of keysToEvict(entries)) localStorage.removeItem(k)
   } catch {
     // storage full or blocked: the app still works, just without last-known data offline

@@ -1,7 +1,7 @@
 import { useEffect, useEffectEvent, useMemo, useRef, useState, type ReactNode } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router'
 import {
-  api, busGroups, busRouteIds, findRoute, getRoutes, getStations, ROUTES, searchRoutes, stationRouteIds, stopTitle, towardLabel,
+  api, BUS_VEHICLES_REFRESH_MS, busGroups, busRouteIds, findRoute, getRoutes, getStations, getSubwayShapes, ROUTES, searchRoutes, stationRouteIds, stopTitle, towardLabel,
   type Car, type Prediction, type Route, type RouteShape, type Station, type Vehicle,
 } from '../api'
 import { directionOf, showsDirection, type Direction } from '../direction'
@@ -93,12 +93,12 @@ export default function MapPage() {
   const stationsPath = busMode ? `/stations${bus}` : 'stations'
   const stations = usePolling(busMode ? () => (busRoute ? api<Station[]>(stationsPath) : Promise.resolve([])) : getStations, stationsPath)
   const shapesPath = busMode ? `/routes/${encodeURIComponent(busRoute ?? '')}/shapes` : '/routes/shapes'
-  const shapes = usePolling(() => (busMode && !busRoute ? Promise.resolve([]) : api<RouteShape[]>(shapesPath)), busMode ? shapesPath : 'shapes')
+  const shapes = usePolling(busMode ? () => (busRoute ? api<RouteShape[]>(shapesPath) : Promise.resolve([])) : getSubwayShapes, busMode ? shapesPath : 'shapes')
   const vehiclesPath = `/vehicles${bus}`
   const vehicles = usePolling(
     () => (busMode && !busRoute ? Promise.resolve([]) : api<Vehicle[]>(vehiclesPath)),
     busMode ? vehiclesPath : 'vehicles',
-    REFRESH_MS,
+    busMode ? BUS_VEHICLES_REFRESH_MS : REFRESH_MS,
     { remember: false }, // old positions mislead
   )
   const busRouteInfo = busRoute ? findRoute(routes.data, busRoute) : undefined

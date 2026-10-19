@@ -37,7 +37,7 @@ export function secondsAgo(date: Date, now: Date): number {
   return Math.max(0, Math.round((now.getTime() - date.getTime()) / 1000))
 }
 
-/** Live times refresh every 10 seconds; older than this, something is wrong (offline, MBTA down). */
+/** Live times refresh every 10 seconds (20 in Home's Near you); older than this, something is wrong (offline, MBTA down). */
 export const STALE_AFTER_SECONDS = 30
 
 /** "45s ago" or "3 min ago". */
