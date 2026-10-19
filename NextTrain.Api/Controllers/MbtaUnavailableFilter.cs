@@ -22,6 +22,9 @@ namespace NextTrain.Api.Controllers
         private readonly ProblemDetailsFactory _problems;
         private readonly ILogger<MbtaUnavailableFilter> _log;
 
+        // When the next warning may be logged (Environment.TickCount64). Unsynchronized: two at once may both log, harmlessly.
+        private static long _nextWarningAt;
+
         // ProblemDetailsFactory builds the same JSON error shape ASP.NET uses everywhere (type, title, status, traceId).
         public MbtaUnavailableFilter(ProblemDetailsFactory problems, ILogger<MbtaUnavailableFilter> log)
         {
@@ -33,10 +36,18 @@ namespace NextTrain.Api.Controllers
         {
             if (context.Exception is not (HttpRequestException or TaskCanceledException)) return;
 
-            // One line, no stack trace: during an MBTA outage every request lands here, and the production logs
-            // (warnings and up, capped per day) should show the outage, not fill up with it.
-            _log.LogWarning("MBTA unavailable for {Path}: {Error}", context.HttpContext.Request.Path, context.Exception.Message);
+            // One line, no stack trace, at most once a minute: during an MBTA outage every request lands here, and the
+            // production logs (warnings and up, capped per day) should show the outage, not fill up with it.
+            var now = Environment.TickCount64;
+            if (now >= _nextWarningAt)
+            {
+                _nextWarningAt = now + 60_000;
+                _log.LogWarning("MBTA unavailable for {Path}: {Error} (more this minute go unlogged)",
+                    context.HttpContext.Request.Path, context.Exception.Message);
+            }
 
+            // Never kept by a browser: a route list's own Cache-Control (an hour) mustn't make its 503 stick.
+            context.HttpContext.Response.Headers.CacheControl = "no-store";
             var problem = _problems.CreateProblemDetails(
                 context.HttpContext,
                 StatusCodes.Status503ServiceUnavailable,

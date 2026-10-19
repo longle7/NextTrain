@@ -1,13 +1,14 @@
 name: Uptime
 
-# Every 15 minutes: is NextTrain up for riders? Checks that the API is healthy (its database answers), that it answers
-# with routes (so MBTA is reachable through it), and that the website loads. A failed check fails the run, and GitHub
-# emails the repository owner about failed scheduled runs. Free for public repositories.
+# Every 15 minutes during service hours: is NextTrain up for riders? Checks that the API is healthy (its database
+# answers), that it answers with routes (so MBTA is reachable through it), and that the website loads. A failed check
+# fails the run, and GitHub emails the repository owner about failed scheduled runs. Free for public repositories.
 # GitHub may start a scheduled run a few minutes late, and pauses schedules after 60 days without commits.
+# Not 06:00-09:59 UTC (about 2-6 AM Eastern, 1-5 AM in winter): the API may sleep then, and a check would only wake it.
 
 on:
   schedule:
-    - cron: '*/15 * * * *'
+    - cron: '*/15 0-5,10-23 * * *'
   workflow_dispatch:
 
 permissions: {}

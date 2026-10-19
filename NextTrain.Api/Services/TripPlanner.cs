@@ -30,7 +30,8 @@ namespace NextTrain.Api.Services
         private const int ChangeWaitMinutes = 5;
 
         // How many trips get live times, and how many are shown.
-        // ponytail: up to 6 x 4 MBTA calls per request (cached 10 s, shared by URL); fewer candidates if the key's quota gets tight.
+        // ponytail: up to 6 x 4 MBTA calls per request (cached 15 s, shared by URL, and by IP limited to 10 requests a minute);
+        // fewer candidates if the key's quota gets tight.
         private const int Candidates = 6, Options = 3;
 
         public static async Task<List<TripOption>> PlanAsync(

@@ -14,10 +14,11 @@ namespace NextTrain.Api.Controllers
     public class ConnectionsController : ControllerBase
     {
         // GET /connections?from=place-pktrm&route=Green-D&direction=1&via=place-gover&toRoute=Blue&toDirection=1&minutes=3
-        // Three MBTA calls, each cached 10 seconds and shared with everyone asking the same thing: the first line's next
-        // trains at the boarding stop, when those trains reach the transfer station, and the second line's departures
-        // from there. `off`: where the first ride is left when the change is a short walk to `via` (off the 66 at
-        // Tremont St opp Roxbury Crossing, onto the 22 at Columbus Ave @ Malcolm X Blvd); `via` itself without it.
+        // Three MBTA calls, each a stop and a route, cached 15 seconds and shared with everyone asking the same thing:
+        // the first line's next trains at the boarding stop, its predictions where those trains reach the transfer
+        // station, and the second line's departures from there. `off`: where the first ride is left when the change is
+        // a short walk to `via` (off the 66 at Tremont St opp Roxbury Crossing, onto the 22 at Columbus Ave @ Malcolm X
+        // Blvd); `via` itself without it.
         [HttpGet]
         public async Task<ConnectionPlan> Get(
             [FromServices] IMbtaClient mbta,

@@ -9,9 +9,11 @@ namespace NextTrain.Api.Controllers
     /// Subway lines and bus routes: names, colors, direction labels, and the streets or track each one runs on.
     /// Thin layers over IMbtaClient, which fetches from MBTA and caches for an hour.
     /// If MBTA is down, MbtaUnavailableFilter turns the error into a 503.
+    /// Phones may keep every answer here for an hour, like /bus-stops: routes and their shapes change at most daily.
     /// </summary>
     [ApiController]
     [Route("routes")]
+    [ResponseCache(Duration = 3600)]
     public class RoutesController : ControllerBase
     {
         // GET /routes: the subway lines (what older app versions expect). ?type=bus: bus routes; ?type=all: both,

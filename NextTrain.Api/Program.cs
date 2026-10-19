@@ -20,8 +20,8 @@ using Polly;
 //
 // How one request flows, e.g. GET /stations/place-pktrm/predictions:
 //   forwarded IP -> compression -> error handling -> CORS -> rate limit -> routing -> StationsController.GetPredictions
-//     -> StationLookupService reads the station from SQL Server
-//     -> IMbtaClient returns the cached departures, or fetches them from MBTA and caches them for 10 seconds
+//     -> StationLookupService reads the station from memory, or SQL Server once every 10 minutes
+//     -> IMbtaClient returns the cached departures, or fetches them from MBTA and caches them for 15 seconds
 //   -> the controller's return value is serialized to JSON. If MBTA fails, MbtaUnavailableFilter answers 503.
 // See docs/backend.md for the bigger picture.
 
@@ -68,10 +68,13 @@ builder.Services.AddControllers(options => options.Filters.Add<MbtaUnavailableFi
 
 // The iPhone app runs the web app from capacitor://localhost and calls this API cross-origin.
 // Allowed origins come from configuration (Cors:AllowedOrigins); the web app itself is same-origin and needs none.
+// The app's requests carry X-User-Id, so the browser asks first (a preflight OPTIONS). Without a max age it remembers
+// the answer 5 seconds, less than the 10-second polls: every request would be two. 10 minutes is Safari's longest.
 builder.Services.AddCors(options => options.AddDefaultPolicy(policy => policy
     .WithOrigins(builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? [])
     .AllowAnyHeader()
-    .AllowAnyMethod()));
+    .AllowAnyMethod()
+    .SetPreflightMaxAge(TimeSpan.FromMinutes(10))));
 
 // GET /health for the host's health probe: 200 when the database is reachable, 503 when not.
 builder.Services.AddHealthChecks().AddCheck<DatabaseHealthCheck>("database");
@@ -118,6 +121,11 @@ builder.Services.AddRateLimiter(options =>
                 _ => new FixedWindowRateLimiterOptions { PermitLimit = perMinute, Window = TimeSpan.FromMinutes(1) }));
     // Error reports (POST /client-errors): a few per device is plenty, and a flood would only bury real ones.
     options.AddPolicy("client-errors", context => RateLimitPartition.GetFixedWindowLimiter(
+        context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+        _ => new FixedWindowRateLimiterOptions { PermitLimit = 10, Window = TimeSpan.FromMinutes(1) }));
+    // Trip plans (GET /trips): each costs up to 24 MBTA calls, and the app asks twice a minute. Without this, one
+    // script could use up the MBTA key's 1,000 calls a minute that every rider shares.
+    options.AddPolicy("trips", context => RateLimitPartition.GetFixedWindowLimiter(
         context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
         _ => new FixedWindowRateLimiterOptions { PermitLimit = 10, Window = TimeSpan.FromMinutes(1) }));
     options.OnRejected = async (rejected, _) =>

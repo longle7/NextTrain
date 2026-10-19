@@ -53,10 +53,18 @@ namespace NextTrain.Api.Services
             var db = scope.ServiceProvider.GetRequiredService<NextTrainDbContext>();
             var mbta = scope.ServiceProvider.GetRequiredService<IMbtaClient>();
 
-            foreach (var activity in await db.LiveActivityTokens.ToListAsync(cancellationToken))
+            var activities = await db.LiveActivityTokens.ToListAsync(cancellationToken);
+            if (activities.Count == 0) return;
+
+            // Their commutes, all in one query.
+            var commuteIds = activities.Select(a => a.CommuteId).ToList();
+            var commutes = await db.UserCommutes.AsNoTracking().Include(c => c.Station)
+                .Where(c => commuteIds.Contains(c.Id))
+                .ToDictionaryAsync(c => c.Id, cancellationToken);
+
+            foreach (var activity in activities)
             {
-                var commute = await db.UserCommutes.Include(c => c.Station)
-                    .FirstOrDefaultAsync(c => c.Id == activity.CommuteId && c.UserId == activity.UserId, cancellationToken);
+                var commute = commutes.GetValueOrDefault(activity.CommuteId) is { } found && found.UserId == activity.UserId ? found : null;
                 var endsAt = new DateTimeOffset(activity.EndsAtUtc, TimeSpan.Zero);
                 var end = commute is null || endsAt <= now;
                 var content = end ? new LiveActivityContent([], null, endsAt, endsAt) : await ContentAsync(mbta, commute!, endsAt, now);

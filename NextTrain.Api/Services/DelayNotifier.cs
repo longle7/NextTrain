@@ -67,10 +67,14 @@ namespace NextTrain.Api.Services
             var db = scope.ServiceProvider.GetRequiredService<NextTrainDbContext>();
             var mbta = scope.ServiceProvider.GetRequiredService<IMbtaClient>();
 
-            // ponytail: reads every notified rider's commutes each minute; filter by day and time in SQL past ~10,000 riders.
+            // Only today's commutes that are on or start within Lead are read (IsDue, in SQL); IsDue then has the last word.
+            // SQL's time type stops short of 24:00, so a start "within half an hour" of 11:45 PM is any start that day.
             var bostonNow = TimeZoneInfo.ConvertTime(now, Boston).DateTime;
-            var due = (await db.UserCommutes
+            var (day, time) = (bostonNow.DayOfWeek.ToString()[..3], bostonNow.TimeOfDay);
+            var latestStart = time + Lead < TimeSpan.FromDays(1) ? time + Lead : TimeSpan.FromDays(1) - TimeSpan.FromTicks(1);
+            var due = (await db.UserCommutes.AsNoTracking()
                     .Include(c => c.Station)
+                    .Where(c => c.ActiveDays.Contains(day) && c.WindowStartLocal <= latestStart && c.WindowEndLocal > time)
                     .Where(c => db.PushDevices.Any(d => d.UserId == c.UserId))
                     .ToListAsync(cancellationToken))
                 .Where(c => IsDue(c, bostonNow))
@@ -106,8 +110,12 @@ namespace NextTrain.Api.Services
                 }
             }
 
-            var forgetBefore = now.UtcDateTime - KeepSent;
-            await db.SentNotifications.Where(n => n.SentAtUtc < forgetBefore).ExecuteDeleteAsync(cancellationToken);
+            // Forgetting old ones can wait: once an hour, not every minute.
+            if (now.Minute == 0)
+            {
+                var forgetBefore = now.UtcDateTime - KeepSent;
+                await db.SentNotifications.Where(n => n.SentAtUtc < forgetBefore).ExecuteDeleteAsync(cancellationToken);
+            }
         }
 
         /// <summary>Whether a commute is on, or starts within <see cref="Lead"/>, on one of its days. Times are Boston's.</summary>

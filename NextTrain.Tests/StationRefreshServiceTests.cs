@@ -1,7 +1,10 @@
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
+using NextTrain.Api.Data;
 using NextTrain.Api.Services;
+using NextTrain.Core.Domain;
 using NextTrain.Core.Services;
 
 namespace NextTrain.Tests;
@@ -21,10 +24,19 @@ public class StationRefreshServiceTests
         }
     }
 
-    private static (StationRefreshService Service, FakeImporter Importer) Create(string refreshHours, bool fail = false)
+    // With an empty Stations table, unless `withStations`.
+    private static (StationRefreshService Service, FakeImporter Importer) Create(string refreshHours, bool fail = false, bool withStations = false)
     {
+        using (var db = TestDb.CreateClean())
+        {
+            if (withStations) db.Stations.Add(new Station { MbtaStopId = "place-alfcl", Name = "Alewife", RouteId = "Red" });
+            db.SaveChanges();
+        }
         var importer = new FakeImporter { Fail = fail };
-        var services = new ServiceCollection().AddScoped<IStationImportService>(_ => importer).BuildServiceProvider();
+        var services = new ServiceCollection()
+            .AddScoped<IStationImportService>(_ => importer)
+            .AddDbContext<NextTrainDbContext>(options => options.UseSqlServer(TestDb.ConnectionString))
+            .BuildServiceProvider();
         var configuration = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?> { ["Stations:RefreshHours"] = refreshHours })
             .Build();
@@ -38,7 +50,7 @@ public class StationRefreshServiceTests
     }
 
     [Fact]
-    public async Task ImportsOnStartup()
+    public async Task ImportsOnStartup_WhenTheDatabaseIsEmpty()
     {
         var (service, importer) = Create("24");
 
@@ -47,6 +59,19 @@ public class StationRefreshServiceTests
         await service.StopAsync(CancellationToken.None);
 
         Assert.Equal(1, importer.Imports);
+    }
+
+    [Fact]
+    public async Task WithStationsAlready_WaitsBeforeImporting()
+    {
+        // A restart (a deploy, a visitor waking it overnight) shouldn't import at once: the database has stations.
+        var (service, importer) = Create("24", withStations: true);
+
+        await service.StartAsync(CancellationToken.None);
+        await Task.Delay(500);
+        await service.StopAsync(CancellationToken.None);
+
+        Assert.Equal(0, importer.Imports);
     }
 
     [Fact]

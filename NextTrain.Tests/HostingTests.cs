@@ -60,5 +60,7 @@ public class HostingTests : IDisposable
         var response = await client.SendAsync(preflight);
 
         Assert.Equal(allowed, response.Headers.TryGetValues("Access-Control-Allow-Origin", out var values) && values.Single() == origin);
+        // The browser keeps the answer 10 minutes (Safari's longest) instead of 5 seconds, less than a poll apart.
+        if (allowed) Assert.Equal("600", response.Headers.GetValues("Access-Control-Max-Age").Single());
     }
 }

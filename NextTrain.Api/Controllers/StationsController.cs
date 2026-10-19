@@ -28,8 +28,10 @@ namespace NextTrain.Api.Controllers
 
         // GET /stations?route=Red&sort=line, or a bus route's stops one way: /stations?route=1&direction=0&sort=line
         // No route: every subway station (what older app versions expect; bus stops are at /bus-stops).
-        // Stations come from the database sorted A-Z; the other sorts reorder that list.
+        // Stations come from the database sorted A-Z; the other sorts reorder that list. Phones may keep the list for an
+        // hour, like /bus-stops: stations change at most daily.
         [HttpGet]
+        [ResponseCache(Duration = 3600)]
         public async Task<ActionResult<IEnumerable<Station>>> GetAll(
             [FromServices] IMbtaClient mbta,
             [FromQuery, RegularExpression(StationRoutes.RouteIdPattern)] string? route,
@@ -88,7 +90,7 @@ namespace NextTrain.Api.Controllers
         // GET /stations/place-pktrm/predictions?route=Red&direction=0, ?bus=true to include its buses, and
         // ?schedules=true to fill in timetable times where nothing is predicted.
         // Flow: find the station in our database (404 if unknown) -> ask MBTA for its upcoming trains (cached
-        // 10 seconds) -> reshape, filter, and sort them for the app.
+        // 15 seconds) -> reshape, filter, and sort them for the app.
         [HttpGet("{mbtaStopId}/predictions")]
         public async Task<ActionResult<IEnumerable<PredictionResponse>>> GetPredictions(
             string mbtaStopId,

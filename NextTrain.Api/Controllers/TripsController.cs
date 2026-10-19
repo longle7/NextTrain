@@ -1,5 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using NextTrain.Api.Services;
 using NextTrain.Core.Services;
 
@@ -14,8 +15,9 @@ namespace NextTrain.Api.Controllers
     public class TripsController : ControllerBase
     {
         // GET /trips?from=1308:4,place-cool:7&to=place-gover:3: stop ID and minutes' walk, up to 8 stops each end.
-        // Up to 3 trips, earliest arrival first; none when nothing has live times.
+        // Up to 3 trips, earliest arrival first; none when nothing has live times. 10 a minute per IP (see Program.cs).
         [HttpGet]
+        [EnableRateLimiting("trips")]
         public Task<List<TripOption>> Get(
             [FromServices] IMbtaClient mbta,
             [FromServices] StationLookupService lookup,

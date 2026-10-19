@@ -67,6 +67,19 @@ public class RateLimitTests : IDisposable
     }
 
     [Fact]
+    public async Task Trips_HaveASmallerLimitOfTheirOwn()
+    {
+        using var factory = TestDb.Api(); // the usual 600 a minute for everything else
+        using var client = factory.CreateClient();
+        const string trip = "/trips?from=nowhere-a:1&to=nowhere-b:1"; // unknown stops: no MBTA calls
+        for (var i = 0; i < 10; i++)
+            Assert.Equal(HttpStatusCode.OK, (await client.SendAsync(Get(trip, "203.0.113.4"))).StatusCode);
+
+        Assert.Equal(HttpStatusCode.TooManyRequests, (await client.SendAsync(Get(trip, "203.0.113.4"))).StatusCode);
+        Assert.NotEqual(HttpStatusCode.TooManyRequests, (await client.SendAsync(Get("/nope", "203.0.113.4"))).StatusCode);
+    }
+
+    [Fact]
     public async Task Health_IsNeverLimited()
     {
         using var client = _factory.CreateClient();
